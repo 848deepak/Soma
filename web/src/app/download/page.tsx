@@ -85,7 +85,7 @@ export default function DownloadPage() {
               No Google Play account required.
             </p>
             <a
-              href="/soma.apk"
+              href="https://github.com/848deepak/Soma-/releases/latest/download/soma.apk"
               download
               className="block w-full bg-rose text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-mauve transition-all hover:-translate-y-0.5"
               style={{ boxShadow: "0 8px 24px -8px rgba(221,167,165,0.5)" }}

@@ -94,7 +94,7 @@ export default function HomePage() {
 
             <div className="flex flex-col sm:flex-row gap-4 pt-2 justify-center lg:justify-start">
               <a
-                href="/soma.apk"
+                href="https://github.com/848deepak/Soma-/releases/latest/download/soma.apk"
                 download
                 className="bg-rose text-white px-8 py-4 rounded-full font-medium shadow-xl hover:bg-mauve transition-all hover:-translate-y-1 text-center"
                 style={{ boxShadow: "0 20px 40px -12px rgba(221,167,165,0.4)" }}

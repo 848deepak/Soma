@@ -37,7 +37,7 @@ export function Navbar() {
 
         <div className="flex items-center gap-3">
           <a
-            href="/soma.apk"
+            href="https://github.com/848deepak/Soma-/releases/latest/download/soma.apk"
             download
             className="hidden md:inline-block bg-charcoal text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-rose hover:shadow-lg transition-all duration-300"
           >
@@ -77,7 +77,7 @@ export function Navbar() {
             </Link>
           ))}
           <a
-            href="/soma.apk"
+            href="https://github.com/848deepak/Soma-/releases/latest/download/soma.apk"
             download
             onClick={() => setOpen(false)}
             className="mt-3 block w-full text-center bg-charcoal text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-rose transition-all duration-300"
