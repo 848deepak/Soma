@@ -43,31 +43,38 @@ const faqs = [
 
 export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-cream pt-28 pb-24 px-6">
+    <div className="page-shell">
       <div
-        className="aurora-blob bg-peach w-[350px] h-[350px] top-0 right-0"
+        className="aurora-blob bg-peach w-[320px] h-[320px] -top-8 -right-8"
+        aria-hidden
+      />
+      <div
+        className="aurora-blob bg-rose w-[240px] h-[240px] bottom-16 -left-8"
         aria-hidden
       />
 
-      <div className="mx-auto max-w-3xl relative z-10">
-        <div className="mb-16 text-center">
-          <h1 className="text-5xl font-serif font-medium text-charcoal mb-4">
+      <div className="page-container max-w-4xl">
+        <div className="mb-10 text-center md:mb-14">
+          <h1 className="mb-3 text-4xl font-serif font-medium text-charcoal md:mb-4 md:text-5xl">
             Support
           </h1>
-          <div className="w-16 h-1 bg-rose/40 mx-auto rounded-full mb-6" />
-          <p className="text-lg text-charcoal/60 font-light">
+          <div className="mx-auto mb-5 h-1 w-16 rounded-full bg-rose/40 md:mb-6" />
+          <p className="text-base font-light text-charcoal/62 md:text-lg">
             We&apos;re here to help. Find answers below or send us a message.
           </p>
         </div>
 
         {/* FAQ */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-serif font-medium text-charcoal mb-6">
+        <section className="mb-8 md:mb-12">
+          <h2 className="mb-4 text-xl font-serif font-medium text-charcoal md:mb-6 md:text-2xl">
             Frequently Asked Questions
           </h2>
           <div className="space-y-3">
             {faqs.map((faq) => (
-              <div key={faq.q} className="glass-card rounded-[1.5rem] p-6">
+              <div
+                key={faq.q}
+                className="glass-panel rounded-[1.2rem] p-5 md:rounded-[1.5rem] md:p-6"
+              >
                 <h3 className="text-sm font-semibold text-charcoal mb-2">
                   {faq.q}
                 </h3>
@@ -80,19 +87,11 @@ export default function SupportPage() {
         </section>
 
         {/* Contact */}
-        <section
-          className="rounded-[2rem] p-8 lg:p-10"
-          style={{
-            background: "rgba(255,255,255,0.65)",
-            backdropFilter: "blur(16px)",
-            border: "1px solid rgba(255,255,255,0.5)",
-            boxShadow: "0 4px 30px rgba(0,0,0,0.03)",
-          }}
-        >
-          <h2 className="text-2xl font-serif font-medium text-charcoal mb-2">
+        <section className="glass-panel rounded-[1.5rem] p-5 sm:p-6 lg:rounded-[2rem] lg:p-10">
+          <h2 className="mb-2 text-xl font-serif font-medium text-charcoal md:text-2xl">
             Contact Us
           </h2>
-          <p className="text-sm text-charcoal/50 mb-8">
+          <p className="mb-6 text-sm text-charcoal/52 md:mb-8">
             Not finding what you need? We usually respond within one business
             day.
           </p>
@@ -113,7 +112,7 @@ export default function SupportPage() {
                 name="name"
                 type="text"
                 placeholder="Your name"
-                className="w-full rounded-xl border border-charcoal/10 bg-white/70 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+                className="w-full rounded-xl border border-charcoal/10 bg-white/75 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 transition focus:outline-none focus:ring-2 focus:ring-rose/30"
               />
             </div>
             <div>
@@ -128,7 +127,7 @@ export default function SupportPage() {
                 name="email"
                 type="email"
                 placeholder="your@email.com"
-                className="w-full rounded-xl border border-charcoal/10 bg-white/70 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+                className="w-full rounded-xl border border-charcoal/10 bg-white/75 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 transition focus:outline-none focus:ring-2 focus:ring-rose/30"
               />
             </div>
             <div>
@@ -143,12 +142,12 @@ export default function SupportPage() {
                 name="body"
                 rows={5}
                 placeholder="Describe your question or issue..."
-                className="w-full rounded-xl border border-charcoal/10 bg-white/70 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 focus:outline-none focus:ring-2 focus:ring-rose/30 transition"
+                className="w-full rounded-xl border border-charcoal/10 bg-white/75 px-4 py-3 text-sm text-charcoal placeholder-charcoal/30 transition focus:outline-none focus:ring-2 focus:ring-rose/30"
               />
             </div>
             <button
               type="submit"
-              className="w-full rounded-full bg-charcoal text-white py-3 text-sm font-medium hover:bg-rose transition-all duration-300"
+              className="w-full rounded-full bg-charcoal py-3 text-sm font-medium text-white transition-all duration-300 hover:bg-rose"
             >
               Send Message
             </button>

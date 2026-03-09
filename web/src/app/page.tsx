@@ -130,53 +130,146 @@ export default function HomePage() {
 
           {/* Right — phone mockup */}
           <div className="relative flex justify-center lg:justify-end order-1 lg:order-2">
-            <div className="relative w-[300px] h-[620px] bg-cream rounded-[46px] border-[7px] border-white ring-1 ring-charcoal/5 shadow-2xl z-10 animate-float overflow-hidden">
-              <div className="w-full h-full bg-gradient-to-b from-white to-cream flex flex-col px-6 pt-12 pb-8 relative">
-                {/* Inner glow blobs */}
-                <div className="absolute top-16 left-8 w-36 h-36 bg-peach/30 rounded-full blur-2xl" />
-                <div className="absolute bottom-16 right-8 w-36 h-36 bg-rose/20 rounded-full blur-2xl" />
+            <div className="relative w-[340px] h-[700px] sm:w-[370px] sm:h-[760px] bg-cream rounded-[50px] border-[8px] border-white ring-1 ring-charcoal/5 shadow-2xl z-10 animate-float overflow-hidden">
+              <div className="w-full h-full bg-gradient-to-b from-white to-cream flex flex-col px-7 pt-14 pb-6 relative">
+                <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[110px] opacity-30 bg-[radial-gradient(circle,#FFDAB9_0%,transparent_70%)]" />
+                <div className="absolute bottom-1/3 left-0 w-56 h-56 rounded-full blur-[95px] opacity-25 bg-[radial-gradient(circle,#DDA7A5_0%,transparent_70%)]" />
 
-                {/* Top bar */}
-                <div className="flex justify-between items-center w-full mb-8 relative z-10">
-                  <span className="font-serif text-charcoal text-lg font-bold">
-                    Good Morning
-                  </span>
-                  <div className="w-8 h-8 bg-peach/40 rounded-full" />
-                </div>
-
-                {/* Cycle ring */}
-                <div className="flex-1 flex items-center justify-center w-full relative z-10">
-                  <div className="relative w-56 h-56 flex items-center justify-center">
-                    <div
-                      className="absolute inset-0 rounded-full blur-2xl animate-pulse-slow"
-                      style={{
-                        background:
-                          "linear-gradient(to top right, rgba(255,218,185,0.5), rgba(221,167,165,0.4))",
-                      }}
-                    />
-                    <div className="relative z-10 w-48 h-48 bg-white/40 backdrop-blur-xl rounded-full border border-white/60 flex flex-col items-center justify-center shadow-sm">
-                      <span className="text-6xl font-serif text-charcoal font-light">
-                        14
-                      </span>
-                      <span className="text-[10px] uppercase tracking-widest text-charcoal/50 mt-2 font-semibold">
-                        Ovulation
-                      </span>
-                    </div>
+                <div className="relative z-10 flex items-start justify-between mb-7">
+                  <h3 className="font-serif text-charcoal text-[2.45rem] leading-[1.04] font-semibold tracking-tight">
+                    Good Morning,
+                    <br />
+                    Parisha
+                  </h3>
+                  <div className="w-12 h-12 rounded-full border border-white/60 flex items-center justify-center text-mauve bg-gradient-to-br from-peach/40 to-rose/20 shadow-[0_4px_16px_rgba(221,167,165,0.2)]">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.857 17.082A23.848 23.848 0 0018 15.75a8.967 8.967 0 01-3-6.75V9a6 6 0 10-12 0v.75a8.967 8.967 0 01-3 6.75c1.02.542 2.073.983 3.143 1.332m11.714-.001A24.255 24.255 0 0112 18.75c-1.012 0-2.004-.06-2.97-.168m5.827 0a3 3 0 11-5.654 0"
+                      />
+                    </svg>
                   </div>
                 </div>
 
-                {/* Insight card */}
-                <div className="w-full glass-card p-4 rounded-3xl border-l-4 border-l-rose relative z-10">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-rose text-base">✦</span>
-                    <p className="text-[10px] font-bold text-charcoal uppercase tracking-wider">
-                      Daily Insight
+                <div className="relative z-10 flex flex-col items-center mt-5 mb-7">
+                  <div className="relative w-[280px] h-[280px] flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full blur-[40px] opacity-60 bg-[linear-gradient(135deg,#FFDAB9_0%,#DDA7A5_50%,#9B7E8C_100%)]" />
+                    <div className="relative w-56 h-56 rounded-full flex items-center justify-center bg-[linear-gradient(135deg,#FFDAB9_0%,#DDA7A5_100%)] shadow-[0_20px_60px_rgba(221,167,165,0.4),inset_0_1px_0_rgba(255,255,255,0.5)]">
+                      <div className="absolute inset-0 rounded-full opacity-30 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.6)_0%,transparent_60%)]" />
+                      <div className="relative z-10 flex flex-col items-center text-white">
+                        <span className="text-[4.5rem] leading-none font-serif">
+                          14
+                        </span>
+                        <span className="text-[0.8rem] tracking-[0.15em] font-medium uppercase mt-1 mb-2.5">
+                          Day
+                        </span>
+                        <span className="text-[1.05rem] font-medium">
+                          Ovulation Phase
+                        </span>
+                      </div>
+                    </div>
+                    <div className="absolute top-8 right-12 w-16 h-16 rounded-full blur-sm opacity-40 bg-[linear-gradient(135deg,#9B7E8C,#DDA7A5)]" />
+                    <div className="absolute bottom-12 left-8 w-14 h-14 rounded-full blur-sm opacity-40 bg-[linear-gradient(135deg,#FFDAB9,#DDA7A5)]" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 rounded-[28px] border border-white/60 p-5 backdrop-blur-sm bg-[linear-gradient(135deg,rgba(255,218,185,0.25)_0%,rgba(221,167,165,0.2)_100%)] shadow-[0_8px_32px_rgba(221,167,165,0.16)]">
+                  <div className="absolute inset-0 opacity-40 rounded-[28px] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.6)_0%,transparent_60%)]" />
+                  <div className="flex gap-4 items-start">
+                    <div className="relative z-10 w-12 h-12 rounded-full border border-white/55 flex items-center justify-center text-mauve bg-gradient-to-br from-peach/40 to-rose/35">
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        aria-hidden
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 3v2.25M12 18.75V21M4.95 4.95l1.591 1.591M17.459 17.459l1.591 1.591M3 12h2.25M18.75 12H21M4.95 19.05l1.591-1.591M17.459 6.541l1.591-1.591M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="relative z-10 text-[0.95rem] leading-relaxed text-charcoal/95">
+                      Your estrogen is peaking today. You might notice a natural
+                      glow and higher energy levels.
                     </p>
                   </div>
-                  <p className="text-xs text-charcoal/80 leading-relaxed font-medium">
-                    Energy is peaking. Great time for high-intensity workouts.
-                  </p>
                 </div>
+
+                <div className="relative z-10 flex items-center justify-center gap-2 py-5 opacity-70">
+                  <span className="w-2 h-2 rounded-full bg-peach" />
+                  <span className="w-2 h-2 rounded-full bg-rose" />
+                  <span className="w-2 h-2 rounded-full bg-mauve" />
+                </div>
+
+                <div className="relative z-10 rounded-[24px] border border-white/60 p-4 backdrop-blur-sm bg-[linear-gradient(135deg,rgba(255,218,185,0.15)_0%,rgba(221,167,165,0.1)_100%)] shadow-[0_4px_20px_rgba(221,167,165,0.1)] mb-4">
+                  <div className="flex justify-between items-center">
+                    {[
+                      { day: "Mon", date: 12 },
+                      { day: "Tue", date: 13 },
+                      { day: "Wed", date: 14, isCurrent: true },
+                      { day: "Thu", date: 15 },
+                      { day: "Fri", date: 16, hasPeriod: true },
+                      { day: "Sat", date: 17, hasPeriod: true },
+                      { day: "Sun", date: 18, hasPeriod: true },
+                    ].map((item) => (
+                      <div
+                        key={item.date}
+                        className="flex flex-col items-center gap-1.5"
+                      >
+                        <span className="text-[0.62rem] text-mauve/85">
+                          {item.day}
+                        </span>
+                        <div className="relative">
+                          {item.isCurrent ? (
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-peach to-rose text-white text-xs font-semibold shadow-[0_4px_16px_rgba(255,218,185,0.5)]">
+                              {item.date}
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 flex items-center justify-center text-xs text-charcoal">
+                              {item.date}
+                            </div>
+                          )}
+                          {item.hasPeriod && !item.isCurrent && (
+                            <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-rose" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="relative z-10 mt-auto border-t border-charcoal/5 bg-white/45 backdrop-blur-md -mx-7 px-7 pt-4 pb-6">
+                  <div className="relative flex justify-between items-end text-[0.95rem] text-charcoal/45">
+                    <span className="text-charcoal/72">Home</span>
+                    <span>Calendar</span>
+                    <span>Insights</span>
+                    <span>Profile</span>
+                    <button
+                      type="button"
+                      className="absolute -top-12 right-0 w-16 h-16 rounded-full bg-gradient-to-br from-rose to-[#C89896] text-white text-4xl leading-none pb-1 shadow-[0_8px_24px_rgba(221,167,165,0.5)]"
+                      aria-label="Add log"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1.5 rounded-full bg-charcoal/25" />
+
+                <div className="hidden sm:block absolute top-1/2 -left-10 -translate-y-1/2 w-2.5 h-40 rounded-full bg-white/55" />
+                <div className="hidden sm:block absolute top-1/2 -right-10 -translate-y-1/2 w-2.5 h-40 rounded-full bg-white/55" />
               </div>
             </div>
 

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const sections = [
   {
-    emoji: "🌊",
+    badge: "CY",
     title: "Cycle Tracking",
     items: [
       "Log period start and end with a single tap",
@@ -20,7 +20,7 @@ const sections = [
     ],
   },
   {
-    emoji: "🌿",
+    badge: "SM",
     title: "Symptom & Mood Logging",
     items: [
       "20+ built-in symptoms: cramps, bloating, headaches, skin, sleep, energy",
@@ -31,7 +31,7 @@ const sections = [
     ],
   },
   {
-    emoji: "🔮",
+    badge: "CI",
     title: "Cycle Intelligence",
     items: [
       "Fertile window prediction using your real cycle history",
@@ -42,7 +42,7 @@ const sections = [
     ],
   },
   {
-    emoji: "💜",
+    badge: "PS",
     title: "Partner Sync",
     items: [
       "Share a subset of your data with a trusted partner",
@@ -53,7 +53,7 @@ const sections = [
     ],
   },
   {
-    emoji: "🔒",
+    badge: "PR",
     title: "Privacy & Security",
     items: [
       "All data stored locally on your device (SQLite)",
@@ -64,7 +64,7 @@ const sections = [
     ],
   },
   {
-    emoji: "📱",
+    badge: "UX",
     title: "Native Experience",
     items: [
       "Haptic feedback on symptom selection",
@@ -78,45 +78,48 @@ const sections = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-cream pt-28 pb-24 px-6">
+    <div className="page-shell">
       {/* Aurora blobs */}
       <div
-        className="aurora-blob bg-peach w-[300px] h-[300px] top-0 left-0"
+        className="aurora-blob bg-peach w-[280px] h-[280px] -top-10 -left-10"
         aria-hidden
       />
       <div
-        className="aurora-blob bg-rose w-[250px] h-[250px] top-40 right-0"
+        className="aurora-blob bg-rose w-[240px] h-[240px] top-40 -right-10"
         aria-hidden
       />
 
-      <div className="mx-auto max-w-4xl relative z-10">
-        <div className="mb-16 text-center">
-          <h1 className="mb-4 text-5xl font-serif font-medium text-charcoal">
+      <div className="page-container max-w-5xl">
+        <div className="mb-10 text-center md:mb-14">
+          <h1 className="mb-3 text-4xl font-serif font-medium text-charcoal md:mb-4 md:text-5xl">
             Features
           </h1>
-          <div className="w-20 h-1 bg-rose/40 mx-auto rounded-full mb-6" />
-          <p className="text-lg text-charcoal/60 font-light max-w-xl mx-auto">
+          <div className="mx-auto mb-5 h-1 w-16 rounded-full bg-rose/40 md:mb-6 md:w-20" />
+          <p className="mx-auto max-w-2xl text-base font-light text-charcoal/65 md:text-lg">
             Everything you need to understand your cycle — built with privacy at
             its core.
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-5">
           {sections.map((s) => (
-            <div key={s.title} className="glass-card rounded-[2rem] p-8">
-              <div className="flex items-center gap-4 mb-5">
-                <div className="w-12 h-12 rounded-2xl bg-peach/20 flex items-center justify-center text-2xl">
-                  {s.emoji}
-                </div>
-                <h2 className="text-xl font-serif font-medium text-charcoal">
+            <div
+              key={s.title}
+              className="glass-panel rounded-[1.5rem] p-5 sm:p-6 md:rounded-[1.8rem] md:p-7"
+            >
+              <div className="mb-4 flex items-center gap-3 md:mb-5 md:gap-4">
+                <div className="feature-badge">{s.badge}</div>
+                <h2 className="text-lg font-serif font-medium text-charcoal md:text-xl">
                   {s.title}
                 </h2>
               </div>
-              <ul className="space-y-2.5">
+              <ul className="space-y-2.5 md:space-y-3">
                 {s.items.map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <span className="mt-0.5 text-rose flex-shrink-0">✓</span>
-                    <span className="text-sm text-charcoal/70">{item}</span>
+                    <span className="mt-1 h-2 w-2 rounded-full bg-rose/80 flex-shrink-0" />
+                    <span className="text-sm leading-relaxed text-charcoal/72">
+                      {item}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -124,11 +127,10 @@ export default function FeaturesPage() {
           ))}
         </div>
 
-        <div className="mt-16 text-center">
+        <div className="mt-10 text-center md:mt-14">
           <Link
             href="/download"
-            className="inline-block bg-rose text-white px-10 py-4 rounded-full font-medium shadow-xl hover:bg-mauve transition-all hover:-translate-y-1"
-            style={{ boxShadow: "0 20px 40px -12px rgba(221,167,165,0.4)" }}
+            className="rose-shadow inline-block rounded-full bg-rose px-8 py-3.5 text-sm font-medium text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-mauve md:px-10 md:py-4 md:text-base"
           >
             Download Soma Free
           </Link>

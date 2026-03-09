@@ -55,33 +55,42 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-cream pt-28 pb-24 px-6">
+    <div className="page-shell">
       <div
-        className="aurora-blob bg-peach w-[350px] h-[350px] top-0 right-0"
+        className="aurora-blob bg-peach w-[320px] h-[320px] -top-10 -right-12"
+        aria-hidden
+      />
+      <div
+        className="aurora-blob bg-rose w-[220px] h-[220px] bottom-10 -left-8"
         aria-hidden
       />
 
-      <div className="mx-auto max-w-3xl relative z-10">
-        <div className="mb-12">
-          <h1 className="text-5xl font-serif font-medium text-charcoal mb-3">
+      <div className="page-container max-w-4xl">
+        <div className="mb-8 text-center md:mb-12 md:text-left">
+          <h1 className="mb-2 text-4xl font-serif font-medium text-charcoal md:mb-3 md:text-5xl">
             Privacy Policy
           </h1>
-          <p className="text-sm text-charcoal/40">Last updated: March 2026</p>
+          <p className="text-xs tracking-wide text-charcoal/45 md:text-sm">
+            Last updated: March 2026
+          </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-5">
           {sections.map((s) => (
-            <div key={s.title} className="glass-card rounded-[1.75rem] p-8">
-              <h2 className="text-lg font-serif font-medium text-charcoal mb-3">
+            <div
+              key={s.title}
+              className="glass-panel rounded-[1.4rem] p-5 sm:p-6 md:rounded-[1.75rem] md:p-8"
+            >
+              <h2 className="mb-2.5 text-base font-serif font-medium text-charcoal md:mb-3 md:text-lg">
                 {s.title}
               </h2>
               {s.content && (
-                <p className="text-charcoal/60 text-sm leading-relaxed">
+                <p className="text-sm leading-relaxed text-charcoal/65 md:text-[0.95rem]">
                   {s.content}
                 </p>
               )}
               {s.email && (
-                <p className="text-charcoal/60 text-sm leading-relaxed">
+                <p className="text-sm leading-relaxed text-charcoal/65 md:text-[0.95rem]">
                   Questions about this policy? Email us at{" "}
                   <a
                     href={`mailto:${s.email}`}

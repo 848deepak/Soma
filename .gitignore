@@ -40,3 +40,17 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Next.js/web build artifacts
+web/.next/
+web/out/
+
+# editor/project metadata
+.idea/
+.vscode/
+
+# local run logs
+*.log
+
+# large app binaries
+web/public/*.apk
