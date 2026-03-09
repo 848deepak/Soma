@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Soma",
+    "slug": "soma-health",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "soma",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FDF7F5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soma.health",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Soma sends reminders to log your daily symptoms and alerts before your period starts.",
+        "NSFaceIDUsageDescription": "Soma uses Face ID to protect your encryption key.",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FDF7F5",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.soma.health",
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#DDA7A5",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Soma uses Face ID to protect your encryption key."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2b688a94-93f1-4e7a-baf8-caa0a8497b01"
+      }
+    },
+    "owner": "848deepak"
+  }
+}
