@@ -11,6 +11,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 const runtimeExtra = Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {};
 
@@ -19,6 +20,34 @@ const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? runtimeExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 const API_TIMEOUT_MS = 15000;
+
+const webStorage = {
+  getItem: async (key: string) => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
+  },
+  setItem: async (key: string, value: string) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(key, value);
+  },
+  removeItem: async (key: string) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(key);
+  },
+};
+
+const serverNoopStorage = {
+  getItem: async () => null,
+  setItem: async () => undefined,
+  removeItem: async () => undefined,
+};
+
+const authStorage =
+  typeof window === 'undefined'
+    ? serverNoopStorage
+    : Platform.OS === 'web'
+      ? webStorage
+      : AsyncStorage;
 
 function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   const controller = new AbortController();
@@ -51,7 +80,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   auth: {
     // AsyncStorage keeps the session across app restarts on mobile
-    storage: AsyncStorage,
+    storage: authStorage,
     autoRefreshToken: true,
     persistSession: true,
     // URL-based OAuth callbacks are not used in this React Native app

@@ -374,6 +374,12 @@ export default function HomePage() {
             >
               Read our Privacy Policy →
             </Link>
+            <Link
+              href="/terms"
+              className="inline-block mt-3 text-sm font-semibold text-rose hover:underline underline-offset-2 transition"
+            >
+              Read our Terms of Use →
+            </Link>
           </div>
 
           {/* Right — data transparency card */}

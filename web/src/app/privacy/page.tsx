@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Soma",
@@ -34,7 +35,7 @@ const sections = [
   {
     title: "Analytics and crash reporting",
     content:
-      "Soma does not include third-party analytics SDKs (Firebase, Mixpanel, Amplitude, etc.). Any crash reporting is limited to anonymised stack traces — no personal or health data is ever attached.",
+      "Soma may use privacy-conscious product analytics and crash reporting to improve reliability and usability. We do not sell your data, and we avoid sending personal health note content in analytics payloads.",
   },
   {
     title: "Data deletion",
@@ -103,6 +104,15 @@ export default function PrivacyPage() {
               )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 text-center md:text-left">
+          <Link
+            href="/terms"
+            className="text-sm font-semibold text-rose hover:underline underline-offset-2"
+          >
+            Read our Terms of Use →
+          </Link>
         </div>
       </div>
     </div>

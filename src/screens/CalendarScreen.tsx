@@ -5,14 +5,16 @@
  * Replaces all mock data with live calculations from CycleIntelligence.
  */
 import { useMemo, useState } from "react";
-import { ActivityIndicator, View, useColorScheme } from "react-native";
+import { ActivityIndicator, Alert, View, useColorScheme } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { logPeriodRangeAction } from "@/hooks/useCycleActions";
 import { useCycleHistory } from "@/hooks/useCycleHistory";
 import { useProfile } from "@/hooks/useProfile";
 import { predictFertileWindow } from "@/services/CycleIntelligence";
 import { CycleCalendarCard } from "@/src/components/cards/CycleCalendarCard";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
+import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
@@ -110,9 +112,15 @@ export function CalendarScreen() {
   const [selectedDay, setSelectedDay] = useState<number | null>(
     todayObj.getDate(),
   );
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
 
   const { data: profile } = useProfile();
-  const { data: cycleData, isLoading: cycleLoading } = useCurrentCycle(
+  const {
+    data: cycleData,
+    isLoading: cycleLoading,
+    refetch: refetchCurrentCycle,
+  } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
@@ -233,6 +241,31 @@ export function CalendarScreen() {
   const hasCycle = Boolean(cycleData?.cycle);
   const isDark = useColorScheme() === "dark";
 
+  async function handleSubmitPeriodModal({
+    startDate,
+    endDate,
+  }: {
+    startDate: string;
+    endDate: string;
+  }) {
+    try {
+      setIsLoggingPeriod(true);
+      await logPeriodRangeAction({
+        startDate,
+        endDate: endDate || undefined,
+      });
+      await refetchCurrentCycle();
+      setShowPeriodModal(false);
+      Alert.alert("Saved", "Period dates logged successfully.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Could not log period dates.";
+      Alert.alert("Action Failed", message);
+    } finally {
+      setIsLoggingPeriod(false);
+    }
+  }
+
   return (
     <Screen>
       <HeaderBar title={"Your Cycle\nCalendar"} />
@@ -246,8 +279,12 @@ export function CalendarScreen() {
           justifyContent: "space-between",
           borderRadius: 999,
           borderWidth: 1,
-          borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(221,167,165,0.2)",
-          backgroundColor: isDark ? "rgba(30,33,40,0.9)" : "rgba(255,255,255,0.8)",
+          borderColor: isDark
+            ? "rgba(255,255,255,0.1)"
+            : "rgba(221,167,165,0.2)",
+          backgroundColor: isDark
+            ? "rgba(30,33,40,0.9)"
+            : "rgba(255,255,255,0.8)",
           paddingHorizontal: 16,
           paddingVertical: 12,
           shadowColor: "#DDA7A5",
@@ -265,21 +302,27 @@ export function CalendarScreen() {
             borderRadius: 18,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: isDark ? "rgba(167,139,250,0.15)" : "rgba(255,218,185,0.4)",
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.15)"
+              : "rgba(255,218,185,0.4)",
           }}
         >
-          <Typography style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}>
+          <Typography
+            style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
+          >
             ‹
           </Typography>
         </PressableScale>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {cycleLoading && <ActivityIndicator size="small" color="#DDA7A5" />}
-          <Typography style={{
-            fontSize: 18,
-            fontWeight: "600",
-            color: isDark ? "#F2F2F2" : "#2D2327",
-          }}>
+          <Typography
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              color: isDark ? "#F2F2F2" : "#2D2327",
+            }}
+          >
             {calendarMeta.monthLabel} {calendarMeta.year}
           </Typography>
         </View>
@@ -292,10 +335,14 @@ export function CalendarScreen() {
             borderRadius: 18,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: isDark ? "rgba(167,139,250,0.15)" : "rgba(255,218,185,0.4)",
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.15)"
+              : "rgba(255,218,185,0.4)",
           }}
         >
-          <Typography style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}>
+          <Typography
+            style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
+          >
             ›
           </Typography>
         </PressableScale>
@@ -317,8 +364,12 @@ export function CalendarScreen() {
             marginBottom: 16,
             borderRadius: 28,
             borderWidth: 1,
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
-            backgroundColor: isDark ? "rgba(30,33,40,0.8)" : "rgba(255,218,185,0.2)",
+            borderColor: isDark
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(255,255,255,0.7)",
+            backgroundColor: isDark
+              ? "rgba(30,33,40,0.8)"
+              : "rgba(255,218,185,0.2)",
             padding: 20,
             shadowColor: "#DDA7A5",
             shadowOffset: { width: 0, height: 8 },
@@ -358,8 +409,12 @@ export function CalendarScreen() {
             alignItems: "center",
             borderRadius: 24,
             borderWidth: 1,
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(221,167,165,0.2)",
-            backgroundColor: isDark ? "rgba(30,33,40,0.8)" : "rgba(255,255,255,0.75)",
+            borderColor: isDark
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(221,167,165,0.2)",
+            backgroundColor: isDark
+              ? "rgba(30,33,40,0.8)"
+              : "rgba(255,255,255,0.75)",
             padding: 24,
           }}
         >
@@ -372,6 +427,42 @@ export function CalendarScreen() {
           </Typography>
         </View>
       ) : null}
+
+      <PressableScale
+        onPress={() => setShowPeriodModal(true)}
+        style={{
+          marginBottom: 24,
+          marginTop: 4,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: isDark
+            ? "rgba(255,255,255,0.2)"
+            : "rgba(221,167,165,0.45)",
+          backgroundColor: isDark
+            ? "rgba(167,139,250,0.14)"
+            : "rgba(255,255,255,0.7)",
+          paddingVertical: 14,
+        }}
+      >
+        <Typography
+          style={{
+            fontSize: 15,
+            fontWeight: "600",
+            color: isDark ? "#F2F2F2" : "#2D2327",
+          }}
+        >
+          Log Period
+        </Typography>
+      </PressableScale>
+
+      <PeriodLogModal
+        visible={showPeriodModal}
+        onClose={() => setShowPeriodModal(false)}
+        onSubmit={handleSubmitPeriodModal}
+        isSubmitting={isLoggingPeriod}
+      />
     </Screen>
   );
 }

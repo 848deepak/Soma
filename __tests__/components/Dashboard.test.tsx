@@ -148,7 +148,7 @@ describe("HomeScreen (Dashboard)", () => {
     expect(screen.getByText("Glasses today")).toBeTruthy();
     expect(screen.getByText("Last night")).toBeTruthy();
     expect(screen.getByText("Current mood")).toBeTruthy();
-    expect(screen.getByText("Energy level")).toBeTruthy();
+    expect(screen.getByText("Readiness")).toBeTruthy();
   });
 
   it("shows placeholder dashes when no today log exists", () => {
@@ -158,7 +158,7 @@ describe("HomeScreen (Dashboard)", () => {
     });
     render(<HomeScreen />);
     // Should show dash placeholders
-    const dashCells = screen.getAllByText("‒");
+    const dashCells = screen.getAllByText("--");
     expect(dashCells.length).toBeGreaterThan(0);
   });
 
@@ -209,7 +209,7 @@ describe("HomeScreen (Dashboard)", () => {
       isLoading: false,
     });
     render(<HomeScreen />);
-    expect(screen.getByText("7h")).toBeTruthy();
+    expect(screen.getByText("7h 0m")).toBeTruthy();
   });
 
   it("shows mood from today log", () => {
@@ -237,23 +237,13 @@ describe("HomeScreen (Dashboard)", () => {
     expect(screen.getByText("Energetic")).toBeTruthy();
   });
 
-  it("shows daily log entries (Flow & Mood, Symptoms, Evening Reflection)", () => {
+  it("shows primary logging actions", () => {
     render(<HomeScreen />);
-    expect(screen.getByText("Flow & Mood")).toBeTruthy();
-    expect(screen.getByText("Symptoms")).toBeTruthy();
-    expect(screen.getByText("Evening Reflection")).toBeTruthy();
+    expect(screen.getByText("Log Period")).toBeTruthy();
+    expect(screen.getByText("Log Today's Flow & Mood")).toBeTruthy();
   });
 
-  it('shows "Tap + to log" when no today log exists', () => {
-    (useTodayLog as jest.Mock).mockReturnValue({
-      data: null,
-      isLoading: false,
-    });
-    render(<HomeScreen />);
-    expect(screen.getByText("Tap + to log")).toBeTruthy();
-  });
-
-  it("marks Flow & Mood as done when mood is logged", () => {
+  it("shows mood value when mood is logged", () => {
     (useTodayLog as jest.Mock).mockReturnValue({
       data: {
         id: "log-1",
@@ -275,7 +265,7 @@ describe("HomeScreen (Dashboard)", () => {
       isLoading: false,
     });
     render(<HomeScreen />);
-    expect(screen.getByText(/Logged · Calm/)).toBeTruthy();
+    expect(screen.getByText("Calm")).toBeTruthy();
   });
 
   it("renders 7 mini calendar days", () => {
@@ -294,7 +284,7 @@ describe("HomeScreen (Dashboard)", () => {
   });
 
   it('falls back to greeting "there" when no profile loaded', () => {
-    (useProfile as jest.Mock).mockReturnValue({ data: null, isLoading: true });
+    (useProfile as jest.Mock).mockReturnValue({ data: null, isLoading: false });
     render(<HomeScreen />);
     expect(screen.getByText(/Good Morning/)).toBeTruthy();
     expect(screen.getByText(/there/)).toBeTruthy();

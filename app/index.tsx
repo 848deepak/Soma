@@ -1,10 +1,10 @@
-import { Redirect } from 'expo-router';
+import { Redirect } from "expo-router";
 
 /**
- * Root route intentionally forwards to login.
- * AuthBootstrap in app/_layout.tsx then controls final destination
- * based on session + onboarding state.
+ * Root route defaults to home tabs.
+ * AuthBootstrap in app/_layout.tsx performs auth/onboarding gating
+ * and redirects to auth or welcome when needed.
  */
 export default function Index() {
-  return <Redirect href="/auth/login" />;
+  return <Redirect href="/(tabs)" />;
 }

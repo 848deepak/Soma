@@ -36,6 +36,12 @@ export function Footer() {
               Privacy
             </Link>
             <Link
+              href="/terms"
+              className="px-4 py-2 rounded-full hover:text-rose hover:bg-white/75 transition"
+            >
+              Terms
+            </Link>
+            <Link
               href="/support"
               className="px-4 py-2 rounded-full hover:text-rose hover:bg-white/75 transition"
             >

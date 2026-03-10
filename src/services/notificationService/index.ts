@@ -15,13 +15,13 @@
  * This is intentionally not persisted – the worst case on app-restart is a
  * harmless duplicate notification that is superseded on the next schedule call.
  */
-import * as Notifications from 'expo-notifications';
+import * as Notifications from "expo-notifications";
 
 // ─── Identifier keys ──────────────────────────────────────────────────────────
 
-const DAILY_KEY = 'daily-log-reminder';
-const PERIOD_KEY = 'period-alert';
-const FERTILE_KEY = 'fertile-window-alert';
+const DAILY_KEY = "daily-log-reminder";
+const PERIOD_KEY = "period-alert";
+const FERTILE_KEY = "fertile-window-alert";
 
 // ─── In-memory registry ───────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ export async function scheduleDailyLogReminder(
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Log Today',
+      title: "Log Today",
       body: "Don't forget to log how you're feeling today.",
       sound: true,
     },
@@ -107,17 +107,19 @@ export async function cancelDailyLogReminder(): Promise<void> {
  * Cancels any previously registered period alert before scheduling.
  * @returns The Expo notification identifier.
  */
-export async function schedulePeriodAlert(predictedDate: string): Promise<string> {
+export async function schedulePeriodAlert(
+  predictedDate: string,
+): Promise<string> {
   await cancelIfScheduled(PERIOD_KEY);
 
-  const [year, month, day] = predictedDate.split('-').map(Number);
+  const [year, month, day] = predictedDate.split("-").map(Number);
   // Day before at 09:00 local time
   const alertDate = new Date(year, month - 1, day - 1, 9, 0, 0);
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Period Soon',
-      body: 'Your period is predicted to start tomorrow.',
+      title: "Period Soon",
+      body: "Your period is predicted to start tomorrow.",
       sound: true,
     },
     trigger: {
@@ -142,16 +144,18 @@ export async function cancelPeriodAlert(): Promise<void> {
  * Cancels any previously registered fertile-window alert before scheduling.
  * @returns The Expo notification identifier.
  */
-export async function scheduleFertileWindowAlert(windowStart: string): Promise<string> {
+export async function scheduleFertileWindowAlert(
+  windowStart: string,
+): Promise<string> {
   await cancelIfScheduled(FERTILE_KEY);
 
-  const [year, month, day] = windowStart.split('-').map(Number);
+  const [year, month, day] = windowStart.split("-").map(Number);
   const alertDate = new Date(year, month - 1, day, 8, 0, 0);
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Fertile Window',
-      body: 'Your fertile window begins today.',
+      title: "Fertile Window",
+      body: "Your fertile window begins today.",
       sound: true,
     },
     trigger: {

@@ -1,14 +1,16 @@
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo } from "react";
-import { View, useColorScheme } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, View, useColorScheme } from "react-native";
 
 import { buildMiniCalendar, useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { logPeriodRangeAction } from "@/hooks/useCycleActions";
+import { useTodayLog } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { InsightCard } from "@/src/components/cards/InsightCard";
-import { HeaderBar } from "@/src/components/ui/HeaderBar";
+import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
+import { SkeletonLoader } from "@/src/components/ui/SkeletonLoader";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useCycleStore } from "@/src/store/useCycleStore";
@@ -54,21 +56,47 @@ function CycleOrb({
       <View
         style={{
           position: "absolute",
-          width: 240,
-          height: 240,
-          borderRadius: 120,
+          width: 224,
+          height: 224,
+          borderRadius: 112,
           backgroundColor: isDark
             ? "rgba(167,139,250,0.25)"
             : "rgba(221,167,165,0.5)",
           opacity: 0.8,
         }}
       />
+      <View
+        style={{
+          position: "absolute",
+          top: 32,
+          right: 48,
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: isDark
+            ? "rgba(167,139,250,0.25)"
+            : "rgba(155,126,140,0.28)",
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 48,
+          left: 32,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: isDark
+            ? "rgba(129,140,248,0.2)"
+            : "rgba(255,218,185,0.35)",
+        }}
+      />
       {/* Inner solid orb */}
       <View
         style={{
-          width: 200,
-          height: 200,
-          borderRadius: 100,
+          width: 224,
+          height: 224,
+          borderRadius: 112,
           backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
           alignItems: "center",
           justifyContent: "center",
@@ -87,7 +115,7 @@ function CycleOrb({
             left: 0,
             right: 0,
             bottom: 0,
-            borderRadius: 100,
+            borderRadius: 112,
             backgroundColor: isDark
               ? "rgba(255,255,255,0.08)"
               : "rgba(255,255,255,0.2)",
@@ -97,9 +125,9 @@ function CycleOrb({
         <Typography
           style={{
             fontFamily: "PlayfairDisplay-SemiBold",
-            fontSize: 64,
+            fontSize: 72,
             color: "#FFFFFF",
-            lineHeight: 68,
+            lineHeight: 76,
             textAlign: "center",
           }}
         >
@@ -108,11 +136,11 @@ function CycleOrb({
         {/* DAY label */}
         <Typography
           style={{
-            fontSize: 11,
-            letterSpacing: 2,
+            fontSize: 13,
+            letterSpacing: 2.4,
             color: "rgba(255,255,255,0.75)",
             textTransform: "uppercase",
-            marginTop: -4,
+            marginTop: -3,
           }}
         >
           Day
@@ -120,7 +148,7 @@ function CycleOrb({
         {/* Phase name */}
         <Typography
           style={{
-            fontSize: 14,
+            fontSize: 16,
             color: "rgba(255,255,255,0.9)",
             marginTop: 4,
             textAlign: "center",
@@ -139,13 +167,20 @@ export function HomeScreen() {
   const isDark = useColorScheme() === "dark";
   const hydrate = useCycleStore((s) => s.hydrate);
   const { user } = useAuthContext();
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
 
   // ─── Real-time Supabase sync ─────────────────────────────────────────────
   useRealtimeSync(user?.id);
 
   // ─── Live data hooks ─────────────────────────────────────────────────────
-  const { data: profile } = useProfile();
-  const { data: cycleData } = useCurrentCycle(
+  const { data: profile, isLoading: isProfileLoading } = useProfile();
+  const { data: todayLog, isLoading: isTodayLoading } = useTodayLog();
+  const {
+    data: cycleData,
+    isLoading: isCycleLoading,
+    refetch: refetchCurrentCycle,
+  } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
@@ -154,13 +189,11 @@ export function HomeScreen() {
     hydrate();
   }, [hydrate]);
 
-  // ─── Derived display values ───────────────────────────────────────────────
-  const greetingName = profile?.first_name || "there";
-  const cycleDay = cycleData?.cycleDay ?? 1;
-  const phaseLabel = cycleData?.phaseLabel ?? "Cycle Phase";
-  const insightText = cycleData?.phase
-    ? (PHASE_INSIGHT[cycleData.phase] ?? PHASE_INSIGHT.follicular!)
-    : "Loading your cycle data…";
+  useEffect(() => {
+    if (typeof refetchCurrentCycle === "function") {
+      void refetchCurrentCycle();
+    }
+  }, [refetchCurrentCycle]);
 
   const miniCalendar = useMemo(
     () =>
@@ -179,57 +212,188 @@ export function HomeScreen() {
     router.push("/log" as never);
   }, [router]);
 
+  const handleOpenPeriodModal = useCallback(() => {
+    setShowPeriodModal(true);
+  }, []);
+
+  const handleSubmitPeriodModal = useCallback(
+    async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
+      try {
+        setIsLoggingPeriod(true);
+        await logPeriodRangeAction({
+          startDate,
+          endDate: endDate || undefined,
+        });
+        await refetchCurrentCycle();
+        setShowPeriodModal(false);
+        Alert.alert("Saved", "Period dates logged successfully.");
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not log period dates.";
+        Alert.alert("Action Failed", message);
+      } finally {
+        setIsLoggingPeriod(false);
+      }
+    },
+    [refetchCurrentCycle],
+  );
+
+  if (isProfileLoading || isTodayLoading || isCycleLoading) {
+    return <SkeletonLoader />;
+  }
+
+  // ─── Derived display values ───────────────────────────────────────────────
+  const greetingName = profile?.first_name || "there";
+  const cycleDay = cycleData?.cycleDay ?? 1;
+  const phaseLabel = cycleData?.phaseLabel ?? "Cycle Phase";
+  const insightText = cycleData?.phase
+    ? (PHASE_INSIGHT[cycleData.phase] ?? PHASE_INSIGHT.follicular!)
+    : "Loading your cycle data…";
+
+  const hydrationValue = `${todayLog?.hydration_glasses ?? 0}/8`;
+  const sleepValue = todayLog?.sleep_hours
+    ? `${Math.floor(todayLog.sleep_hours)}h ${Math.round((todayLog.sleep_hours % 1) * 60)}m`
+    : "--";
+  const moodValue = todayLog?.mood ?? "--";
+  const energyValue = todayLog?.energy_level
+    ? `${todayLog.energy_level} Energy`
+    : "--";
+
   return (
     <Screen>
-      {/* ── Top bar ──────────────────────────────────────────────── */}
-      <HeaderBar
-        title={`Good Morning,\n${greetingName}`}
-        rightSlot={
-          <PressableScale
-            className="h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-somaPeach/30 dark:border-darkBorder dark:bg-darkCard"
-            style={{
-              shadowColor: "#DDA7A5",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 12,
-              elevation: 4,
-            }}
-          >
-            <SymbolView
-              name={{ ios: "bell", android: "notifications", web: "notifications" }}
-              tintColor="#9B7E8C"
-              size={20}
-            />
-          </PressableScale>
-        }
-      />
-
-      {/* ── Hero gradient orb ─────────────────────────────────────── */}
+      {/* Top bar */}
       <View
         style={{
-          marginTop: 24,
-          height: 280,
-          alignItems: "center",
-          justifyContent: "center",
+          marginTop: 0,
+          paddingTop: 40,
+          paddingBottom: 32,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
         }}
       >
+        <Typography
+          style={{
+            fontFamily: "PlayfairDisplay-SemiBold",
+            fontSize: 32,
+            lineHeight: 38,
+            color: isDark ? "#F2F2F2" : "#2D2327",
+          }}
+        >
+          {`Good Morning,\n${greetingName}`}
+        </Typography>
+
+        <PressableScale
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.2)"
+              : "rgba(255, 218, 185, 0.3)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.6)",
+            shadowColor: "#DDA7A5",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 16,
+            elevation: 4,
+          }}
+        >
+          <SymbolView
+            name={{
+              ios: "bell",
+              android: "notifications",
+              web: "notifications",
+            }}
+            tintColor="#9B7E8C"
+            size={20}
+          />
+        </PressableScale>
+      </View>
+
+      {/* Hero orb */}
+      <View style={{ marginTop: 32, marginBottom: 40, alignItems: "center" }}>
         <CycleOrb day={cycleDay} phaseLabel={phaseLabel} isDark={isDark} />
       </View>
 
-      {/* ── Phase insight card ────────────────────────────────────── */}
-      <InsightCard body={insightText} delay={100} />
+      {/* Insight card */}
+      <View
+        style={{
+          marginBottom: 32,
+          borderRadius: 28,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.6)",
+          backgroundColor: isDark
+            ? "rgba(30,33,40,0.85)"
+            : "rgba(255, 218, 185, 0.22)",
+          padding: 24,
+          shadowColor: "#DDA7A5",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.15,
+          shadowRadius: 32,
+          elevation: 5,
+        }}
+      >
+        <View style={{ flexDirection: "row", gap: 14 }}>
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(255, 218, 185, 0.35)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.5)",
+            }}
+          >
+            <SymbolView
+              name={{
+                ios: "sparkles",
+                android: "auto_awesome",
+                web: "auto_awesome",
+              }}
+              tintColor="#9B7E8C"
+              size={20}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Typography
+              style={{
+                fontSize: 15,
+                lineHeight: 24,
+                color: isDark ? "#F2F2F2" : "#2D2327",
+              }}
+            >
+              {insightText}
+            </Typography>
+          </View>
+        </View>
+      </View>
 
-      {/* ── Decorative dots ───────────────────────────────────────── */}
+      {/* Decorative dots */}
       <View
         style={{
           flexDirection: "row",
-          alignItems: "center",
           justifyContent: "center",
-          gap: 6,
-          marginTop: 16,
-          marginBottom: 4,
+          gap: 8,
+          marginBottom: 32,
+          opacity: 0.6,
         }}
       >
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: "#FFDAB9",
+          }}
+        />
         <View
           style={{
             width: 8,
@@ -240,19 +404,10 @@ export function HomeScreen() {
         />
         <View
           style={{
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: "#FFDAB9",
-          }}
-        />
-        <View
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: 3,
+            width: 8,
+            height: 8,
+            borderRadius: 4,
             backgroundColor: "#9B7E8C",
-            opacity: 0.5,
           }}
         />
       </View>
@@ -260,15 +415,13 @@ export function HomeScreen() {
       {/* ── Mini calendar strip ───────────────────────────────────── */}
       <View
         style={{
-          marginTop: 8,
+          marginBottom: 32,
           borderRadius: 24,
           borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.1)"
-            : "rgba(221,167,165,0.2)",
+          borderColor: "rgba(255,255,255,0.6)",
           backgroundColor: isDark
-            ? "rgba(30,33,40,0.8)"
-            : "rgba(255,255,255,0.75)",
+            ? "rgba(30,33,40,0.82)"
+            : "rgba(255, 218, 185, 0.14)",
           padding: 16,
           shadowColor: "#DDA7A5",
           shadowOffset: { width: 0, height: 4 },
@@ -297,16 +450,12 @@ export function HomeScreen() {
               </Typography>
               <View
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
                   alignItems: "center",
                   justifyContent: "center",
-                  backgroundColor: item.isCurrent
-                    ? isDark
-                      ? "#A78BFA"
-                      : "#DDA7A5"
-                    : "transparent",
+                  backgroundColor: item.isCurrent ? "#DDA7A5" : "transparent",
                   shadowColor: item.isCurrent ? "#DDA7A5" : "transparent",
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: item.isCurrent ? 0.4 : 0,
@@ -322,7 +471,7 @@ export function HomeScreen() {
                         ? "#F2F2F2"
                         : "#2D2327",
                     fontWeight: item.isCurrent ? "600" : "400",
-                    fontSize: 14,
+                    fontSize: 15,
                   }}
                 >
                   {item.date}
@@ -344,70 +493,201 @@ export function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Action Buttons (Figma: "Log Today's Flow" + "Log Symptoms") ───── */}
+      {/* ── 2x2 widgets grid ───────────────────────────────────────── */}
       <View
         style={{
-          marginTop: 20,
-          flexDirection: "row",
-          gap: 12,
           marginBottom: 32,
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          rowGap: 12,
         }}
       >
-        {/* Primary: Log Today's Flow */}
+        {[
+          {
+            key: "hydration",
+            icon: {
+              ios: "drop.fill",
+              android: "water_drop",
+              web: "water_drop",
+            },
+            iconColor: "#8BA888",
+            value: hydrationValue,
+            label: "Glasses today",
+            bg: "rgba(139,168,136,0.16)",
+          },
+          {
+            key: "sleep",
+            icon: {
+              ios: "moon.fill",
+              android: "nights_stay",
+              web: "nights_stay",
+            },
+            iconColor: "#9B7E8C",
+            value: sleepValue,
+            label: "Last night",
+            bg: "rgba(155,126,140,0.16)",
+          },
+          {
+            key: "mood",
+            icon: { ios: "face.smiling.fill", android: "mood", web: "mood" },
+            iconColor: "#FFDAB9",
+            value: moodValue,
+            label: "Current mood",
+            bg: "rgba(255,218,185,0.2)",
+          },
+          {
+            key: "energy",
+            icon: { ios: "bolt.fill", android: "bolt", web: "bolt" },
+            iconColor: "#DDA7A5",
+            value: energyValue,
+            label: "Readiness",
+            bg: "rgba(221,167,165,0.2)",
+          },
+        ].map((item) => (
+          <View
+            key={item.key}
+            style={{
+              width: "48.3%",
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.6)",
+              backgroundColor: item.bg,
+              padding: 20,
+              aspectRatio: 1,
+              justifyContent: "space-between",
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(255,255,255,0.35)",
+              }}
+            >
+              <SymbolView
+                name={item.icon as any}
+                tintColor={item.iconColor}
+                size={20}
+              />
+            </View>
+            <View>
+              <Typography
+                style={{
+                  fontFamily: "PlayfairDisplay-SemiBold",
+                  fontSize: item.key === "energy" ? 18 : 28,
+                  lineHeight: item.key === "energy" ? 24 : 30,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                }}
+              >
+                {item.value}
+              </Typography>
+              <Typography
+                variant="helper"
+                className="mt-1 text-somaMauve dark:text-darkTextSecondary"
+              >
+                {item.label}
+              </Typography>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* ── Primary action pill + FAB-style secondary action ───────── */}
+      <View
+        style={{
+          marginBottom: 130,
+        }}
+      >
         <PressableScale
-          onPress={handleLogFlow}
+          onPress={handleOpenPeriodModal}
           style={{
-            flex: 1,
+            marginBottom: 12,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: isDark
+              ? "rgba(255,255,255,0.18)"
+              : "rgba(221,167,165,0.45)",
+            paddingVertical: 14,
+          }}
+        >
+          <Typography
+            style={{
+              fontSize: 15,
+              fontWeight: "600",
+              color: isDark ? "#F2F2F2" : "#2D2327",
+            }}
+          >
+            Log Period
+          </Typography>
+        </PressableScale>
+
+        <PressableScale
+          onPress={handleLogSymptoms}
+          style={{
             alignItems: "center",
             justifyContent: "center",
             borderRadius: 999,
             backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-            paddingVertical: 18,
+            paddingVertical: 20,
             shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.4,
-            shadowRadius: 24,
+            shadowRadius: 40,
             elevation: 10,
           }}
         >
           <Typography
             style={{
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: "600",
               color: "#FFFFFF",
               textAlign: "center",
             }}
           >
-            Log Today's Flow
-          </Typography>
-        </PressableScale>
-
-        {/* Secondary: Log Symptoms */}
-        <PressableScale
-          onPress={handleLogSymptoms}
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 999,
-            borderWidth: 1.5,
-            borderColor: isDark ? "#A78BFA" : "#DDA7A5",
-            backgroundColor: "transparent",
-            paddingVertical: 18,
-          }}
-        >
-          <Typography
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: isDark ? "#A78BFA" : "#DDA7A5",
-              textAlign: "center",
-            }}
-          >
-            Log Symptoms
+            Log Today's Flow & Mood
           </Typography>
         </PressableScale>
       </View>
+
+      {/* Floating FAB to mirror reference composition */}
+      <PressableScale
+        onPress={handleLogFlow}
+        style={{
+          position: "absolute",
+          right: 28,
+          bottom: 144,
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.5,
+          shadowRadius: 24,
+          elevation: 10,
+        }}
+      >
+        <SymbolView
+          name={{ ios: "plus", android: "add", web: "add" }}
+          tintColor="#FFFFFF"
+          size={28}
+        />
+      </PressableScale>
+
+      <PeriodLogModal
+        visible={showPeriodModal}
+        onClose={() => setShowPeriodModal(false)}
+        onSubmit={handleSubmitPeriodModal}
+        isSubmitting={isLoggingPeriod}
+      />
     </Screen>
   );
 }

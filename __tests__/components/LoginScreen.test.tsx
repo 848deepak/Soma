@@ -81,13 +81,13 @@ describe("LoginScreen – login mode", () => {
     );
   });
 
-  it("navigates to tabs on successful login", async () => {
+  it("navigates to welcome on successful login", async () => {
     // Default mock already resolves successfully; just verify navigation
     const { getByTestId } = render(<LoginScreen />);
     fireEvent.changeText(getByTestId("email-input"), "test@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.press(getByTestId("primary-button"));
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/(tabs)"));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/welcome"));
   });
 
   it("shows alert on sign in failure", async () => {
@@ -105,10 +105,10 @@ describe("LoginScreen – login mode", () => {
     );
   });
 
-  it("navigates to tabs when skip button is pressed", () => {
+  it("navigates to welcome when skip button is pressed", async () => {
     const { getByTestId } = render(<LoginScreen />);
     fireEvent.press(getByTestId("skip-button"));
-    expect(mockReplace).toHaveBeenCalledWith("/(tabs)");
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/welcome"));
   });
 
   it("navigates to signup when create account is pressed", () => {

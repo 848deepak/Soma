@@ -1,41 +1,89 @@
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, TextInput, View, useColorScheme } from 'react-native';
+import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { useMemo, useState } from "react";
+import {
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    TextInput,
+    View,
+    useColorScheme,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
-import { SymptomButton } from '@/src/components/buttons/SymptomButton';
-import { PressableScale } from '@/src/components/ui/PressableScale';
-import { HeaderBar } from '@/src/components/ui/HeaderBar';
-import { Screen } from '@/src/components/ui/Screen';
-import { Typography } from '@/src/components/ui/Typography';
-import { symptomOptions } from '@/src/features/cycle/uiMockData';
-import { useSaveLog } from '@/hooks/useSaveLog';
-import { useTodayLog } from '@/hooks/useDailyLogs';
-import type { FlowLevel, SymptomOption } from '@/types/database';
+import { useTodayLog } from "@/hooks/useDailyLogs";
+import { useSaveLog } from "@/hooks/useSaveLog";
+import { PressableScale } from "@/src/components/ui/PressableScale";
+import { Typography } from "@/src/components/ui/Typography";
+import type { FlowLevel, SymptomOption } from "@/types/database";
 
 const flowLevels = [
-  { label: 'None', opacity: 0.1 },
-  { label: 'Light', opacity: 0.3 },
-  { label: 'Medium', opacity: 0.55 },
-  { label: 'Heavy', opacity: 0.8 },
-  { label: 'V. Heavy', opacity: 1.0 },
+  { label: "None", opacity: 0 },
+  { label: "Light", opacity: 0.3 },
+  { label: "Medium", opacity: 0.65 },
+  { label: "Heavy", opacity: 1 },
 ] as const;
+
+const symptoms: SymptomOption[] = [
+  "Cramps",
+  "Tender",
+  "Radiant",
+  "Brain Fog",
+  "Bloating",
+  "Energized",
+  "Moody",
+  "Calm",
+];
+
+function Teardrop({
+  filled,
+  color,
+  opacity = 1,
+}: {
+  filled: boolean;
+  color: string;
+  opacity?: number;
+}) {
+  return (
+    <Svg width={32} height={40} viewBox="0 0 32 40" fill="none">
+      <Path
+        d="M16 0C16 0 0 16 0 26C0 33.732 7.163 40 16 40C24.837 40 32 33.732 32 26C32 16 16 0 16 0Z"
+        fill={filled ? color : "transparent"}
+        fillOpacity={opacity}
+        stroke={color}
+        strokeWidth={filled ? 0 : 1.5}
+        strokeOpacity={filled ? 0 : 0.4}
+      />
+    </Svg>
+  );
+}
 
 export function DailyLogScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
+  const isDark = useColorScheme() === "dark";
   const saveLog = useSaveLog();
 
   const { data: todayLog } = useTodayLog();
 
-  const [flowLevel, setFlowLevel] = useState<number>(todayLog?.flow_level ?? 2);
+  const [flowLevel, setFlowLevel] = useState<number>(
+    Math.min(todayLog?.flow_level ?? 2, 3),
+  );
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>(
     todayLog?.symptoms ?? [],
   );
-  const [notes, setNotes] = useState(todayLog?.notes ?? '');
+  const [notes, setNotes] = useState(todayLog?.notes ?? "");
+  const accentPrimary = isDark ? "#A78BFA" : "#DDA7A5";
+  const accentPrimaryDark = isDark ? "#7C6BE8" : "#DDA7A5";
 
   const subtitle = useMemo(
-    () => new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }),
+    () =>
+      new Date().toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
     [],
   );
 
@@ -47,7 +95,9 @@ export function DailyLogScreen() {
   function handleSymptomToggle(symptom: string) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedSymptoms((previous) =>
-      previous.includes(symptom) ? previous.filter((item) => item !== symptom) : [...previous, symptom],
+      previous.includes(symptom)
+        ? previous.filter((item) => item !== symptom)
+        : [...previous, symptom],
     );
   }
 
@@ -65,199 +115,336 @@ export function DailyLogScreen() {
     );
   }
 
-  const cardStyle = {
-    marginTop: 20,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.7)',
-    backgroundColor: isDark ? 'rgba(30,33,40,0.85)' : 'rgba(255,255,255,0.75)',
-    padding: 20,
-    shadowColor: '#DDA7A5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 3,
-  };
-
-  const dropColor = isDark ? '#A78BFA' : '#DDA7A5';
-
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: isDark ? "#0F1115" : "#FFFDFB" }}
     >
-      <Screen scrollable>
-        <HeaderBar
-          title={'How are you\nfeeling today?'}
-          subtitle={subtitle}
-          rightSlot={
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {/* Soft Aurora Background Blurs */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: 320,
+            height: 320,
+            borderRadius: 160,
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.12)"
+              : "rgba(255,218,185,0.25)",
+            opacity: 0.8,
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: "33%",
+            right: 0,
+            width: 288,
+            height: 288,
+            borderRadius: 144,
+            backgroundColor: isDark
+              ? "rgba(129,140,248,0.12)"
+              : "rgba(155,126,140,0.18)",
+            opacity: 0.7,
+          }}
+        />
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: 180 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              paddingTop: 36,
+              paddingBottom: 14,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Typography
+                style={{
+                  fontFamily: "PlayfairDisplay-SemiBold",
+                  fontSize: 28,
+                  lineHeight: 34,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                }}
+              >
+                {"How are you\nfeeling today?"}
+              </Typography>
+              <Typography
+                style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  color: "#9B7E8C",
+                }}
+              >
+                {subtitle}
+              </Typography>
+            </View>
             <PressableScale
               onPress={() => router.back()}
+              testID="daily-log-close-button"
               style={{
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isDark
+                  ? "rgba(30,33,40,0.85)"
+                  : "rgba(255,255,255,0.7)",
                 borderWidth: 1,
-                borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(221,167,165,0.3)',
-                backgroundColor: isDark ? 'rgba(30,33,40,0.9)' : 'rgba(255,255,255,0.85)',
+                borderColor: "rgba(221,167,165,0.2)",
+                shadowColor: "#DDA7A5",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 16,
+                elevation: 3,
               }}
             >
-              <Typography style={{ fontSize: 22, color: '#9B7E8C', lineHeight: 26 }}>
-                ×
-              </Typography>
+              <SymbolView
+                name={{ ios: "xmark", android: "close", web: "close" }}
+                tintColor="#9B7E8C"
+                size={20}
+              />
             </PressableScale>
-          }
-        />
-
-        {/* ── Flow section ──────────────────────────────────────── */}
-        <View style={cardStyle}>
-          <Typography
-            style={{
-              marginBottom: 20,
-              fontSize: 17,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
-            }}
-          >
-            Flow
-          </Typography>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around' }}>
-            {flowLevels.map((level, index) => {
-              const isSelected = flowLevel === index;
-              const dropHeight = 36 + index * 10;
-              return (
-                <PressableScale
-                  key={level.label}
-                  onPress={() => handleFlowChange(index)}
-                  style={{ alignItems: 'center', paddingHorizontal: 8 }}
-                >
-                  {/* Teardrop shape */}
-                  <View
-                    style={{
-                      width: 34,
-                      height: dropHeight,
-                      borderTopLeftRadius: 17,
-                      borderTopRightRadius: 17,
-                      borderBottomLeftRadius: 999,
-                      borderBottomRightRadius: 999,
-                      backgroundColor: dropColor,
-                      opacity: isSelected ? 1.0 : level.opacity,
-                      shadowColor: isSelected ? dropColor : 'transparent',
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: isSelected ? 0.5 : 0,
-                      shadowRadius: 12,
-                      elevation: isSelected ? 6 : 0,
-                    }}
-                  />
-                  <Typography
-                    variant="helper"
-                    style={{
-                      marginTop: 10,
-                      color: isSelected
-                        ? isDark ? '#F2F2F2' : '#2D2327'
-                        : '#9B7E8C',
-                      fontWeight: isSelected ? '600' : '400',
-                    }}
-                  >
-                    {level.label}
-                  </Typography>
-                </PressableScale>
-              );
-            })}
           </View>
-        </View>
 
-        {/* ── Symptoms section ──────────────────────────────────── */}
-        <View style={cardStyle}>
-          <Typography
-            style={{
-              marginBottom: 16,
-              fontSize: 17,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
-            }}
-          >
-            Symptoms
-          </Typography>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {symptomOptions.map((symptom) => {
-              const isSelected = selectedSymptoms.includes(symptom);
-              return (
-                <SymptomButton
-                  key={symptom}
-                  label={symptom}
-                  selected={isSelected}
-                  onPress={() => handleSymptomToggle(symptom)}
+          <View style={{ paddingTop: 12 }}>
+            {/* Flow */}
+            <View style={{ marginBottom: 42 }}>
+              <Typography
+                style={{
+                  fontFamily: "PlayfairDisplay-SemiBold",
+                  fontSize: 18,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  marginBottom: 24,
+                }}
+              >
+                Flow
+              </Typography>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 14,
+                }}
+              >
+                {flowLevels.map((level, index) => {
+                  const isSelected = flowLevel === index;
+                  return (
+                    <PressableScale
+                      key={level.label}
+                      onPress={() => handleFlowChange(index)}
+                      style={{ alignItems: "center", gap: 10 }}
+                    >
+                      <View
+                        style={{
+                          transform: [{ scale: isSelected ? 1.15 : 1 }],
+                          shadowColor: accentPrimary,
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: isSelected ? 0.3 : 0,
+                          shadowRadius: 12,
+                          elevation: isSelected ? 5 : 0,
+                        }}
+                      >
+                        <Teardrop
+                          filled={index > 0}
+                          color={accentPrimary}
+                          opacity={level.opacity}
+                        />
+                      </View>
+                      <Typography
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isSelected ? "600" : "400",
+                          color: isSelected
+                            ? isDark
+                              ? "#F2F2F2"
+                              : "#2D2327"
+                            : "#9B7E8C",
+                        }}
+                      >
+                        {level.label}
+                      </Typography>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Symptoms */}
+            <View style={{ marginBottom: 42 }}>
+              <Typography
+                style={{
+                  fontFamily: "PlayfairDisplay-SemiBold",
+                  fontSize: 18,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  marginBottom: 24,
+                }}
+              >
+                Symptoms
+              </Typography>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {symptoms.map((symptom) => {
+                  const isSelected = selectedSymptoms.includes(symptom);
+                  return (
+                    <PressableScale
+                      key={symptom}
+                      onPress={() => handleSymptomToggle(symptom)}
+                      style={{
+                        paddingHorizontal: 20,
+                        paddingVertical: 12,
+                        borderRadius: 999,
+                        backgroundColor: isSelected ? "#9B7E8C" : "transparent",
+                        borderWidth: isSelected ? 0 : 1,
+                        borderColor: "rgba(155, 126, 140, 0.3)",
+                        shadowColor: "#9B7E8C",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: isSelected ? 0.3 : 0,
+                        shadowRadius: 16,
+                        elevation: isSelected ? 4 : 0,
+                      }}
+                    >
+                      <Typography
+                        style={{
+                          fontSize: 14,
+                          color: isSelected ? "#FFFFFF" : "#9B7E8C",
+                          fontWeight: isSelected ? "500" : "400",
+                        }}
+                      >
+                        {symptom}
+                      </Typography>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 28,
+                opacity: 0.4,
+              }}
+            >
+              <View
+                style={{ flex: 1, height: 1, backgroundColor: "#DDA7A5" }}
+              />
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: "#DDA7A5",
+                }}
+              />
+              <View
+                style={{ flex: 1, height: 1, backgroundColor: "#DDA7A5" }}
+              />
+            </View>
+
+            {/* Notes */}
+            <View style={{ marginBottom: 18 }}>
+              <Typography
+                style={{
+                  fontFamily: "PlayfairDisplay-SemiBold",
+                  fontSize: 18,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  marginBottom: 16,
+                }}
+              >
+                Notes
+              </Typography>
+              <View
+                style={{
+                  borderRadius: 24,
+                  borderWidth: 1,
+                  borderColor: "rgba(221, 167, 165, 0.2)",
+                  backgroundColor: isDark
+                    ? "rgba(30,33,40,0.9)"
+                    : "rgba(255, 218, 185, 0.15)",
+                  padding: 18,
+                  shadowColor: "#DDA7A5",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 20,
+                  elevation: 2,
+                }}
+              >
+                <TextInput
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  placeholder="How are you feeling? Any observations?"
+                  placeholderTextColor="#9B7E8C"
+                  textAlignVertical="top"
+                  style={{
+                    minHeight: 80,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: isDark ? "#F2F2F2" : "#2D2327",
+                  }}
                 />
-              );
-            })}
+              </View>
+            </View>
           </View>
-        </View>
+        </ScrollView>
 
-        {/* ── Notes section ─────────────────────────────────────── */}
-        <View style={cardStyle}>
-          <Typography
-            style={{
-              marginBottom: 12,
-              fontSize: 17,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
-            }}
-          >
-            Notes
-          </Typography>
-          <TextInput
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            placeholder="How are you feeling? Any observations?"
-            placeholderTextColor="#9B7E8C"
-            textAlignVertical="top"
-            style={{
-              minHeight: 92,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(221,167,165,0.25)',
-              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,218,185,0.15)',
-              padding: 16,
-              fontSize: 14,
-              color: isDark ? '#F2F2F2' : '#2D2327',
-              lineHeight: 20,
-            }}
-          />
-        </View>
-
-        {/* ── Save button ───────────────────────────────────────── */}
-        <PressableScale
-          onPress={handleSave}
+        {/* Save button bar */}
+        <View
           style={{
-            marginTop: 24,
-            marginBottom: 32,
-            alignItems: 'center',
-            borderRadius: 999,
-            backgroundColor: isDark ? '#A78BFA' : '#DDA7A5',
-            paddingVertical: 18,
-            opacity: saveLog.isPending ? 0.6 : 1,
-            shadowColor: '#DDA7A5',
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 40,
-            elevation: 12,
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingHorizontal: 28,
+            paddingTop: 18,
+            paddingBottom: 28,
+            backgroundColor: isDark
+              ? "rgba(15,17,21,0.95)"
+              : "rgba(255, 253, 251, 0.95)",
+            borderTopWidth: 1,
+            borderTopColor: "rgba(221, 167, 165, 0.1)",
           }}
         >
-          <Typography
+          <PressableScale
+            onPress={handleSave}
             style={{
-              fontSize: 16,
-              fontWeight: '600',
-              color: '#FFFFFF',
+              alignItems: "center",
+              borderRadius: 999,
+              backgroundColor: accentPrimary,
+              paddingVertical: 20,
+              opacity: saveLog.isPending ? 0.6 : 1,
+              shadowColor: accentPrimaryDark,
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.4,
+              shadowRadius: 40,
+              elevation: 12,
             }}
           >
-            {saveLog.isPending ? 'Saving…' : "Save Today's Log"}
-          </Typography>
-        </PressableScale>
-      </Screen>
-    </KeyboardAvoidingView>
+            <Typography
+              style={{ fontSize: 16, fontWeight: "600", color: "#FFFFFF" }}
+            >
+              {saveLog.isPending ? "Saving…" : "Save Log"}
+            </Typography>
+          </PressableScale>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
