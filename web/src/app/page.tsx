@@ -2,21 +2,79 @@ import Link from "next/link";
 
 const featureCards = [
   {
-    emoji: "🌊",
+    icon: "cycle",
     title: "Cycle Syncing",
     desc: "Don't fight your fatigue. Soma reveals workouts, nutrition, and energy patterns tailored to your hormonal phase — follicular, ovulatory, luteal, menstrual.",
   },
   {
-    emoji: "🔒",
+    icon: "lock",
     title: "Partner View",
     desc: "Generate a secure, encrypted link for your partner. They see your mood and fertility status; your detailed private logs stay yours, always.",
   },
   {
-    emoji: "✨",
+    icon: "spark",
     title: "Fluid Logging",
     desc: "Forget clinical checkboxes. Log your flow, mood, and symptoms using our beautiful tag interface — takes under 30 seconds.",
   },
-];
+] as const;
+
+function FeatureIcon({ icon }: { icon: "cycle" | "lock" | "spark" }) {
+  if (icon === "cycle") {
+    return (
+      <svg
+        className="w-8 h-8 text-mauve"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        aria-hidden
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 12a9 9 0 11-2.64-6.36M21 4v6h-6"
+        />
+      </svg>
+    );
+  }
+
+  if (icon === "lock") {
+    return (
+      <svg
+        className="w-8 h-8 text-mauve"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        aria-hidden
+      >
+        <rect x="4" y="11" width="16" height="9" rx="2" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 11V8a4 4 0 118 0v3"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      className="w-8 h-8 text-mauve"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z"
+      />
+    </svg>
+  );
+}
 
 const privacyItems = [
   {
@@ -310,8 +368,8 @@ export default function HomePage() {
                 key={f.title}
                 className="glass-card p-10 rounded-[2rem] group cursor-default"
               >
-                <div className="w-16 h-16 rounded-2xl bg-peach/20 flex items-center justify-center mb-8 text-3xl group-hover:scale-110 transition duration-300">
-                  {f.emoji}
+                <div className="w-16 h-16 rounded-2xl bg-peach/20 flex items-center justify-center mb-8 group-hover:scale-110 transition duration-300">
+                  <FeatureIcon icon={f.icon} />
                 </div>
                 <h3 className="text-2xl font-serif mb-4 text-charcoal font-medium">
                   {f.title}
