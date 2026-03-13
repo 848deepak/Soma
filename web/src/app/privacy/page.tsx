@@ -13,14 +13,14 @@ const sections = [
       "Soma is built on a simple principle: your health data belongs to you. We will never sell, share, or monetise your personal information. This policy explains what data the app collects, why, and how it is protected.",
   },
   {
-    title: "Data stored on your device",
+    title: "Data processing",
     content:
-      "By default, Soma stores all data locally on your device using SQLite — cycle dates, symptom logs, personal notes, and notification preferences. None of this data leaves your device unless you explicitly enable cloud sync.",
+      "Soma processes cycle data, daily logs, profile settings, and partner-sharing preferences to provide tracking, predictions, and partner features.",
   },
   {
-    title: "Optional cloud sync",
+    title: "Storage and transport",
     content:
-      "If you create an account and enable sync, your data is transmitted using TLS in transit and AES-256-GCM encryption at rest. Encryption keys are generated on your device and stored in the secure enclave — we have no access to your plaintext data.",
+      "Data is transmitted over secure network connections and stored for app functionality such as insights, history, and partner sharing.",
   },
   {
     title: "Partner Sync",
@@ -40,7 +40,7 @@ const sections = [
   {
     title: "Data deletion",
     content:
-      "You can delete all your data at any time from Settings → Account → Delete All Data. This action is immediate and irreversible. If cloud sync is enabled, your data is purged from our servers within 24 hours.",
+      "You can delete your account data at any time from Settings → Account → Delete Account. This action is irreversible.",
   },
   {
     title: "Children",

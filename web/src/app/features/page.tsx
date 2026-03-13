@@ -4,7 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Features — Soma",
   description:
-    "Explore everything Soma can do: cycle tracking, symptom logging, predictions, partner sync, and more.",
+    "Explore Soma features: cycle tracking, daily logs, insights, partner sync, and account controls.",
 };
 
 const sections = [
@@ -20,24 +20,25 @@ const sections = [
     ],
   },
   {
-    badge: "SM",
-    title: "Symptom & Mood Logging",
+    badge: "DL",
+    title: "Daily Logging",
     items: [
-      "20+ built-in symptoms: cramps, bloating, headaches, skin, sleep, energy",
-      "Custom mood tags and free-text notes",
+      "Flow tracking (none, light, medium, heavy)",
+      "Symptom selection with notes",
+      "Mood and quick check-in logging",
+      "Hydration and sleep fields",
       "Quick daily check-in from the home screen",
-      "Symptom frequency analysis across multiple cycles",
-      "PMS risk indicator based on your patterns",
+      "Save and update logs for today",
     ],
   },
   {
-    badge: "CI",
-    title: "Cycle Intelligence",
+    badge: "IN",
+    title: "Insights",
     items: [
       "Fertile window prediction using your real cycle history",
-      "Ovulation estimation with confidence indicators",
-      "Trend insights: is your cycle getting shorter or longer?",
-      "Basal body temperature correlation (manual entry)",
+      "Cycle history visual trends",
+      "Symptom pattern summaries",
+      "Trend insight callouts",
       "Cycle phase awareness: follicular, ovulatory, luteal, menstrual",
     ],
   },
@@ -49,29 +50,19 @@ const sections = [
       "Secure, code-based pairing — no personal details shared",
       "Partners see only what you choose to share",
       "Revoke access instantly at any time",
-      "Real-time sync so your partner always has current info",
+      "Partner support alert visibility",
     ],
   },
   {
-    badge: "PR",
-    title: "Privacy & Security",
+    badge: "AC",
+    title: "Account & Controls",
     items: [
-      "All data stored locally on your device (SQLite)",
-      "Optional cloud sync with AES-256-GCM encryption",
-      "Anon-first: no account required to use the app",
+      "Anonymous session support",
+      "Email sign in and sign up flow",
+      "Notification reminders",
+      "JSON and CSV data export",
       "One-tap data deletion — permanent and irreversible",
-      "No ads, no tracking, no data selling — ever",
-    ],
-  },
-  {
-    badge: "UX",
-    title: "Native Experience",
-    items: [
-      "Haptic feedback on symptom selection",
-      "Configurable daily reminder notifications",
-      "Dark mode support",
-      "Offline-first with automatic background sync",
-      "Fast, smooth animations with React Native Reanimated",
+      "Theme preferences and profile editing",
     ],
   },
 ];

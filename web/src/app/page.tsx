@@ -3,18 +3,18 @@ import Link from "next/link";
 const featureCards = [
   {
     icon: "cycle",
-    title: "Cycle Syncing",
-    desc: "Don't fight your fatigue. Soma reveals workouts, nutrition, and energy patterns tailored to your hormonal phase — follicular, ovulatory, luteal, menstrual.",
+    title: "Cycle Tracking",
+    desc: "Log period dates, view your cycle calendar, and see predicted fertile window and next-cycle timing based on your history.",
   },
   {
     icon: "lock",
     title: "Partner View",
-    desc: "Generate a secure, encrypted link for your partner. They see your mood and fertility status; your detailed private logs stay yours, always.",
+    desc: "Share through a 6-character code with explicit mood, fertility, and symptom permissions that you can change anytime.",
   },
   {
     icon: "spark",
-    title: "Fluid Logging",
-    desc: "Forget clinical checkboxes. Log your flow, mood, and symptoms using our beautiful tag interface — takes under 30 seconds.",
+    title: "Daily Logging",
+    desc: "Track flow level, mood, selected symptoms, notes, hydration, sleep, and quick check-ins from the app.",
   },
 ] as const;
 
@@ -78,23 +78,23 @@ function FeatureIcon({ icon }: { icon: "cycle" | "lock" | "spark" }) {
 
 const privacyItems = [
   {
-    title: "End-to-End Encrypted",
-    sub: "AES-256 standard. Keys generated on your device.",
+    title: "Anonymous Start",
+    sub: "Use the app without creating an email/password account.",
   },
   {
-    title: "Local-First Storage",
-    sub: "Data lives on your phone, not our servers.",
+    title: "Partner Permissions",
+    sub: "Choose exactly what your partner can view.",
   },
   {
-    title: "Anonymous Usage",
-    sub: "No email required to start tracking.",
+    title: "Data Controls",
+    sub: "Export your logs or delete account data from settings.",
   },
 ];
 
 const dataRows = [
-  { label: "Cycle Data", status: "Encrypted", dotColor: "bg-rose" },
-  { label: "Symptom Logs", status: "Encrypted", dotColor: "bg-rose" },
-  { label: "Personal Notes", status: "Encrypted", dotColor: "bg-rose" },
+  { label: "Cycle Data", status: "Stored", dotColor: "bg-rose" },
+  { label: "Symptom Logs", status: "Stored", dotColor: "bg-rose" },
+  { label: "Personal Notes", status: "Stored", dotColor: "bg-rose" },
   {
     label: "Advertising ID",
     status: "Not Collected",
@@ -146,8 +146,8 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg text-charcoal/70 max-w-md mx-auto lg:mx-0 leading-relaxed font-light">
-              Soma is the privacy-first cycle tracker that syncs your life to
-              your hormones. No ads. No data selling. Just biology.
+              Soma helps you track cycles, daily symptoms, and partner-sharing
+              permissions with a clean, focused workflow.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-2 justify-center lg:justify-start">
@@ -182,7 +182,7 @@ export default function HomePage() {
                   d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                 />
               </svg>
-              AES-256 Encrypted on Device
+              Private by default controls
             </p>
           </div>
 
@@ -404,10 +404,9 @@ export default function HomePage() {
               <span className="text-gradient-warm">belongs to you.</span>
             </h2>
             <p className="text-white/60 text-lg leading-relaxed mb-10 max-w-lg">
-              Most health apps sell your data to advertisers. We built Soma
-              differently. Your health logs are encrypted{" "}
-              <strong className="text-white/80">on your device</strong> before
-              they ever touch the cloud.
+              Soma gives you practical control: anonymous usage, partner
+              permission toggles, export tools, and full data deletion from
+              settings.
             </p>
 
             <ul className="space-y-6">
@@ -458,7 +457,7 @@ export default function HomePage() {
             <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
               <span className="font-serif text-2xl">Data Transparency</span>
               <span className="text-xs bg-rose text-charcoal px-3 py-1.5 rounded-full font-bold uppercase tracking-wider">
-                Secure
+                Controls
               </span>
             </div>
             <div className="space-y-5 font-mono text-sm">

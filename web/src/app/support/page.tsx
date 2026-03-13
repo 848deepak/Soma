@@ -9,19 +9,19 @@ export const metadata: Metadata = {
 const faqs = [
   {
     q: "Is Soma really free?",
-    a: "Yes. Soma is completely free with no in-app purchases, subscriptions, or ads. We believe health tools should be accessible to everyone.",
+    a: "Yes. Soma is currently free to download and use.",
   },
   {
     q: "Do I need to create an account?",
-    a: "No. You can use all core features without any account. An optional account unlocks encrypted cloud backup and Partner Sync.",
+    a: "No. You can start with an anonymous session. You can also sign in with email if you prefer.",
   },
   {
     q: "Where is my data stored?",
-    a: "By default, everything is stored locally on your device using SQLite. Cloud sync is strictly opt-in and your data is encrypted end-to-end.",
+    a: "Your cycle and log data are saved in your Soma account data store so they can be used across app features like insights and partner sharing.",
   },
   {
     q: "Can Soma predict my ovulation date?",
-    a: "Yes. After you've logged a few cycles, Soma uses your history to predict your fertile window and estimated ovulation day. The more cycles you log, the more accurate the prediction.",
+    a: "Yes. Soma estimates fertile window and cycle phase from your recorded cycle history.",
   },
   {
     q: "How do I set up Partner Sync?",
@@ -29,11 +29,11 @@ const faqs = [
   },
   {
     q: "How do I delete all my data?",
-    a: "Go to Settings → Account → Delete All Data. This is immediate and permanent. If cloud sync is enabled, your server-side data is also purged within 24 hours.",
+    a: "Go to Settings → Account → Delete Account. This permanently deletes your cycle history, logs, and partner links.",
   },
   {
     q: "Will Soma come to iPhone (iOS)?",
-    a: "We're actively working on an iOS release. Leave your email in the contact form below and we'll notify you the moment it's available.",
+    a: "Soma has iOS project support in the codebase. Availability depends on release scheduling.",
   },
   {
     q: "The APK won't install on my Android device.",

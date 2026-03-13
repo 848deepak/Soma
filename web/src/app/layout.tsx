@@ -19,11 +19,11 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Soma — Tune into your inner rhythm",
   description:
-    "Soma is the privacy-first cycle tracker that syncs your life to your hormones. No ads. No data selling. Just biology.",
+    "Soma helps you track cycles, daily logs, insights, and partner-sharing permissions with a clean, focused experience.",
   openGraph: {
     title: "Soma — Tune into your inner rhythm",
     description:
-      "Privacy-first cycle tracking. Everything stays on your device.",
+      "Cycle tracking, daily logging, insights, and partner sync controls in one app.",
     type: "website",
   },
 };
