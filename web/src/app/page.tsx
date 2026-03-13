@@ -414,7 +414,20 @@ export default function HomePage() {
               {privacyItems.map((item) => (
                 <li key={item.title} className="flex items-start gap-4">
                   <div className="mt-1 w-6 h-6 rounded-full bg-rose/20 flex items-center justify-center text-rose text-sm flex-shrink-0">
-                    ✓
+                    <svg
+                      className="w-3.5 h-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.25"
+                      aria-hidden
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
                   </div>
                   <div>
                     <span className="block text-white font-medium">
