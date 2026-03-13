@@ -28,13 +28,13 @@ Privacy-first cycle tracking app (Expo + React Native + Supabase) with partner s
 
 Representative app mockups:
 
-| Home                                                | Calendar                                                |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| ![Soma Home](docs/screenshots/screenshot-1.png)    | ![Soma Calendar](docs/screenshots/screenshot-2.png)    |
+| Home                                            | Calendar                                            |
+| ----------------------------------------------- | --------------------------------------------------- |
+| ![Soma Home](docs/screenshots/screenshot-1.png) | ![Soma Calendar](docs/screenshots/screenshot-2.png) |
 
-| Insights                                            | Profile                                                 |
-| --------------------------------------------------- | ------------------------------------------------------- |
-| ![Soma Insights](docs/screenshots/screenshot-3.png) | ![Soma Profile](docs/screenshots/screenshot-4.png)     |
+| Insights                                            | Profile                                            |
+| --------------------------------------------------- | -------------------------------------------------- |
+| ![Soma Insights](docs/screenshots/screenshot-3.png) | ![Soma Profile](docs/screenshots/screenshot-4.png) |
 
 ## Tech stack
 
