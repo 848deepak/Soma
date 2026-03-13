@@ -8,6 +8,7 @@ Privacy-first cycle tracking app (Expo + React Native + Supabase) with partner s
 ## What is implemented
 
 ### Mobile app
+
 - Authentication: email login/signup + anonymous session flow
 - Onboarding: welcome + setup flow for initial profile/cycle start
 - Core tabs: Home, Calendar, Insights, Profile/Settings
@@ -18,9 +19,17 @@ Privacy-first cycle tracking app (Expo + React Native + Supabase) with partner s
 - Analytics/error hooks integrated in key flows
 
 ### Website (`web/`)
+
 - Marketing pages: Home, Features, Download, Privacy, Terms, Support
 - Download links point to GitHub latest release asset:
   `https://github.com/848deepak/Soma-/releases/latest/download/soma.apk`
+
+## Screenshots
+
+| App | App |
+| --- | --- |
+| ![Soma screenshot 1](docs/screenshots/screenshot-1.png) | ![Soma screenshot 2](docs/screenshots/screenshot-2.png) |
+| ![Soma screenshot 3](docs/screenshots/screenshot-3.png) | ![Soma screenshot 4](docs/screenshots/screenshot-4.png) |
 
 ## Tech stack
 
@@ -45,6 +54,7 @@ __tests__/          Unit/component/integration tests
 ## Local development
 
 ### Prerequisites
+
 - Node.js 20+
 - npm
 - Expo CLI / EAS CLI (for cloud builds)
@@ -78,6 +88,7 @@ cp .env.example .env.local
 ```
 
 Required public vars:
+
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
@@ -99,6 +110,7 @@ cd web && npm run build
 ## Build and release
 
 Expo project:
+
 - https://expo.dev/accounts/848deepak/projects/soma-health
 
 ### EAS builds
