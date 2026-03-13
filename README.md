@@ -26,10 +26,15 @@ Privacy-first cycle tracking app (Expo + React Native + Supabase) with partner s
 
 ## Screenshots
 
-| App | App |
-| --- | --- |
-| ![Soma screenshot 1](docs/screenshots/screenshot-1.png) | ![Soma screenshot 2](docs/screenshots/screenshot-2.png) |
-| ![Soma screenshot 3](docs/screenshots/screenshot-3.png) | ![Soma screenshot 4](docs/screenshots/screenshot-4.png) |
+Representative app mockups:
+
+| Home                                                | Calendar                                                |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| ![Soma Home](docs/screenshots/screenshot-1.png)    | ![Soma Calendar](docs/screenshots/screenshot-2.png)    |
+
+| Insights                                            | Profile                                                 |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| ![Soma Insights](docs/screenshots/screenshot-3.png) | ![Soma Profile](docs/screenshots/screenshot-4.png)     |
 
 ## Tech stack
 
@@ -111,7 +116,7 @@ cd web && npm run build
 
 Expo project:
 
-- https://expo.dev/accounts/848deepak/projects/soma-health
+- <https://expo.dev/accounts/848deepak/projects/soma-health>
 
 ### EAS builds
 
