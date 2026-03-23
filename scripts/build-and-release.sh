@@ -59,7 +59,7 @@ echo ""
 echo -e "${YELLOW}[3/7]${NC} Triggering EAS build..."
 eas build --platform android --profile $PROFILE --non-interactive --no-wait --json > build-output.json
 
-BUILD_ID=$(cat build-output.json | jq -r 'if type=="array" then .[0].id else .id end')
+BUILD_ID=$(cat build-output.json | jq -r '.[0].id')
 echo -e "Build ID: ${GREEN}$BUILD_ID${NC}"
 echo -e "Build URL: ${GREEN}https://expo.dev/accounts/848deepak/projects/$PROJECT_NAME/builds/$BUILD_ID${NC}"
 rm build-output.json
@@ -115,7 +115,7 @@ fi
 
 # 5. Download APK
 echo -e "${YELLOW}[5/7]${NC} Downloading APK..."
-DOWNLOAD_URL=$(eas build:view $BUILD_ID --json | jq -r 'if type=="array" then .[0].artifacts.buildUrl else .artifacts.buildUrl end')
+DOWNLOAD_URL=$(eas build:view $BUILD_ID --json | jq -r '.artifacts.buildUrl')
 
 if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
     echo -e "${RED}❌ Failed to get download URL${NC}"

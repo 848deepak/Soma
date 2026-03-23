@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-
+"use client";
 import { useEffect, useState } from "react";
 import { getLatestApkUrl } from "../../utils/getLatestApkUrl";
-
-export const metadata: Metadata = {
-  title: "Download Soma",
-  description: "Download Soma for Android or get notified for the iOS launch.",
-};
 
 const steps = [
   {
@@ -50,6 +44,9 @@ const steps = [
   },
 ];
 
+import Link from "next/link";
+
+function DownloadPage() {
   const [apkUrl, setApkUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -171,3 +168,5 @@ const steps = [
     </div>
   );
 }
+
+export default DownloadPage;
