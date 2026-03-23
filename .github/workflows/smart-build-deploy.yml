@@ -239,6 +239,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug Expo Token
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "EXPO_TOKEN is not set"
+            exit 1
+          else
+            echo "EXPO_TOKEN is set"
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
