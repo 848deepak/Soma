@@ -2,13 +2,13 @@
 
 This document explains the automated CI/CD pipeline that builds, releases, and deploys your app.
 
-## Overview
+## Overview 
 
 The GitHub Actions workflow (`.github/workflows/build-and-release.yml`) automatically:
-1. ✅ Builds Android APK via EAS Build
-2. ✅ Creates GitHub Release with APK
-3. ✅ Updates website with latest version
-4. ✅ Sends notifications on completion
+1. ✅ Builds Android APK via EAS Build.
+2. ✅ Creates GitHub Release with APK.
+3. ✅ Updates website with latest version.
+4. ✅ Sends notifications on completion.
 
 ## Triggers
 
