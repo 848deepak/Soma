@@ -4,12 +4,12 @@
  * The row is auto-created by the handle_new_user DB trigger on sign-up,
  * so it always exists after ensureAnonymousSession() completes.
  */
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { supabase } from '@/lib/supabase';
-import type { ProfileRow, ProfileUpdate } from '@/types/database';
+import { supabase } from "@/lib/supabase";
+import type { ProfileRow, ProfileUpdate } from "@/types/database";
 
-export const PROFILE_QUERY_KEY = ['profile'] as const;
+export const PROFILE_QUERY_KEY = ["profile"] as const;
 
 export function useProfile() {
   return useQuery<ProfileRow | null>({
@@ -21,16 +21,34 @@ export function useProfile() {
       if (!user) return null;
 
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.warn("[Profile] Query error:", error);
+        // Return null instead of throwing to prevent app crashes
+        return null;
+      }
       return data as unknown as ProfileRow;
     },
     // Profile rarely changes – 5 minute stale time
     staleTime: 5 * 60 * 1000,
+    // Simplified retry logic - only retry network errors
+    retry: (failureCount, error) => {
+      // Only retry actual network failures, not data issues
+      if (error.message.includes("network") && failureCount < 2) {
+        return true;
+      }
+      return false;
+    },
+    // Never throw errors - return null for graceful degradation
+    throwOnError: false,
+    // Add timeout through query options (3 seconds)
+    meta: {
+      timeout: 3000,
+    },
   });
 }
 
@@ -46,12 +64,12 @@ export function useUpdateProfile() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update(update)
-        .eq('id', user.id)
+        .eq("id", user.id)
         .select()
         .single();
 

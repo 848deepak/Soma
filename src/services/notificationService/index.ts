@@ -14,8 +14,20 @@
  * re-scheduling cancels the previous instance first (preventing duplicates).
  * This is intentionally not persisted – the worst case on app-restart is a
  * harmless duplicate notification that is superseded on the next schedule call.
+ *
+ * Platform Support:
+ *   - iOS/Android: Full support for local notifications
+ *   - Web: Gracefully disabled (methods return no-op promises)
  */
-import * as Notifications from "expo-notifications";
+import { Platform } from 'react-native';
+
+// Conditional import for native platforms only
+let Notifications: typeof import('expo-notifications') | null = null;
+
+if (Platform.OS === 'ios' || Platform.OS === 'android') {
+  // Dynamic import is handled at runtime, preventing SSR issues
+  Notifications = require('expo-notifications');
+}
 
 // ─── Identifier keys ──────────────────────────────────────────────────────────
 
@@ -43,6 +55,8 @@ export function _resetRegistry(): void {
  * and removes it from the registry.
  */
 async function cancelIfScheduled(key: string): Promise<void> {
+  if (!Notifications) return;
+
   const id = scheduledIds.get(key);
   if (id) {
     await Notifications.cancelScheduledNotificationAsync(id);
@@ -59,6 +73,11 @@ export type PermissionResult = { granted: boolean };
  * Safe to call multiple times – iOS will only show the system dialog once.
  */
 export async function requestPermissions(): Promise<PermissionResult> {
+  if (!Notifications) {
+    console.warn('[Notifications] Not available on this platform');
+    return { granted: false };
+  }
+
   const result = await Notifications.requestPermissionsAsync({
     ios: { allowAlert: true, allowBadge: true, allowSound: true },
   });
@@ -76,6 +95,11 @@ export async function scheduleDailyLogReminder(
   hour: number,
   minute: number,
 ): Promise<string> {
+  if (!Notifications) {
+    console.warn('[Notifications] Not available on this platform');
+    return '';
+  }
+
   await cancelIfScheduled(DAILY_KEY);
 
   const id = await Notifications.scheduleNotificationAsync({
@@ -110,6 +134,11 @@ export async function cancelDailyLogReminder(): Promise<void> {
 export async function schedulePeriodAlert(
   predictedDate: string,
 ): Promise<string> {
+  if (!Notifications) {
+    console.warn('[Notifications] Not available on this platform');
+    return '';
+  }
+
   await cancelIfScheduled(PERIOD_KEY);
 
   const [year, month, day] = predictedDate.split("-").map(Number);
@@ -147,6 +176,11 @@ export async function cancelPeriodAlert(): Promise<void> {
 export async function scheduleFertileWindowAlert(
   windowStart: string,
 ): Promise<string> {
+  if (!Notifications) {
+    console.warn('[Notifications] Not available on this platform');
+    return '';
+  }
+
   await cancelIfScheduled(FERTILE_KEY);
 
   const [year, month, day] = windowStart.split("-").map(Number);
@@ -178,6 +212,8 @@ export async function cancelFertileWindowAlert(): Promise<void> {
  * in-memory registry. Useful when the user disables notifications globally.
  */
 export async function cancelAllNotifications(): Promise<void> {
+  if (!Notifications) return;
+
   await Notifications.cancelAllScheduledNotificationsAsync();
   scheduledIds.clear();
 }

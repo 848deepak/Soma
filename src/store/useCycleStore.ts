@@ -9,12 +9,17 @@
  *    pre-populates the progress ring before TQ's first response arrives.
  *  - `isSaving` is still used to disable Save buttons during mutations.
  */
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import { supabase } from '@/lib/supabase';
-import { computeCycleDay, computePhase, computeProgress, getPhaseLabel } from '@/hooks/useCurrentCycle';
-import { captureException } from '@/src/services/errorTracking';
-import type { CycleRow } from '@/types/database';
+import {
+    computeCycleDay,
+    computePhase,
+    computeProgress,
+    getPhaseLabel,
+} from "@/hooks/useCurrentCycle";
+import { supabase } from "@/lib/supabase";
+import { captureException } from "@/src/services/errorTracking";
+import type { CycleRow } from "@/types/database";
 
 type CycleState = {
   cycleDay: number;
@@ -33,20 +38,24 @@ type CycleState = {
 
 const PHASE_INSIGHT: Record<string, { title: string; description: string }> = {
   menstrual: {
-    title: 'Rest and restore.',
-    description: 'Your body is working hard. Gentle movement and warm nourishment help today.',
+    title: "Rest and restore.",
+    description:
+      "Your body is working hard. Gentle movement and warm nourishment help today.",
   },
   follicular: {
-    title: 'Energy is building.',
-    description: 'Rising estrogen lifts your mood and focus. A great time for new projects.',
+    title: "Energy is building.",
+    description:
+      "Rising estrogen lifts your mood and focus. A great time for new projects.",
   },
   ovulation: {
-    title: 'Your estrogen is peaking today.',
-    description: 'You may notice a natural glow and higher energy levels. Great day for connections.',
+    title: "Your estrogen is peaking today.",
+    description:
+      "You may notice a natural glow and higher energy levels. Great day for connections.",
   },
   luteal: {
-    title: 'Slow down and reflect.',
-    description: 'Progesterone is rising. Honour rest needs and reduce high-intensity commitments.',
+    title: "Slow down and reflect.",
+    description:
+      "Progesterone is rising. Honour rest needs and reduce high-intensity commitments.",
   },
 };
 
@@ -54,10 +63,10 @@ export const useCycleStore = create<CycleState>((set) => ({
   // Sensible defaults shown while Supabase loads
   cycleDay: 1,
   cycleLength: 28,
-  phaseLabel: 'Cycle Phase',
+  phaseLabel: "Cycle Phase",
   progress: 0,
-  insightTitle: 'Loading…',
-  insightDescription: '',
+  insightTitle: "Loading…",
+  insightDescription: "",
   mood: undefined,
   energy: undefined,
   isSaving: false,
@@ -69,19 +78,54 @@ export const useCycleStore = create<CycleState>((set) => ({
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch active cycle and today's log in parallel
-      const today = new Date().toISOString().split('T')[0]!;
+      // Fetch active cycle and today's log in parallel with simplified error handling
+      const today = new Date().toISOString().split("T")[0]!;
 
-      const [cycleResult, logResult, profileResult] = await Promise.all([
-        supabase.from('cycles').select('*').is('end_date', null).order('start_date', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('daily_logs').select('mood, energy_level').eq('date', today).maybeSingle(),
-        supabase.from('profiles').select('cycle_length_average, period_duration_average').eq('id', user.id).maybeSingle(),
+      // Use Promise.allSettled for better error handling - no timeouts needed
+      const [cycleResult, logResult, profileResult] = await Promise.allSettled([
+        supabase
+          .from("cycles")
+          .select("*")
+          .is("end_date", null)
+          .order("start_date", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("daily_logs")
+          .select("mood, energy_level")
+          .eq("date", today)
+          .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("cycle_length_average, period_duration_average")
+          .eq("id", user.id)
+          .maybeSingle(),
       ]);
 
-      if (cycleResult.data) {
-        const cycle = cycleResult.data as unknown as CycleRow;
-        const profile = profileResult.data as unknown as { cycle_length_average: number | null; period_duration_average: number | null } | null;
-        const log = logResult.data as unknown as { mood: string | null; energy_level: string | null } | null;
+      // Extract data safely from settled promises
+      const cycleData =
+        cycleResult.status === "fulfilled" && cycleResult.value.data
+          ? cycleResult.value.data
+          : null;
+      const logData =
+        logResult.status === "fulfilled" && logResult.value.data
+          ? logResult.value.data
+          : null;
+      const profileData =
+        profileResult.status === "fulfilled" && profileResult.value.data
+          ? profileResult.value.data
+          : null;
+
+      if (cycleData) {
+        const cycle = cycleData as unknown as CycleRow;
+        const profile = profileData as unknown as {
+          cycle_length_average: number | null;
+          period_duration_average: number | null;
+        } | null;
+        const log = logData as unknown as {
+          mood: string | null;
+          energy_level: string | null;
+        } | null;
 
         const cycleLength = profile?.cycle_length_average ?? 28;
         const periodLen = profile?.period_duration_average ?? 5;
@@ -99,9 +143,38 @@ export const useCycleStore = create<CycleState>((set) => ({
           mood: log?.mood ?? undefined,
           energy: log?.energy_level ?? undefined,
         });
+      } else {
+        // No cycle data found, set sensible defaults
+        set({
+          cycleDay: 1,
+          cycleLength: 28,
+          phaseLabel: "Welcome to SOMA",
+          progress: 0,
+          insightTitle: "Get started",
+          insightDescription:
+            "Track your cycle to unlock personalized insights.",
+          mood: undefined,
+          energy: undefined,
+        });
       }
     } catch (error) {
-      captureException(error instanceof Error ? error : new Error(String(error)));
+      console.warn("[CycleStore] Hydration failed:", error);
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+
+      // Set fallback state even on error
+      set({
+        cycleDay: 1,
+        cycleLength: 28,
+        phaseLabel: "Welcome to SOMA",
+        progress: 0,
+        insightTitle: "Welcome",
+        insightDescription:
+          "Start tracking your cycle for personalized insights.",
+        mood: undefined,
+        energy: undefined,
+      });
     }
   },
 }));

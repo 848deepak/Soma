@@ -1,0 +1,21 @@
+flowchart TD
+  A[User (Woman)] -->|SOS Trigger| B(SOMA App)
+  B -->|API Call| C[Supabase Backend]
+  C -->|Store SOS| D[(Database)]
+  C -->|Notify| E[Partner/Trusted Contact]
+  C -->|Push Notification| F[Expo Push Service]
+  B -->|Realtime Update| G[UI Dashboard]
+  B -->|Cycle Log| D
+  B -->|Daily Log| D
+  B -->|Chat (Planned)| H[Chat Service]
+  H -->|Realtime| B
+  C -->|(Planned) Notify| I[Authorities/NGO]
+  style A fill:#f9f,stroke:#333,stroke-width:2px
+  style B fill:#bbf,stroke:#333,stroke-width:2px
+  style C fill:#bfb,stroke:#333,stroke-width:2px
+  style D fill:#fff,stroke:#333,stroke-width:2px
+  style E fill:#ffb,stroke:#333,stroke-width:2px
+  style F fill:#bff,stroke:#333,stroke-width:2px
+  style G fill:#eee,stroke:#333,stroke-width:2px
+  style H fill:#fcc,stroke:#333,stroke-width:2px
+  style I fill:#fcf,stroke:#333,stroke-width:2px

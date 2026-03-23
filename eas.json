@@ -30,11 +30,18 @@
     },
     "production": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "SENTRY_PROJECT": "soma-mobile",
+        "SENTRY_ORG": "soma-org"
+      },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "buildConfiguration": "Release"
       },
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
       }
     }
   },

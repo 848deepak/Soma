@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant U as User
+  participant App as SOMA App
+  participant S as Supabase
+  participant P as Partner
+  participant N as Notification Service
+
+  U->>App: Tap SOS
+  App->>S: API: /sos/trigger (location, time)
+  S->>S: Store SOS
+  S->>P: Notify partner (push/email)
+  S->>N: Send push notification
+  N->>P: Deliver notification
+  P->>App: Open app, view SOS
+  App->>S: Fetch SOS status
+  S->>App: Return status
+
+  Note over U,App: If offline, app caches SOS and retries
+  Note over S,P: (Planned) Escalate to authorities if no response

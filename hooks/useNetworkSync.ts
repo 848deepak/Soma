@@ -20,15 +20,29 @@ export function useNetworkSync(): void {
 
   useEffect(() => {
     // Seed the initial connectivity state without triggering a flush.
-    Network.getNetworkStateAsync()
-      .then((state) => {
+    // Add timeout protection to prevent blocking
+    const initializeNetworkState = async () => {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Network state timeout")), 5000);
+        });
+
+        const networkPromise = Network.getNetworkStateAsync();
+
+        const state = await Promise.race([networkPromise, timeoutPromise]);
         wasConnectedRef.current = Boolean(
           state.isConnected && state.isInternetReachable,
         );
-      })
-      .catch(() => {
-        wasConnectedRef.current = false;
-      });
+      } catch (error) {
+        console.warn(
+          "[NetworkSync] Failed to get initial network state:",
+          error,
+        );
+        wasConnectedRef.current = false; // Assume offline on error
+      }
+    };
+
+    initializeNetworkState();
 
     const subscription = Network.addNetworkStateListener((state) => {
       const isNowConnected = Boolean(

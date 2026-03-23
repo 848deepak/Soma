@@ -1,30 +1,30 @@
-import { Tabs } from "expo-router";
-import { SymbolView } from "expo-symbols";
-import { Platform, View, useColorScheme } from "react-native";
+import { Tabs } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import { Platform, View, useColorScheme } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#9B7E8C", // somaMauve — active icon/label
-        tabBarInactiveTintColor: isDark ? "rgba(242,242,242,0.45)" : "#BFAEB8",
+        tabBarActiveTintColor: '#9B7E8C', // somaMauve — active icon/label
+        tabBarInactiveTintColor: isDark ? 'rgba(242,242,242,0.45)' : '#BFAEB8',
         tabBarStyle: {
           // Glassmorphic bottom nav matching Figma BottomNav.tsx
           backgroundColor: isDark
-            ? "rgba(15,17,21,0.95)"
-            : "rgba(255,253,251,0.96)",
+            ? 'rgba(15,17,21,0.95)'
+            : 'rgba(255,253,251,0.96)',
           borderTopWidth: 1,
           borderTopColor: isDark
-            ? "rgba(255,255,255,0.08)"
-            : "rgba(221,167,165,0.12)",
+            ? 'rgba(255,255,255,0.08)'
+            : 'rgba(221,167,165,0.12)',
           // Soft shadow above nav bar
           ...Platform.select({
             ios: {
-              shadowColor: isDark ? "#000000" : "#DDA7A5",
+              shadowColor: isDark ? '#000000' : '#DDA7A5',
               shadowOffset: { width: 0, height: -4 },
               shadowOpacity: isDark ? 0.3 : 0.08,
               shadowRadius: 24,
@@ -39,9 +39,9 @@ export default function TabLayout() {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontFamily: "System",
+          fontFamily: 'System',
           fontSize: 11,
-          fontWeight: "400",
+          fontWeight: '400',
           letterSpacing: 0,
           marginTop: 2,
         },
@@ -54,24 +54,24 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <View
               style={{
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: focused
                   ? isDark
-                    ? "rgba(167,139,250,0.24)"
-                    : "rgba(255, 218, 185, 0.5)"
-                  : "transparent",
+                    ? 'rgba(167,139,250,0.24)'
+                    : 'rgba(255, 218, 185, 0.5)'
+                  : 'transparent',
               }}
             >
               <SymbolView
-                name={{ ios: "house.fill", android: "home", web: "home" }}
+                name={{ ios: 'house.fill', android: 'home', web: 'home' }}
                 tintColor={color}
                 size={22}
               />
@@ -82,27 +82,27 @@ export default function TabLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: "Calendar",
+          title: 'Calendar',
           tabBarIcon: ({ color, focused }) => (
             <View
               style={{
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: focused
                   ? isDark
-                    ? "rgba(167,139,250,0.24)"
-                    : "rgba(255, 218, 185, 0.5)"
-                  : "transparent",
+                    ? 'rgba(167,139,250,0.24)'
+                    : 'rgba(255, 218, 185, 0.5)'
+                  : 'transparent',
               }}
             >
               <SymbolView
                 name={{
-                  ios: "calendar",
-                  android: "calendar_month",
-                  web: "calendar_month",
+                  ios: 'calendar',
+                  android: 'calendar_month',
+                  web: 'calendar_month',
                 }}
                 tintColor={color}
                 size={22}
@@ -114,27 +114,27 @@ export default function TabLayout() {
       <Tabs.Screen
         name="insights"
         options={{
-          title: "Insights",
+          title: 'Insights',
           tabBarIcon: ({ color, focused }) => (
             <View
               style={{
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: focused
                   ? isDark
-                    ? "rgba(167,139,250,0.24)"
-                    : "rgba(255, 218, 185, 0.5)"
-                  : "transparent",
+                    ? 'rgba(167,139,250,0.24)'
+                    : 'rgba(255, 218, 185, 0.5)'
+                  : 'transparent',
               }}
             >
               <SymbolView
                 name={{
-                  ios: "chart.bar.xaxis",
-                  android: "bar_chart",
-                  web: "bar_chart",
+                  ios: 'chart.bar.xaxis',
+                  android: 'bar_chart',
+                  web: 'bar_chart',
                 }}
                 tintColor={color}
                 size={22}
@@ -146,27 +146,27 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Profile",
+          title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <View
               style={{
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: "center",
-                justifyContent: "center",
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: focused
                   ? isDark
-                    ? "rgba(167,139,250,0.24)"
-                    : "rgba(255, 218, 185, 0.5)"
-                  : "transparent",
+                    ? 'rgba(167,139,250,0.24)'
+                    : 'rgba(255, 218, 185, 0.5)'
+                  : 'transparent',
               }}
             >
               <SymbolView
                 name={{
-                  ios: "person.crop.circle",
-                  android: "person",
-                  web: "person",
+                  ios: 'person.crop.circle',
+                  android: 'person',
+                  web: 'person',
                 }}
                 tintColor={color}
                 size={22}

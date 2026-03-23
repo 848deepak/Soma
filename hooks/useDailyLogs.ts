@@ -6,14 +6,14 @@
  *   useDailyLogs(limit)  – recent N logs (used by Insights / Calendar)
  *   useTodayLog()        – today's single log (used by Dashboard widgets + log screens)
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
-import { supabase } from '@/lib/supabase';
-import type { DailyLogRow } from '@/types/database';
+import { supabase } from "@/lib/supabase";
+import type { DailyLogRow } from "@/types/database";
 
-export const DAILY_LOGS_KEY = (limit: number) => ['daily-logs', limit] as const;
-export const todayIso = () => new Date().toISOString().split('T')[0]!;
-export const TODAY_LOG_KEY = () => ['daily-log', todayIso()] as const;
+export const DAILY_LOGS_KEY = (limit: number) => ["daily-logs", limit] as const;
+export const todayIso = () => new Date().toISOString().split("T")[0]!;
+export const TODAY_LOG_KEY = () => ["daily-log", todayIso()] as const;
 
 /**
  * Fetches the N most recent daily log rows for the signed-in user.
@@ -24,9 +24,9 @@ export function useDailyLogs(limit: number = 90) {
     queryKey: DAILY_LOGS_KEY(limit),
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .order('date', { ascending: false })
+        .from("daily_logs")
+        .select("*")
+        .order("date", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
@@ -44,16 +44,34 @@ export function useTodayLog() {
   return useQuery<DailyLogRow | null>({
     queryKey: TODAY_LOG_KEY(),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('daily_logs')
-        .select('*')
-        .eq('date', todayIso())
+      // Add timeout protection
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Today log query timeout"));
+        }, 8000);
+      });
+
+      const logPromise = supabase
+        .from("daily_logs")
+        .select("*")
+        .eq("date", todayIso())
         .maybeSingle();
+
+      const { data, error } = await Promise.race([logPromise, timeoutPromise]);
 
       if (error) throw error;
       return data as unknown as DailyLogRow | null;
     },
     // Today's log changes when the user logs – keep stale time short
     staleTime: 60 * 1000,
+    // Add retry configuration
+    retry: (failureCount, error) => {
+      if (error.message.includes("timeout") && failureCount >= 1) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    // Don't throw errors, return null instead
+    throwOnError: false,
   });
 }

@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState } from "react";
+import Link from 'next/link';
+import { useState } from 'react';
 
 const links = [
-  { label: "Home", href: "/" },
-  { label: "Features", href: "/features" },
-  { label: "Download", href: "/download" },
-  { label: "Privacy", href: "/privacy" },
+  { label: 'Home', href: '/' },
+  { label: 'Features', href: '/features' },
+  { label: 'Download', href: '/download' },
+  { label: 'Privacy', href: '/privacy' },
 ];
 
 export function Navbar() {
@@ -51,17 +51,17 @@ export function Navbar() {
             {/* Hamburger – mobile only */}
             <button
               className="md:hidden flex flex-col items-center justify-center h-10 w-10 gap-1.5 rounded-full border border-white/70 bg-white/55 backdrop-blur-sm"
-              aria-label={open ? "Close menu" : "Open menu"}
+              aria-label={open ? 'Close menu' : 'Open menu'}
               onClick={() => setOpen((v) => !v)}
             >
               <span
-                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-transform duration-200 ${open ? "translate-y-2 rotate-45" : ""}`}
+                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-transform duration-200 ${open ? 'translate-y-2 rotate-45' : ''}`}
               />
               <span
-                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-opacity duration-200 ${open ? "opacity-0" : ""}`}
+                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-opacity duration-200 ${open ? 'opacity-0' : ''}`}
               />
               <span
-                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-transform duration-200 ${open ? "-translate-y-2 -rotate-45" : ""}`}
+                className={`block h-0.5 w-5 rounded-full bg-charcoal transition-transform duration-200 ${open ? '-translate-y-2 -rotate-45' : ''}`}
               />
             </button>
           </div>

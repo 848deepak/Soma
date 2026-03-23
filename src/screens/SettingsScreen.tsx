@@ -29,7 +29,7 @@ import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
-import { trackEvent } from "@/src/services/analytics";
+import { track } from "@/src/services/analytics";
 import {
   cancelAllNotifications,
   requestPermissions,
@@ -526,7 +526,7 @@ export function SettingsScreen() {
       Alert.alert("Unavailable", "Could not open your email app.");
       return;
     }
-    trackEvent("feedback_submitted");
+    track("feedback_submitted");
     await Linking.openURL(emailUrl);
   }
 

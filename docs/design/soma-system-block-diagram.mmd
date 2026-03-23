@@ -1,0 +1,39 @@
+flowchart TD
+  subgraph Mobile App
+    A1[Home]
+    A2[Dashboard]
+    A3[SOS Button]
+    A4[Partner Link]
+    A5[Cycle Tracker]
+    A6[Daily Log]
+    A7[Insights]
+    A8[Chat/Help]
+  end
+  subgraph Backend
+    B1[Supabase API]
+    B2[Database]
+    B3[Realtime]
+    B4[Notification Service]
+    B5[Chat Service (Planned)]
+  end
+  subgraph External
+    C1[Partner]
+    C2[Authorities/NGO]
+  end
+  A3 -->|Trigger| B1
+  B1 -->|Store| B2
+  B1 -->|Notify| B4
+  B4 --> C1
+  B1 -->|Realtime| B3
+  B3 --> A2
+  A8 -->|Chat| B5
+  B5 -->|Realtime| A8
+  B1 -->|Escalate| C2
+  A4 -->|Invite| C1
+  A5 -->|Log| B2
+  A6 -->|Log| B2
+  A7 -->|Fetch| B2
+  style A3 fill:#fcc,stroke:#333,stroke-width:2px
+  style A8 fill:#fcf,stroke:#333,stroke-width:2px
+  style B5 fill:#fcf,stroke:#333,stroke-width:2px
+  style C2 fill:#fcf,stroke:#333,stroke-width:2px

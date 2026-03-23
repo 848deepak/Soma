@@ -8,10 +8,10 @@
  * The hook subscribes to onAuthStateChange so it updates immediately
  * when the user signs in, signs out, or the token refreshes.
  */
-import { useEffect, useState } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User } from "@supabase/supabase-js";
+import { useEffect, useState } from "react";
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 export interface AuthState {
   user: User | null;
@@ -29,19 +29,59 @@ export function useAuth(): AuthState {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Resolve any existing persisted session from AsyncStorage on mount
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setIsLoading(false);
-    });
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
-    // Subscribe to future auth state changes (sign-in, sign-out, token refresh)
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setIsLoading(false);
-    });
+    const resolveInitialSession = async () => {
+      try {
+        // Reduced timeout to 3 seconds for faster failure and app startup
+        timeoutId = setTimeout(() => {
+          if (isMounted) {
+            console.warn(
+              "[Auth] Session timeout after 3s, defaulting to no session",
+            );
+            setSession(null);
+            setIsLoading(false);
+          }
+        }, 3000);
+
+        const { data, error } = await supabase.auth.getSession();
+
+        if (isMounted) {
+          clearTimeout(timeoutId);
+          if (error) {
+            console.warn("[Auth] Session error:", error);
+            setSession(null);
+          } else {
+            setSession(data.session ?? null);
+          }
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.warn("[Auth] Session resolution error:", error);
+        if (isMounted) {
+          clearTimeout(timeoutId);
+          setSession(null);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    resolveInitialSession();
+
+    // Subscribe to auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (isMounted) {
+          setSession(newSession);
+          setIsLoading(false);
+        }
+      },
+    );
 
     return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
       listener.subscription.unsubscribe();
     };
   }, []);

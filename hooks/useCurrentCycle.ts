@@ -6,12 +6,12 @@
  * An "active cycle" is a cycles row where end_date IS NULL.
  * Returns null when no cycle exists yet (new user before SetupScreen).
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
-import { supabase } from '@/lib/supabase';
-import type { CycleRow, CyclePhase } from '@/types/database';
+import { supabase } from "@/lib/supabase";
+import type { CyclePhase, CycleRow } from "@/types/database";
 
-export const CURRENT_CYCLE_KEY = ['current-cycle'] as const;
+export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
 // ─── Pure helper functions (also used by CycleIntelligence in Phase 3) ───────
 
@@ -21,7 +21,9 @@ export function computeCycleDay(startDateIso: string): number {
   start.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diff = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const diff = Math.floor(
+    (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+  );
   return Math.max(1, diff + 1);
 }
 
@@ -41,22 +43,25 @@ export function computePhase(
   periodLen: number = 5,
 ): CyclePhase {
   const ovulationDay = Math.max(periodLen + 2, cycleLength - 14);
-  if (cycleDay <= periodLen) return 'menstrual';
-  if (cycleDay < ovulationDay) return 'follicular';
-  if (cycleDay <= ovulationDay + 1) return 'ovulation';
-  return 'luteal';
+  if (cycleDay <= periodLen) return "menstrual";
+  if (cycleDay < ovulationDay) return "follicular";
+  if (cycleDay <= ovulationDay + 1) return "ovulation";
+  return "luteal";
 }
 
 /** Progress ratio 0–1 clamped to the cycle length. */
-export function computeProgress(cycleDay: number, cycleLength: number = 28): number {
+export function computeProgress(
+  cycleDay: number,
+  cycleLength: number = 28,
+): number {
   return Math.min(1, cycleDay / cycleLength);
 }
 
 const PHASE_LABELS: Record<CyclePhase, string> = {
-  menstrual: 'Menstrual Phase',
-  follicular: 'Follicular Phase',
-  ovulation: 'Ovulation Phase',
-  luteal: 'Luteal Phase',
+  menstrual: "Menstrual Phase",
+  follicular: "Follicular Phase",
+  ovulation: "Ovulation Phase",
+  luteal: "Luteal Phase",
 };
 
 export function getPhaseLabel(phase: CyclePhase): string {
@@ -78,14 +83,17 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
     queryKey: CURRENT_CYCLE_KEY,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('cycles')
-        .select('*')
-        .is('end_date', null)
-        .order('start_date', { ascending: false })
+        .from("cycles")
+        .select("*")
+        .is("end_date", null)
+        .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.warn("[CurrentCycle] Query error:", error);
+        return null;
+      }
       if (!data) return null;
 
       const cycle = data as unknown as CycleRow;
@@ -102,6 +110,19 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
     },
     // Cycle data doesn't change during a session – refresh every 10 min
     staleTime: 10 * 60 * 1000,
+    // Simplified retry logic
+    retry: (failureCount, error) => {
+      if (error.message.includes("network") && failureCount < 1) {
+        return true;
+      }
+      return false;
+    },
+    // Don't throw errors, return null instead
+    throwOnError: false,
+    // Add timeout through query options
+    meta: {
+      timeout: 3000,
+    },
   });
 }
 
@@ -114,8 +135,13 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
 export function buildMiniCalendar(
   cycle: CycleRow | null,
   periodLen: number = 5,
-): Array<{ day: string; date: number; isCurrent: boolean; hasPeriod: boolean }> {
-  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+): Array<{
+  day: string;
+  date: number;
+  isCurrent: boolean;
+  hasPeriod: boolean;
+}> {
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

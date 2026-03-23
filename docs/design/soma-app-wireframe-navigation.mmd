@@ -1,0 +1,36 @@
+flowchart TD
+  A[Home Screen]
+  B[Dashboard]
+  C[SOS Button]
+  D[Partner Link]
+  E[Cycle Tracker]
+  F[Daily Log]
+  G[Insights]
+  H[Chat/Help (Planned)]
+
+  A --> B
+  B --> C
+  B --> D
+  B --> E
+  B --> F
+  B --> G
+  B --> H
+  C -->|Trigger| I[SOS Modal]
+  D -->|Invite/Status| J[Partner Modal]
+  E -->|Track| K[Cycle Modal]
+  F -->|Log| L[Log Modal]
+  H -->|Chat| M[Chat Modal]
+
+  style A fill:#bbf,stroke:#333,stroke-width:2px
+  style B fill:#bfb,stroke:#333,stroke-width:2px
+  style C fill:#fcc,stroke:#333,stroke-width:2px
+  style D fill:#ffb,stroke:#333,stroke-width:2px
+  style E fill:#bff,stroke:#333,stroke-width:2px
+  style F fill:#eee,stroke:#333,stroke-width:2px
+  style G fill:#eee,stroke:#333,stroke-width:2px
+  style H fill:#fcf,stroke:#333,stroke-width:2px
+  style I fill:#fcc,stroke:#333,stroke-width:2px
+  style J fill:#ffb,stroke:#333,stroke-width:2px
+  style K fill:#bff,stroke:#333,stroke-width:2px
+  style L fill:#eee,stroke:#333,stroke-width:2px
+  style M fill:#fcf,stroke:#333,stroke-width:2px

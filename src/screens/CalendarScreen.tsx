@@ -4,7 +4,7 @@
  * Full cycle calendar with real Supabase data.
  * Replaces all mock data with live calculations from CycleIntelligence.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, View, useColorScheme } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
@@ -106,7 +106,8 @@ function getDayNote(day: number, meta: MonthCalendarMeta): string {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function CalendarScreen() {
-  const todayObj = new Date();
+  // Memoize today's date to prevent unnecessary recalculations
+  const todayObj = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(todayObj.getFullYear());
   const [viewMonth, setViewMonth] = useState(todayObj.getMonth()); // 0-indexed
   const [selectedDay, setSelectedDay] = useState<number | null>(
@@ -128,12 +129,20 @@ export function CalendarScreen() {
 
   const periodLen = profile?.period_duration_average ?? 5;
 
+  // Memoize current month check to prevent recalculation
+  const isCurrentMonth = useMemo(
+    () =>
+      viewYear === todayObj.getFullYear() && viewMonth === todayObj.getMonth(),
+    [viewYear, viewMonth, todayObj],
+  );
+
+  const currentDay = useMemo(
+    () => (isCurrentMonth ? todayObj.getDate() : -1),
+    [isCurrentMonth, todayObj],
+  );
+
   // ─── Derived calendar meta ─────────────────────────────────────────────────
   const calendarMeta: MonthCalendarMeta = useMemo(() => {
-    const isCurrentMonth =
-      viewYear === todayObj.getFullYear() && viewMonth === todayObj.getMonth();
-    const currentDay = isCurrentMonth ? todayObj.getDate() : -1;
-
     let periodDays: number[] = [];
     let fertileWindow: number[] = [];
     let ovulationDay = -1;
@@ -207,7 +216,7 @@ export function CalendarScreen() {
       fertileWindow,
       ovulationDay,
     };
-  }, [cycleData, completedCycles, viewMonth, viewYear, periodLen, todayObj]);
+  }, [cycleData, completedCycles, viewMonth, viewYear, periodLen, currentDay]);
 
   // ─── Calendar grid ──────────────────────────────────────────────────────────
   const weeks = useMemo(() => {
@@ -217,7 +226,7 @@ export function CalendarScreen() {
   }, [viewMonth, viewYear]);
 
   // ─── Month navigation helpers ──────────────────────────────────────────────
-  function goToPrevMonth() {
+  const goToPrevMonth = useCallback(() => {
     setSelectedDay(null);
     if (viewMonth === 0) {
       setViewMonth(11);
@@ -225,9 +234,9 @@ export function CalendarScreen() {
     } else {
       setViewMonth((m) => m - 1);
     }
-  }
+  }, [viewMonth]);
 
-  function goToNextMonth() {
+  const goToNextMonth = useCallback(() => {
     setSelectedDay(null);
     if (viewMonth === 11) {
       setViewMonth(0);
@@ -235,36 +244,39 @@ export function CalendarScreen() {
     } else {
       setViewMonth((m) => m + 1);
     }
-  }
+  }, [viewMonth]);
 
-  const dayNote = selectedDay ? getDayNote(selectedDay, calendarMeta) : null;
+  // Memoize computed values
+  const dayNote = useMemo(
+    () => (selectedDay ? getDayNote(selectedDay, calendarMeta) : null),
+    [selectedDay, calendarMeta],
+  );
   const hasCycle = Boolean(cycleData?.cycle);
   const isDark = useColorScheme() === "dark";
 
-  async function handleSubmitPeriodModal({
-    startDate,
-    endDate,
-  }: {
-    startDate: string;
-    endDate: string;
-  }) {
-    try {
-      setIsLoggingPeriod(true);
-      await logPeriodRangeAction({
-        startDate,
-        endDate: endDate || undefined,
-      });
-      await refetchCurrentCycle();
-      setShowPeriodModal(false);
-      Alert.alert("Saved", "Period dates logged successfully.");
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Could not log period dates.";
-      Alert.alert("Action Failed", message);
-    } finally {
-      setIsLoggingPeriod(false);
-    }
-  }
+  const handleSubmitPeriodModal = useCallback(
+    async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
+      try {
+        setIsLoggingPeriod(true);
+        await logPeriodRangeAction({
+          startDate,
+          endDate: endDate || undefined,
+        });
+        await refetchCurrentCycle();
+        setShowPeriodModal(false);
+        Alert.alert("Saved", "Period dates logged successfully.");
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not log period dates.";
+        Alert.alert("Action Failed", message);
+      } finally {
+        setIsLoggingPeriod(false);
+      }
+    },
+    [refetchCurrentCycle],
+  );
 
   return (
     <Screen>

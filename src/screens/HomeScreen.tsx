@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, View, useColorScheme } from "react-native";
 
 import { buildMiniCalendar, useCurrentCycle } from "@/hooks/useCurrentCycle";
@@ -11,6 +11,7 @@ import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { SkeletonLoader } from "@/src/components/ui/SkeletonLoader";
+import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useCycleStore } from "@/src/store/useCycleStore";
@@ -28,7 +29,7 @@ const PHASE_INSIGHT: Record<string, string> = {
 };
 
 // ── Gradient Orb — hero element matching Figma ─────────────────────────────
-function CycleOrb({
+const CycleOrb = React.memo(function CycleOrb({
   day,
   phaseLabel,
   isDark,
@@ -160,7 +161,7 @@ function CycleOrb({
       </View>
     </View>
   );
-}
+});
 
 export function HomeScreen() {
   const router = useRouter();
@@ -169,32 +170,62 @@ export function HomeScreen() {
   const { user } = useAuthContext();
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
+  const [forceShow, setForceShow] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // ─── Real-time Supabase sync ─────────────────────────────────────────────
   useRealtimeSync(user?.id);
 
   // ─── Live data hooks ─────────────────────────────────────────────────────
-  const { data: profile, isLoading: isProfileLoading } = useProfile();
-  const { data: todayLog, isLoading: isTodayLoading } = useTodayLog();
+  const { data: profile, isLoading: isProfileLoading, error: profileError } = useProfile();
+  const { data: todayLog, isLoading: isTodayLoading, error: todayError } = useTodayLog();
   const {
     data: cycleData,
     isLoading: isCycleLoading,
+    error: cycleError,
     refetch: refetchCurrentCycle,
   } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
 
+  // Initialize app state once
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
-
-  useEffect(() => {
-    if (typeof refetchCurrentCycle === "function") {
-      void refetchCurrentCycle();
+    if (!hasInitialized) {
+      hydrate();
+      setHasInitialized(true);
     }
-  }, [refetchCurrentCycle]);
+  }, [hydrate, hasInitialized]);
 
+  // Optimized refetch logic - only run once on mount to avoid infinite loops
+  useEffect(() => {
+    if (hasInitialized && typeof refetchCurrentCycle === "function") {
+      // Use a timeout to ensure this only happens once after initialization
+      const timeoutId = setTimeout(() => {
+        void refetchCurrentCycle();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [hasInitialized]); // Removed refetchCurrentCycle dependency to prevent infinite loops
+
+  // ─── Loading timeout protection ──────────────────────────────────────────
+  useEffect(() => {
+    // Force show content after 10 seconds even if still loading (reduced from 15s)
+    const timeoutId = setTimeout(() => {
+      console.warn('[HomeScreen] Loading timeout reached, showing content with fallbacks');
+      setForceShow(true);
+    }, 10000);
+
+    // Clear timeout when loading completes normally or errors occur
+    if ((!isProfileLoading && !isTodayLoading && !isCycleLoading) ||
+        profileError || todayError || cycleError) {
+      clearTimeout(timeoutId);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [isProfileLoading, isTodayLoading, isCycleLoading, profileError, todayError, cycleError]);
+
+  // Memoize mini calendar to prevent unnecessary recalculations
   const miniCalendar = useMemo(
     () =>
       buildMiniCalendar(
@@ -204,6 +235,7 @@ export function HomeScreen() {
     [cycleData?.cycle, profile?.period_duration_average],
   );
 
+  // Memoize navigation handlers
   const handleLogFlow = useCallback(() => {
     router.push("/quick-checkin" as never);
   }, [router]);
@@ -240,17 +272,24 @@ export function HomeScreen() {
     [refetchCurrentCycle],
   );
 
-  if (isProfileLoading || isTodayLoading || isCycleLoading) {
-    return <SkeletonLoader />;
+  // Show loading splash only if all queries are loading AND timeout hasn't been reached AND no errors
+  if ((isProfileLoading || isTodayLoading || isCycleLoading) && !forceShow && !profileError && !todayError && !cycleError) {
+    return (
+      <SomaLoadingSplash
+        timeout={10000}
+        onTimeout={() => setForceShow(true)}
+        subtitle="Preparing your personal cycle insights..."
+      />
+    );
   }
 
-  // ─── Derived display values ───────────────────────────────────────────────
+  // ─── Derived display values with fallbacks ───────────────────────────────────────────────
   const greetingName = profile?.first_name || "there";
   const cycleDay = cycleData?.cycleDay ?? 1;
   const phaseLabel = cycleData?.phaseLabel ?? "Cycle Phase";
   const insightText = cycleData?.phase
     ? (PHASE_INSIGHT[cycleData.phase] ?? PHASE_INSIGHT.follicular!)
-    : "Loading your cycle data…";
+    : "Welcome to SOMA. Let's start tracking your cycle.";
 
   const hydrationValue = `${todayLog?.hydration_glasses ?? 0}/8`;
   const sleepValue = todayLog?.sleep_hours
