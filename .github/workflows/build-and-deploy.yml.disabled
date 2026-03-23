@@ -1,0 +1,191 @@
+name: Build and Deploy Soma App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  # ===========================
+  # JOB 1: Build Android APK
+  # ===========================
+  build-android:
+    name: Build Android APK/AAB
+    runs-on: ubuntu-latest
+    outputs:
+      apk-url: ${{ steps.build-output.outputs.apk-url }}
+      build-id: ${{ steps.build-output.outputs.build-id }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Get app version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Building version: $VERSION"
+
+      # Build for PREVIEW (APK for easy distribution)
+      - name: Build Android APK (Preview)
+        id: build-preview
+        run: |
+          echo "🚀 Starting EAS Build for Android APK..."
+          eas build --platform android --profile preview --non-interactive --no-wait > build-output.txt
+          BUILD_ID=$(grep -oP 'https://expo.dev/accounts/[^/]+/projects/[^/]+/builds/[\w-]+' build-output.txt | tail -1 | grep -oP '[\w-]+$')
+          echo "build-id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "✅ Build queued: $BUILD_ID"
+
+      # Wait for build to complete and get artifact URL
+      - name: Wait for build and get APK URL
+        id: build-output
+        run: |
+          BUILD_ID="${{ steps.build-preview.outputs.build-id }}"
+          echo "⏳ Waiting for build $BUILD_ID to complete..."
+
+          # Poll build status (max 30 minutes)
+          for i in {1..60}; do
+            STATUS=$(eas build:view $BUILD_ID --json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf-8'))[0].status")
+            echo "Build status: $STATUS (check $i/60)"
+
+            if [ "$STATUS" = "finished" ]; then
+              APK_URL=$(eas build:view $BUILD_ID --json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf-8'))[0].artifacts.buildUrl")
+              echo "apk-url=$APK_URL" >> $GITHUB_OUTPUT
+              echo "build-id=$BUILD_ID" >> $GITHUB_OUTPUT
+              echo "✅ Build complete! APK URL: $APK_URL"
+              exit 0
+            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "canceled" ]; then
+              echo "❌ Build failed with status: $STATUS"
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          echo "❌ Build timeout after 30 minutes"
+          exit 1
+
+  # ===========================
+  # JOB 2: Publish OTA Update
+  # ===========================
+  publish-ota-update:
+    name: Publish OTA Update
+    runs-on: ubuntu-latest
+    needs: build-android # Run after build completes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA Update to Production Channel
+        run: |
+          echo "📡 Publishing OTA update to production channel..."
+          eas update --branch production --message "Auto-deploy from commit ${{ github.sha }}" --non-interactive
+          echo "✅ OTA update published!"
+
+  # ===========================
+  # JOB 3: Store Build Metadata
+  # ===========================
+  update-build-metadata:
+    name: Update Build Metadata
+    runs-on: ubuntu-latest
+    needs: [build-android, publish-ota-update]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update latest-build.json
+        run: |
+          mkdir -p build-artifacts
+          cat > build-artifacts/latest-build.json << EOF
+          {
+            "version": "${{ needs.build-android.outputs.version }}",
+            "buildId": "${{ needs.build-android.outputs.build-id }}",
+            "apkUrl": "${{ needs.build-android.outputs.apk-url }}",
+            "platform": "android",
+            "buildDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commitSha": "${{ github.sha }}",
+            "commitMessage": "${{ github.event.head_commit.message }}",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+          cat build-artifacts/latest-build.json
+
+      - name: Commit and push metadata
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add build-artifacts/latest-build.json
+          git diff --staged --quiet || git commit -m "chore: update build metadata [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================
+  # JOB 4: Create GitHub Release (Optional)
+  # ===========================
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-android
+    if: startsWith(github.event.head_commit.message, 'release:') # Only on release commits
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-android.outputs.version }}
+          name: Soma v${{ needs.build-android.outputs.version }}
+          body: |
+            ## 📱 Soma v${{ needs.build-android.outputs.version }}
+
+            ### Download
+            - [Android APK](${{ needs.build-android.outputs.apk-url }})
+
+            ### What's Changed
+            ${{ github.event.head_commit.message }}
+
+            ### Build Info
+            - Build ID: `${{ needs.build-android.outputs.build-id }}`
+            - Commit: `${{ github.sha }}`
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -41,7 +41,7 @@ class ErrorTrackingService {
         dsn,
         enableAutoSessionTracking: true,
         sessionTrackingIntervalMillis: 30000,
-        enableAutoPerformanceTracking: true,
+        enableAutoPerformanceTracing: true,
         tracesSampleRate: 0.1, // 10% sampling for performance
       });
     }

@@ -6,32 +6,35 @@
  * The import lives here (not in app/_layout.tsx) so any module that imports
  * this file always gets the polyfill installed first.
  */
-import 'react-native-url-polyfill/auto';
+import "react-native-url-polyfill/auto";
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-import { createClient } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createClient } from "@supabase/supabase-js";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
-const runtimeExtra = Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {};
+const runtimeExtra =
+  Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {};
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? runtimeExtra.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ?? runtimeExtra.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? runtimeExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  runtimeExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 const API_TIMEOUT_MS = 15000;
 
 const webStorage = {
   getItem: async (key: string) => {
-    if (typeof window === 'undefined') return null;
+    if (typeof window === "undefined") return null;
     return window.localStorage.getItem(key);
   },
   setItem: async (key: string, value: string) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     window.localStorage.setItem(key, value);
   },
   removeItem: async (key: string) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     window.localStorage.removeItem(key);
   },
 };
@@ -43,9 +46,9 @@ const serverNoopStorage = {
 };
 
 const authStorage =
-  typeof window === 'undefined'
+  typeof window === "undefined"
     ? serverNoopStorage
-    : Platform.OS === 'web'
+    : Platform.OS === "web"
       ? webStorage
       : AsyncStorage;
 
@@ -57,7 +60,7 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   // so that both component unmounts and the 15 s ceiling are respected.
   const callerSignal = init?.signal ?? null;
   const signal =
-    callerSignal && typeof AbortSignal.any === 'function'
+    callerSignal && typeof AbortSignal.any === "function"
       ? AbortSignal.any([controller.signal, callerSignal])
       : controller.signal;
 
@@ -68,9 +71,9 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    'Missing Supabase environment variables.\n' +
-      'Copy .env.example → .env.local and fill in EXPO_PUBLIC_SUPABASE_URL ' +
-      'and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+    "Missing Supabase environment variables.\n" +
+      "Copy .env.example → .env.local and fill in EXPO_PUBLIC_SUPABASE_URL " +
+      "and EXPO_PUBLIC_SUPABASE_ANON_KEY.",
   );
 }
 

@@ -1,0 +1,243 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+  workflow_dispatch:
+    inputs:
+      build_profile:
+        description: 'Build profile (preview or production)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  build-android:
+    name: Build Android App
+    runs-on: ubuntu-latest
+    outputs:
+      build_id: ${{ steps.build.outputs.build_id }}
+      download_url: ${{ steps.build.outputs.download_url }}
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          BUILD_NUMBER=$(node -p "require('./app.json').expo.android?.versionCode || '1'")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION, Build: $BUILD_NUMBER"
+
+      - name: Build Android APK
+        id: build
+        run: |
+          PROFILE="${{ github.event.inputs.build_profile || 'preview' }}"
+          echo "Building with profile: $PROFILE"
+
+          # Trigger build
+          eas build --platform android --profile $PROFILE --non-interactive --no-wait --json > build-output.json
+
+          # Extract build ID
+          BUILD_ID=$(cat build-output.json | jq -r '.[0].id')
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "Build ID: $BUILD_ID"
+
+          # Wait for build to complete (with timeout)
+          echo "Waiting for build to complete..."
+          TIMEOUT=1800  # 30 minutes
+          ELAPSED=0
+          INTERVAL=30
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(eas build:view $BUILD_ID --json | jq -r '.status')
+            echo "Build status: $STATUS (${ELAPSED}s elapsed)"
+
+            if [ "$STATUS" = "FINISHED" ]; then
+              echo "Build completed successfully!"
+              DOWNLOAD_URL=$(eas build:view $BUILD_ID --json | jq -r '.artifacts.buildUrl')
+              echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+              exit 0
+            elif [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELED" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "Build timed out after ${TIMEOUT}s"
+          exit 1
+
+      - name: Download APK
+        run: |
+          curl -L -o soma-health.apk "${{ steps.build.outputs.download_url }}"
+          ls -lh soma-health.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: soma-health.apk
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## What's New in v${{ needs.build-android.outputs.version }}
+
+          🎉 Latest build of Soma Health - Period & Wellness Companion
+
+          ### Installation
+          - Download the APK below
+          - Enable "Install from Unknown Sources" on your Android device
+          - Install the app
+
+          ### Features
+          - Period tracking with calendar view
+          - Health insights and analytics
+          - Secure data sync with Supabase
+          - Privacy-focused design
+
+          ### Build Info
+          - Version: ${{ needs.build-android.outputs.version }}
+          - Build Number: ${{ needs.build-android.outputs.build_number }}
+          - Build ID: ${{ needs.build-android.outputs.build_id }}
+          - Platform: Android
+          - Profile: ${{ github.event.inputs.build_profile || 'preview' }}
+
+          ### Links
+          - [View Build on Expo](https://expo.dev/accounts/848deepak/projects/soma-health/builds/${{ needs.build-android.outputs.build_id }})
+          - [GitHub Repository](https://github.com/848deepak/Soma)
+          - [Website](https://soma-health.vercel.app)
+          EOF
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-android.outputs.version }}-build.${{ needs.build-android.outputs.build_number }}
+          name: Soma Health v${{ needs.build-android.outputs.version }} (Build ${{ needs.build-android.outputs.build_number }})
+          body_path: release-notes.md
+          files: soma-health.apk
+          draft: false
+          prerelease: ${{ github.event.inputs.build_profile != 'production' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-website:
+    name: Update Website
+    needs: [build-android, create-release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Update website with latest version
+        run: |
+          cd web
+
+          # Update version in package.json or environment
+          VERSION="${{ needs.build-android.outputs.version }}"
+          BUILD_NUMBER="${{ needs.build-android.outputs.build_number }}"
+
+          # Create/update a version.json file that the website can read
+          cat > public/version.json <<EOF
+          {
+            "version": "$VERSION",
+            "buildNumber": "$BUILD_NUMBER",
+            "buildId": "${{ needs.build-android.outputs.build_id }}",
+            "downloadUrl": "https://github.com/848deepak/Soma/releases/latest/download/soma-health.apk",
+            "releaseUrl": "https://github.com/848deepak/Soma/releases/latest",
+            "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+          cat public/version.json
+
+      - name: Commit version update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/public/version.json
+          git diff --staged --quiet || git commit -m "chore: update app version to ${{ needs.build-android.outputs.version }}"
+          git push
+
+      - name: Trigger Vercel deployment (optional)
+        if: secrets.VERCEL_DEPLOY_HOOK != ''
+        run: |
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+
+  notify:
+    name: Send Notification
+    needs: [build-android, create-release, update-website]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Build Success Notification
+        if: needs.build-android.result == 'success'
+        run: |
+          echo "✅ Build completed successfully!"
+          echo "Version: ${{ needs.build-android.outputs.version }}"
+          echo "Download: https://github.com/848deepak/Soma/releases/latest"
+          echo "Build URL: https://expo.dev/accounts/848deepak/projects/soma-health/builds/${{ needs.build-android.outputs.build_id }}"
+
+      - name: Build Failure Notification
+        if: needs.build-android.result == 'failure'
+        run: |
+          echo "❌ Build failed"
+          echo "Check logs: https://expo.dev/accounts/848deepak/projects/soma-health/builds/${{ needs.build-android.outputs.build_id }}"
+          exit 1

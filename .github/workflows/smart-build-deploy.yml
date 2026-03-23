@@ -1,0 +1,336 @@
+name: Smart Build & Deploy
+
+# Triggers:
+# - Push to main: OTA update only (fast)
+# - Push with "release:" in commit: Full build + OTA (slow)
+# - Manual trigger: Choose what to build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: "Build Android APK"
+        required: true
+        type: boolean
+        default: true
+      build_ios:
+        description: "Build iOS (requires Apple Developer account)"
+        required: true
+        type: boolean
+        default: false
+      build_profile:
+        description: "Build profile"
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+        default: preview
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ===========================
+  # JOB 1: Determine what to build
+  # ===========================
+  check-build-needed:
+    name: Check Build Requirements
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+      build-profile: ${{ steps.check.outputs.build-profile }}
+      build-ios: ${{ steps.check.outputs.build-ios }}
+      build-android: ${{ steps.check.outputs.build-android }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Need previous commit to check changes
+
+      - name: Determine build strategy
+        id: check
+        run: |
+          # Manual trigger - use inputs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "build-profile=${{ inputs.build_profile }}" >> $GITHUB_OUTPUT
+            echo "build-ios=${{ inputs.build_ios }}" >> $GITHUB_OUTPUT
+            echo "build-android=${{ inputs.build_android }}" >> $GITHUB_OUTPUT
+            echo "📱 Manual build triggered"
+            exit 0
+          fi
+
+          # Check commit message for "release:" prefix
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          if [[ "$COMMIT_MSG" == release:* ]]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "build-profile=production" >> $GITHUB_OUTPUT
+            echo "build-ios=false" >> $GITHUB_OUTPUT
+            echo "build-android=true" >> $GITHUB_OUTPUT
+            echo "🎯 Release commit detected - full build triggered"
+            exit 0
+          fi
+
+          # Check if app.json or eas.json changed (requires full build)
+          if git diff --name-only HEAD^ HEAD | grep -qE "app\.json|eas\.json|package\.json"; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "build-profile=preview" >> $GITHUB_OUTPUT
+            echo "build-ios=false" >> $GITHUB_OUTPUT
+            echo "build-android=true" >> $GITHUB_OUTPUT
+            echo "⚙️ Config changed - build triggered"
+            exit 0
+          fi
+
+          # Default: OTA update only (no full build)
+          echo "should-build=false" >> $GITHUB_OUTPUT
+          echo "📡 Code changes only - OTA update will be published"
+
+  # ===========================
+  # JOB 2: Publish OTA Update (Always runs)
+  # ===========================
+  publish-ota:
+    name: Publish OTA Update
+    runs-on: ubuntu-latest
+    needs: check-build-needed
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish Update
+        run: |
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          BRANCH="production"
+
+          # Use preview branch if explicitly specified
+          if [ "${{ needs.check-build-needed.outputs.build-profile }}" = "preview" ]; then
+            BRANCH="preview"
+          fi
+
+          echo "📡 Publishing OTA update to '$BRANCH' channel..."
+          eas update --branch $BRANCH --message "$COMMIT_MSG" --non-interactive
+          echo "✅ OTA update published to $BRANCH channel"
+
+  # ===========================
+  # JOB 3: Build Android
+  # ===========================
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: check-build-needed
+    if: needs.check-build-needed.outputs.should-build == 'true' && needs.check-build-needed.outputs.build-android == 'true'
+    outputs:
+      apk-url: ${{ steps.get-artifact.outputs.apk-url }}
+      build-id: ${{ steps.submit-build.outputs.build-id }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      - name: Submit build to EAS
+        id: submit-build
+        run: |
+          PROFILE="${{ needs.check-build-needed.outputs.build-profile }}"
+          echo "🏗️ Building Android with profile: $PROFILE"
+
+          BUILD_OUTPUT=$(eas build --platform android --profile $PROFILE --non-interactive --json)
+          BUILD_ID=$(echo "$BUILD_OUTPUT" | jq -r '.[0].id')
+
+          echo "build-id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "✅ Build submitted: $BUILD_ID"
+          echo "🔗 View at: https://expo.dev/accounts/848deepak/projects/soma-health/builds/$BUILD_ID"
+
+      - name: Wait for build completion
+        id: wait-build
+        run: |
+          BUILD_ID="${{ steps.submit-build.outputs.build-id }}"
+          echo "⏳ Waiting for build to complete (this takes 10-20 minutes)..."
+
+          for i in {1..60}; do
+            echo "⏱️ Check $i/60 ($(($i * 30)) seconds elapsed)..."
+
+            BUILD_STATUS=$(eas build:view $BUILD_ID --json | jq -r '.[0].status')
+
+            if [ "$BUILD_STATUS" = "finished" ]; then
+              echo "✅ Build finished successfully!"
+              exit 0
+            elif [ "$BUILD_STATUS" = "errored" ] || [ "$BUILD_STATUS" = "canceled" ]; then
+              echo "❌ Build failed with status: $BUILD_STATUS"
+              eas build:view $BUILD_ID
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          echo "⚠️ Build timeout - check EAS dashboard"
+          exit 1
+
+      - name: Get build artifact URL
+        id: get-artifact
+        run: |
+          BUILD_ID="${{ steps.submit-build.outputs.build-id }}"
+          APK_URL=$(eas build:view $BUILD_ID --json | jq -r '.[0].artifacts.buildUrl')
+
+          echo "apk-url=$APK_URL" >> $GITHUB_OUTPUT
+          echo "📦 APK URL: $APK_URL"
+
+  # ===========================
+  # JOB 4: Build iOS (Optional)
+  # ===========================
+  build-ios:
+    name: Build iOS
+    runs-on: ubuntu-latest
+    needs: check-build-needed
+    if: needs.check-build-needed.outputs.should-build == 'true' && needs.check-build-needed.outputs.build-ios == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS
+        run: |
+          PROFILE="${{ needs.check-build-needed.outputs.build-profile }}"
+          echo "🍎 Building iOS with profile: $PROFILE"
+          eas build --platform ios --profile $PROFILE --non-interactive --no-wait
+          echo "✅ iOS build submitted"
+
+  # ===========================
+  # JOB 5: Update Metadata & Create Release
+  # ===========================
+  finalize:
+    name: Finalize Deployment
+    runs-on: ubuntu-latest
+    needs: [check-build-needed, build-android, publish-ota]
+    if: needs.check-build-needed.outputs.should-build == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create build metadata
+        run: |
+          mkdir -p build-artifacts
+          cat > build-artifacts/latest-build.json << EOF
+          {
+            "version": "${{ needs.build-android.outputs.version }}",
+            "buildId": "${{ needs.build-android.outputs.build-id }}",
+            "apkUrl": "${{ needs.build-android.outputs.apk-url }}",
+            "platform": "android",
+            "profile": "${{ needs.check-build-needed.outputs.build-profile }}",
+            "buildDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commitSha": "${{ github.sha }}",
+            "commitMessage": "${{ github.event.head_commit.message }}",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+
+          echo "📄 Build metadata created:"
+          cat build-artifacts/latest-build.json
+
+      - name: Commit metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add build-artifacts/latest-build.json
+          git diff --staged --quiet || git commit -m "chore: update build metadata [skip ci]"
+          git push
+
+      - name: Create GitHub Release
+        if: startsWith(github.event.head_commit.message, 'release:')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-android.outputs.version }}
+          name: Soma v${{ needs.build-android.outputs.version }}
+          body: |
+            ## 📱 Soma Health Tracker
+
+            ### Download
+            - 🤖 [Android APK](${{ needs.build-android.outputs.apk-url }})
+
+            ### What's New
+            ${{ github.event.head_commit.message }}
+
+            ### Build Details
+            - **Version:** ${{ needs.build-android.outputs.version }}
+            - **Build ID:** `${{ needs.build-android.outputs.build-id }}`
+            - **Platform Profile:** ${{ needs.check-build-needed.outputs.build-profile }}
+            - **Commit:** `${{ github.sha }}`
+            - **Built:** $(date -u +"%B %d, %Y")
+
+            ---
+
+            ### Installation
+            1. Download the APK file above
+            2. Transfer to your Android device
+            3. Enable "Install from Unknown Sources" if prompted
+            4. Open and install the APK
+            5. Launch Soma and enjoy!
+
+            ### Automatic Updates
+            This build includes OTA update support. You'll receive automatic updates for bug fixes and new features without needing to reinstall.
+          draft: false
+          prerelease: false
+          files: |
+            build-artifacts/latest-build.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
