@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+
+import { useEffect, useState } from "react";
+import { getLatestApkUrl } from "../../utils/getLatestApkUrl";
 
 export const metadata: Metadata = {
   title: "Download Soma",
@@ -48,7 +50,12 @@ const steps = [
   },
 ];
 
-export default function DownloadPage() {
+  const [apkUrl, setApkUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    getLatestApkUrl().then(setApkUrl);
+  }, []);
+
   return (
     <div className="page-shell">
       <div
@@ -83,13 +90,22 @@ export default function DownloadPage() {
               Download the APK directly onto any Android device (Android 10+).
               No Google Play account required.
             </p>
-            <a
-              href="https://github.com/848deepak/Soma-/releases/latest/download/soma.apk"
-              download
-              className="rose-shadow-soft block w-full rounded-full bg-rose px-6 py-3 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-mauve"
-            >
-              Download APK
-            </a>
+            {apkUrl ? (
+              <a
+                href={apkUrl}
+                download
+                className="rose-shadow-soft block w-full rounded-full bg-rose px-6 py-3 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-mauve"
+              >
+                Download APK
+              </a>
+            ) : (
+              <button
+                className="rose-shadow-soft block w-full rounded-full bg-gray-400 px-6 py-3 text-sm font-medium text-white cursor-not-allowed"
+                disabled
+              >
+                Loading APK link…
+              </button>
+            )}
             <p className="mt-3 text-xs text-charcoal/40">
               You may need to enable &quot;Install from unknown sources&quot;
             </p>
