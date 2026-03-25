@@ -3,12 +3,18 @@
  * Safety validation and recovery utilities for cycle data
  */
 
-import type { CycleRow } from "@/types/database";
+type ValidatableCycle = {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string | null;
+  cycle_length: number | null;
+};
 
 /**
  * Validates a cycle object for required fields and data integrity
  */
-export function validateCycle(cycle: CycleRow): {
+export function validateCycle(cycle: ValidatableCycle): {
   valid: boolean;
   errors: string[];
 } {

@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.soma.health",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -37,6 +38,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.soma.health",
+      "versionCode": 1,
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",

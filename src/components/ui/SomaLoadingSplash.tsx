@@ -1,11 +1,9 @@
 /**
- * SomaLoadingSplash.tsx
- * Custom loading splash screen that replaces the default loading skeleton.
- * Shows beautiful branding and ensures the app never hangs on loading indefinitely.
+ * Full-screen branded splash shown during app bootstrap.
+ * Keeps launch visuals aligned with native splash assets.
  */
-import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
-import { Animated, Text, useColorScheme, View } from "react-native";
+import { Animated, Easing, Text, View } from "react-native";
 
 interface SomaLoadingSplashProps {
   /** Force hide the splash after a timeout (default: 20 seconds) */
@@ -19,24 +17,36 @@ interface SomaLoadingSplashProps {
 export function SomaLoadingSplash({
   timeout = 20000,
   onTimeout,
-  subtitle = "Preparing your personal cycle insights...",
+  subtitle = "cycle intelligence",
 }: SomaLoadingSplashProps) {
-  const isDark = useColorScheme() === "dark";
   const [opacity] = useState(new Animated.Value(0));
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [heartPulse] = useState(new Animated.Value(1));
 
   useEffect(() => {
     // Fade in animation
     Animated.timing(opacity, {
       toValue: 1,
-      duration: 800,
+      duration: 420,
       useNativeDriver: true,
     }).start();
 
-    // Show timeout warning after 15 seconds
-    const warningTimer = setTimeout(() => {
-      setShowTimeoutWarning(true);
-    }, 15000);
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(heartPulse, {
+          toValue: 1.08,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(heartPulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
 
     // Auto-hide after timeout
     const timeoutTimer = setTimeout(() => {
@@ -45,132 +55,85 @@ export function SomaLoadingSplash({
     }, timeout);
 
     return () => {
-      clearTimeout(warningTimer);
       clearTimeout(timeoutTimer);
+      pulseLoop.stop();
     };
-  }, [opacity, timeout, onTimeout]);
+  }, [heartPulse, opacity, timeout, onTimeout]);
 
   return (
     <Animated.View
       style={{
         flex: 1,
-        backgroundColor: isDark ? "#0F1115" : "#FFFDFB",
+        backgroundColor: "#FDF7F5",
         alignItems: "center",
         justifyContent: "center",
         opacity,
       }}
     >
-      {/* Background gradient orbs */}
       <View
         style={{
           position: "absolute",
-          width: 280,
-          height: 280,
-          borderRadius: 140,
-          backgroundColor: isDark
-            ? "rgba(79,70,229,0.15)"
-            : "rgba(255,218,185,0.4)",
-          opacity: 0.7,
+          width: 320,
+          height: 320,
+          borderRadius: 160,
+          backgroundColor: "#F6E6E3",
+          opacity: 0.9,
         }}
       />
-      <View
+      <Animated.View
         style={{
-          position: "absolute",
-          width: 200,
-          height: 200,
-          borderRadius: 100,
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.25)"
-            : "rgba(221,167,165,0.5)",
-          opacity: 0.6,
-        }}
-      />
-
-      {/* SOMA Logo */}
-      <View
-        style={{
-          width: 120,
-          height: 120,
-          borderRadius: 60,
-          backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+          width: 154,
+          height: 154,
+          borderRadius: 77,
+          backgroundColor: "#DDA7A5",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: 40,
-          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
-          shadowOffset: { width: 0, height: 16 },
-          shadowOpacity: 0.5,
-          shadowRadius: 32,
-          elevation: 16,
+          transform: [{ scale: heartPulse }],
+          shadowColor: "#DDA7A5",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.35,
+          shadowRadius: 20,
+          elevation: 8,
+          marginBottom: 36,
         }}
       >
         <Text
           style={{
-            fontFamily: "PlayfairDisplay-SemiBold",
-            fontSize: 36,
+            fontSize: 74,
             color: "#FFFFFF",
-            letterSpacing: 2,
+            lineHeight: 74,
           }}
         >
-          SOMA
+          ♥
         </Text>
-      </View>
+      </Animated.View>
 
-      {/* Loading indicator */}
-      <View
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.2)"
-            : "rgba(255, 218, 185, 0.3)",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 24,
-        }}
-      >
-        <SymbolView
-          name={{
-            ios: "heart.fill",
-            android: "favorite",
-            web: "favorite",
-          }}
-          tintColor="#9B7E8C"
-          size={24}
-          style={{
-            // Simple pulse animation
-            opacity: showTimeoutWarning ? 0.5 : 1,
-          }}
-        />
-      </View>
-
-      {/* Subtitle */}
       <Text
         style={{
-          fontSize: 16,
-          color: isDark ? "#F2F2F2" : "#2D2327",
+          fontFamily: "PlayfairDisplay-SemiBold",
+          fontSize: 44,
+          color: "#6E4A57",
+          letterSpacing: 6,
           textAlign: "center",
-          marginBottom: 16,
+          marginBottom: 10,
+          paddingHorizontal: 32,
+        }}
+      >
+        SOMA
+      </Text>
+
+      <Text
+        style={{
+          fontSize: 15,
+          color: "#8A6977",
+          letterSpacing: 1.2,
+          textAlign: "center",
+          textTransform: "lowercase",
           paddingHorizontal: 32,
         }}
       >
         {subtitle}
       </Text>
-
-      {/* Timeout warning */}
-      {showTimeoutWarning && (
-        <Text
-          style={{
-            fontSize: 14,
-            color: "#9B7E8C",
-            textAlign: "center",
-            paddingHorizontal: 32,
-            opacity: 0.8,
-          }}
-        >
-          This is taking longer than usual...
-        </Text>
-      )}
     </Animated.View>
   );
 }

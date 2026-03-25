@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { __DEV__ } from "react-native";
 
 import type { DerivedCycleData } from "@/hooks/useCurrentCycle";
 import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";

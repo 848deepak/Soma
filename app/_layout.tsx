@@ -61,6 +61,11 @@ export const unstable_settings = {
   initialRouteName: "index",
 };
 
+SplashScreen.setOptions({
+  duration: 450,
+  fade: true,
+});
+
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
 
@@ -284,8 +289,8 @@ export default function RootLayout() {
   if (!appReady) {
     return (
       <SomaLoadingSplash
-        subtitle="Initializing your cycle companion..."
-        timeout={8000}
+        subtitle="SOMA"
+        timeout={9000}
         onTimeout={() => {
           setAuthBootstrapped(true);
           setAppReady(true);

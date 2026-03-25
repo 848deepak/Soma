@@ -33,6 +33,10 @@ yarn-error.*
 # local env files
 .env
 .env*.local
+supabase/.env.secrets.local
+build-api/.env.local
+build-api/.env.production
+google-play-service-account.json
 
 # typescript
 *.tsbuildinfo
