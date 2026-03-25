@@ -308,7 +308,7 @@ SERVICE_ACCOUNT_JSON="$(cat /path/to/service-account.json)"
 
 ### Phase 2: Configuration (3 min)
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 npx supabase secrets set \
   FCM_PROJECT_ID="$FCM_PROJECT_ID" \

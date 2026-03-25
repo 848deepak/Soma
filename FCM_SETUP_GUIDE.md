@@ -78,7 +78,7 @@ ya29.a0AfH6SMB...
 Store FCM credentials securely in your Supabase project:
 
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 # Set FCM_PROJECT_ID
 npx supabase secrets set \
@@ -115,7 +115,7 @@ SUPABASE_URL            | 139fd54c...
 Deploy the production-ready `send-fcm-v2` function:
 
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 npx supabase functions deploy send-fcm-v2 \
   --project-ref wqgprkhkbqcbokxstxrq \
@@ -262,7 +262,7 @@ FCM service temporarily unavailable (retry safe):
 Check your Supabase database to confirm notifications were logged:
 
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 npx supabase db query --linked --output json \
   "select id, notification_id, user_id, event_type, metadata, created_at 

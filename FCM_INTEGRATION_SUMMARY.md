@@ -128,7 +128,7 @@ From your Firebase project, you need:
 
 ### STEP 2: Configure Secrets
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 npx supabase secrets set \
   FCM_PROJECT_ID="your-project-id" \
@@ -138,7 +138,7 @@ npx supabase secrets set \
 
 ### STEP 3: Deploy Function
 ```bash
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 
 npx supabase functions deploy send-fcm-v2 \
   --project-ref wqgprkhkbqcbokxstxrq \
@@ -351,7 +351,7 @@ Database Tables (Supabase Postgres):
 
 ```bash
 # 1. Set environment (one-time)
-export SUPABASE_ACCESS_TOKEN="sbp_149bd66b03136fe0f21f228053ba15d73618b9e6"
+export SUPABASE_ACCESS_TOKEN="<your-supabase-cli-token>"
 export SUPABASE_PROJECT_REF="wqgprkhkbqcbokxstxrq"
 
 # 2. Configure secrets

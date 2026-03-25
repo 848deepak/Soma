@@ -12,6 +12,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "security:scan-secrets": "bash scripts/scan-secrets.sh",
     "e2e:ios": "detox test --configuration ios.sim.debug",
     "e2e:android": "detox test --configuration android.emu.debug",
     "e2e:build:ios": "detox build --configuration ios.sim.debug",
