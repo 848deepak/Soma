@@ -30,15 +30,15 @@ const API_TIMEOUT_MS = 15000;
 const webStorage = {
   getItem: async (key: string) => {
     if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(key);
+    return window.sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(key, value);
+    window.sessionStorage.setItem(key, value);
   },
   removeItem: async (key: string) => {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
   },
 };
 

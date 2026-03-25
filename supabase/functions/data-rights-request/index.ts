@@ -13,8 +13,27 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+function hasAllowedOrigin(req: Request): boolean {
+  const allowedOriginsRaw = Deno.env.get('ALLOWED_ORIGINS')?.trim();
+  if (!allowedOriginsRaw) return true;
+
+  const origin = req.headers.get('Origin')?.trim();
+  if (!origin) return true;
+
+  const allowedOrigins = allowedOriginsRaw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return allowedOrigins.includes(origin);
+}
+
 Deno.serve(async (req) => {
   try {
+    if (!hasAllowedOrigin(req)) {
+      return jsonResponse({ error: 'Origin not allowed' }, 403);
+    }
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return jsonResponse({ error: 'Missing Authorization header' }, 401);
