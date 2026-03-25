@@ -20,6 +20,55 @@ interface ErrorMetadata {
   [key: string]: unknown;
 }
 
+const SENSITIVE_KEY_PATTERN =
+  /(token|password|authorization|cookie|session|secret|key|email|phone|notes?|symptom|flow|cycle|dob|birth|address)/i;
+
+function redactValue(value: unknown): unknown {
+  if (value == null) return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (normalized.length === 0) return value;
+    if (normalized.length > 120) return "[REDACTED_LONG_TEXT]";
+    if (/^eyJ[A-Za-z0-9_-]+\./.test(normalized)) return "[REDACTED_TOKEN]";
+    if (/^[A-Za-z0-9_-]{28,}$/.test(normalized)) return "[REDACTED_SECRET]";
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 5).map((item) => redactValue(item));
+  }
+
+  if (typeof value === "object") {
+    return sanitizeMetadata(value as Record<string, unknown>);
+  }
+
+  return value;
+}
+
+function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(metadata)) {
+    if (SENSITIVE_KEY_PATTERN.test(key)) {
+      sanitized[key] = "[REDACTED]";
+      continue;
+    }
+    sanitized[key] = redactValue(value);
+  }
+
+  return sanitized;
+}
+
+function sanitizeError(error: Error): { name: string; message: string } {
+  const safeMessage =
+    error.message.length > 240 ? `${error.message.slice(0, 240)}...` : error.message;
+  return {
+    name: error.name || "Error",
+    message: safeMessage,
+  };
+}
+
 interface PerformanceMetric {
   name: string;
   duration: number;
@@ -57,27 +106,28 @@ class ErrorTrackingService {
    * Capture and report an exception
    */
   captureException(error: Error, metadata: ErrorMetadata = {}) {
-    const enhancedError = this.enhanceErrorContext(error, metadata);
+    const sanitizedMetadata = sanitizeMetadata(metadata);
+    const enhancedError = this.enhanceErrorContext(error, sanitizedMetadata);
+    const safeError = sanitizeError(error);
 
     if (this.isDevelopment) {
-      console.error(
-        "[ErrorTracking] Exception:",
-        enhancedError.message,
-        enhancedError,
-      );
+      console.error("[ErrorTracking] Exception:", safeError.message, {
+        name: safeError.name,
+        metadata: sanitizedMetadata,
+      });
     } else {
       Sentry.withScope((scope) => {
         // Add user context
-        if (metadata.userId) {
+        if (typeof metadata.userId === "string" && metadata.userId.length > 0) {
           scope.setUser({ id: metadata.userId });
         }
 
         // Add custom tags
-        scope.setTag("screen", metadata.screen || "unknown");
-        scope.setTag("action", metadata.action || "unknown");
+        scope.setTag("screen", String(metadata.screen || "unknown"));
+        scope.setTag("action", String(metadata.action || "unknown"));
 
         // Add extra context
-        scope.setContext("metadata", metadata);
+        scope.setContext("metadata", sanitizedMetadata);
         scope.setContext("app_state", {
           timestamp: new Date().toISOString(),
           cycleDay: metadata.cycleDay,
@@ -88,7 +138,7 @@ class ErrorTrackingService {
     }
 
     // Store error locally for offline review
-    this.storeErrorLocally(enhancedError, metadata);
+    this.storeErrorLocally(enhancedError, sanitizedMetadata);
   }
 
   /**
@@ -99,17 +149,19 @@ class ErrorTrackingService {
     level: "info" | "warning" | "error" = "info",
     metadata: ErrorMetadata = {},
   ) {
+    const sanitizedMetadata = sanitizeMetadata(metadata);
+
     if (this.isDevelopment) {
       console.log(
         `[ErrorTracking] ${level.toUpperCase()}: ${message}`,
-        metadata,
+        sanitizedMetadata,
       );
     } else {
       Sentry.withScope((scope) => {
         if (metadata.userId) {
           scope.setUser({ id: metadata.userId });
         }
-        scope.setContext("metadata", metadata);
+        scope.setContext("metadata", sanitizedMetadata);
         Sentry.captureMessage(message, level);
       });
     }
@@ -124,6 +176,15 @@ class ErrorTrackingService {
         id: userId,
         email,
       });
+    }
+  }
+
+  /**
+   * Clear user context from Sentry
+   */
+  clearUser() {
+    if (!this.isDevelopment) {
+      Sentry.setUser(null);
     }
   }
 
@@ -184,13 +245,13 @@ class ErrorTrackingService {
    * Enhance error with additional context
    */
   private enhanceErrorContext(error: Error, metadata: ErrorMetadata): Error {
+    const safeError = sanitizeError(error);
     const enhanced = new Error(error.message);
-    enhanced.name = error.name;
-    enhanced.stack = error.stack;
+    enhanced.name = safeError.name;
+    enhanced.stack = this.isDevelopment ? error.stack : undefined;
 
     // Add metadata to error object
     Object.assign(enhanced, {
-      originalError: error,
       metadata,
       timestamp: new Date().toISOString(),
       userAgent:
@@ -208,8 +269,7 @@ class ErrorTrackingService {
       const errorLog = {
         id: Date.now().toString(),
         message: error.message,
-        stack: error.stack,
-        metadata,
+        metadata: sanitizeMetadata(metadata),
         timestamp: new Date().toISOString(),
       };
 
@@ -221,10 +281,7 @@ class ErrorTrackingService {
 
       await AsyncStorage.setItem("error_logs", JSON.stringify(updatedLogs));
     } catch (storageError) {
-      console.warn(
-        "[ErrorTracking] Failed to store error locally:",
-        storageError,
-      );
+      console.warn("[ErrorTracking] Failed to store error locally");
     }
   }
 
@@ -299,7 +356,11 @@ export function trackPerformance(metric: PerformanceMetric) {
  * Add debugging breadcrumb
  */
 export function addBreadcrumb(message: string, data?: Record<string, unknown>) {
-  errorTrackingService.addBreadcrumb(message, data);
+  errorTrackingService.addBreadcrumb(message, data ? sanitizeMetadata(data) : undefined);
+}
+
+export function sanitizeErrorForTelemetry(error: Error): { name: string; message: string } {
+  return sanitizeError(error);
 }
 
 /**

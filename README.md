@@ -97,11 +97,23 @@ Required public vars:
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
+Function/ops secret template:
+
+- `supabase/.env.secrets.example`
+
 For EAS cloud builds, prefer project secrets:
 
 ```bash
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR_PROJECT_REF.supabase.co"
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "YOUR_SUPABASE_ANON_KEY"
+```
+
+For Supabase edge function secrets (COPPA, data-rights, FCM), use a private env file:
+
+```bash
+cp supabase/.env.secrets.example supabase/.env.secrets.local
+# fill real values in supabase/.env.secrets.local
+npx supabase secrets set --env-file supabase/.env.secrets.local
 ```
 
 ## Quality checks

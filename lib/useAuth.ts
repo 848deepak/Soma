@@ -50,7 +50,7 @@ export function useAuth(): AuthState {
         if (isMounted) {
           clearTimeout(timeoutId);
           if (error) {
-            console.warn("[Auth] Session error:", error);
+            console.warn("[Auth] Session error:", error.message);
             setSession(null);
           } else {
             setSession(data.session ?? null);
@@ -58,7 +58,8 @@ export function useAuth(): AuthState {
           setIsLoading(false);
         }
       } catch (error) {
-        console.warn("[Auth] Session resolution error:", error);
+        const message = error instanceof Error ? error.message : "Unknown session error";
+        console.warn("[Auth] Session resolution error:", message);
         if (isMounted) {
           clearTimeout(timeoutId);
           setSession(null);

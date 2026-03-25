@@ -21,6 +21,8 @@
  */
 import { Platform } from 'react-native';
 
+import { trackEvent } from '@/src/services/analytics';
+
 // Conditional import for native platforms only
 let Notifications: typeof import('expo-notifications') | null = null;
 
@@ -116,12 +118,18 @@ export async function scheduleDailyLogReminder(
   });
 
   scheduledIds.set(DAILY_KEY, id);
+  trackEvent('notification_scheduled', {
+    type: DAILY_KEY,
+    hour,
+    minute,
+  });
   return id;
 }
 
 /** Cancels the active daily log reminder (no-op if none is scheduled). */
 export async function cancelDailyLogReminder(): Promise<void> {
   await cancelIfScheduled(DAILY_KEY);
+  trackEvent('notification_cancelled', { type: DAILY_KEY });
 }
 
 /**
@@ -158,12 +166,17 @@ export async function schedulePeriodAlert(
   });
 
   scheduledIds.set(PERIOD_KEY, id);
+  trackEvent('notification_scheduled', {
+    type: PERIOD_KEY,
+    predictedDate,
+  });
   return id;
 }
 
 /** Cancels the active period alert (no-op if none is scheduled). */
 export async function cancelPeriodAlert(): Promise<void> {
   await cancelIfScheduled(PERIOD_KEY);
+  trackEvent('notification_cancelled', { type: PERIOD_KEY });
 }
 
 /**
@@ -199,12 +212,17 @@ export async function scheduleFertileWindowAlert(
   });
 
   scheduledIds.set(FERTILE_KEY, id);
+  trackEvent('notification_scheduled', {
+    type: FERTILE_KEY,
+    windowStart,
+  });
   return id;
 }
 
 /** Cancels the active fertile-window alert (no-op if none is scheduled). */
 export async function cancelFertileWindowAlert(): Promise<void> {
   await cancelIfScheduled(FERTILE_KEY);
+  trackEvent('notification_cancelled', { type: FERTILE_KEY });
 }
 
 /**
@@ -216,4 +234,5 @@ export async function cancelAllNotifications(): Promise<void> {
 
   await Notifications.cancelAllScheduledNotificationsAsync();
   scheduledIds.clear();
+  trackEvent('notification_cancelled', { type: 'all' });
 }

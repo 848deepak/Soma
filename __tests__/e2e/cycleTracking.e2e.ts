@@ -11,7 +11,7 @@
 
 describe('Cycle Tracking E2E', () => {
   beforeAll(async () => {
-    await device.launchApp();
+    await device.launchApp({});
     // Skip onboarding or login to get to main app
     await element(by.text('Continue without account')).tap();
   });
@@ -92,7 +92,8 @@ describe('Cycle Tracking E2E', () => {
 
       // Select a mood
       await element(by.text('Good')).tap();
-      await expect(element(by.text('Good'))).toHaveToggleValue(true);
+      await (expect(element(by.text('Good'))) as unknown as { toHaveToggleValue: (v: boolean) => Promise<void> })
+        .toHaveToggleValue(true);
     });
 
     it('should allow selecting multiple symptoms', async () => {
@@ -104,9 +105,12 @@ describe('Cycle Tracking E2E', () => {
       await element(by.text('Tender')).tap();
 
       // Verify selections
-      await expect(element(by.text('Cramps'))).toHaveToggleValue(true);
-      await expect(element(by.text('Bloating'))).toHaveToggleValue(true);
-      await expect(element(by.text('Tender'))).toHaveToggleValue(true);
+      await (expect(element(by.text('Cramps'))) as unknown as { toHaveToggleValue: (v: boolean) => Promise<void> })
+        .toHaveToggleValue(true);
+      await (expect(element(by.text('Bloating'))) as unknown as { toHaveToggleValue: (v: boolean) => Promise<void> })
+        .toHaveToggleValue(true);
+      await (expect(element(by.text('Tender'))) as unknown as { toHaveToggleValue: (v: boolean) => Promise<void> })
+        .toHaveToggleValue(true);
     });
 
     it('should save daily log data', async () => {
@@ -161,7 +165,8 @@ describe('Cycle Tracking E2E', () => {
       await element(by.text('Save')).tap();
 
       // Should close and return to home
-      await expect(element(by.text('😊'))).not.toExist();
+      await (expect(element(by.text('😊'))).not as unknown as { toExist: () => Promise<void> })
+        .toExist();
     });
   });
 
@@ -245,7 +250,7 @@ describe('Cycle Tracking E2E', () => {
 
       // Restart app
       await device.terminateApp();
-      await device.launchApp();
+      await device.launchApp({});
 
       // Data should still be there
       await waitFor(element(by.text('Good')))
@@ -255,7 +260,8 @@ describe('Cycle Tracking E2E', () => {
 
     it('should sync data when network is available', async () => {
       // Test offline/online data sync
-      await device.setNetworkConnection(false);
+      await (device as unknown as { setNetworkConnection?: (enabled: boolean) => Promise<void> })
+        .setNetworkConnection?.(false);
 
       // Log data offline
       await element(by.text('Log Today\'s Flow & Mood')).tap();
@@ -263,7 +269,8 @@ describe('Cycle Tracking E2E', () => {
       await element(by.text('Save Log')).tap();
 
       // Restore network
-      await device.setNetworkConnection(true);
+      await (device as unknown as { setNetworkConnection?: (enabled: boolean) => Promise<void> })
+        .setNetworkConnection?.(true);
 
       // Data should sync and persist
       await expect(element(by.text('Calm'))).toBeVisible();

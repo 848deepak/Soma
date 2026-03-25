@@ -5,6 +5,7 @@
  *   predictFertileWindow, estimateOvulation, assessPMSRisk
  */
 import {
+  derivePeriodVisualizationDays,
   predictFertileWindow,
   estimateOvulation,
   assessPMSRisk,
@@ -53,6 +54,48 @@ function makeLog(
 }
 
 const START = '2024-01-01';
+
+// ─── derivePeriodVisualizationDays ──────────────────────────────────────────
+
+describe('derivePeriodVisualizationDays', () => {
+  it('keeps only logged days as actual period days', () => {
+    const result = derivePeriodVisualizationDays({
+      month: 2,
+      year: 2026,
+      periodLength: 5,
+      loggedPeriodDays: [10, 11],
+      predictedPeriodStartDate: '2026-03-10',
+    });
+
+    expect(result.periodDays).toEqual([10, 11]);
+  });
+
+  it('does not allow predictions to override logged days', () => {
+    const result = derivePeriodVisualizationDays({
+      month: 2,
+      year: 2026,
+      periodLength: 5,
+      loggedPeriodDays: [10, 11],
+      predictedPeriodStartDate: '2026-03-10',
+    });
+
+    // Predicted range is Mar 10-14; logged days 10/11 must stay actual only.
+    expect(result.predictedPeriodDays).toEqual([12, 13, 14]);
+  });
+
+  it('returns full predicted range when there is no overlap with logged days', () => {
+    const result = derivePeriodVisualizationDays({
+      month: 2,
+      year: 2026,
+      periodLength: 3,
+      loggedPeriodDays: [1, 2],
+      predictedPeriodStartDate: '2026-03-10',
+    });
+
+    expect(result.periodDays).toEqual([1, 2]);
+    expect(result.predictedPeriodDays).toEqual([10, 11, 12]);
+  });
+});
 
 // ─── predictFertileWindow ────────────────────────────────────────────────────
 

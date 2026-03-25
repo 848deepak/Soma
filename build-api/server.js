@@ -4,6 +4,7 @@
 import { Octokit } from "@octokit/rest";
 import cors from "cors";
 import express from "express";
+import util from "node:util";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +26,15 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // Optional, for higher rate limi
 const octokit = new Octokit({
   auth: GITHUB_TOKEN,
 });
+
+function logInfo(message) {
+  process.stdout.write(`${message}\n`);
+}
+
+function logError(message, error) {
+  const details = error ? ` ${util.format(error)}` : "";
+  process.stderr.write(`${message}${details}\n`);
+}
 
 // ===========================
 // GET /api/latest-build
@@ -52,7 +62,7 @@ app.get("/api/latest-build", async (req, res) => {
 
     throw new Error("File not found");
   } catch (error) {
-    console.error("Error fetching build metadata:", error);
+    logError("Error fetching build metadata:", error);
     return res.status(500).json({
       success: false,
       error: "Failed to fetch latest build metadata",
@@ -90,7 +100,7 @@ app.get("/api/builds/history", async (req, res) => {
             );
             return JSON.parse(content);
           }
-        } catch (error) {
+        } catch {
           return null;
         }
       }),
@@ -101,7 +111,7 @@ app.get("/api/builds/history", async (req, res) => {
       data: builds.filter(Boolean),
     });
   } catch (error) {
-    console.error("Error fetching build history:", error);
+    logError("Error fetching build history:", error);
     return res.status(500).json({
       success: false,
       error: "Failed to fetch build history",
@@ -144,7 +154,7 @@ app.get("/download", async (req, res) => {
 
     throw new Error("APK URL not found");
   } catch (error) {
-    console.error("Error redirecting to APK:", error);
+    logError("Error redirecting to APK:", error);
     return res.status(404).json({
       success: false,
       error: "APK not found",
@@ -153,8 +163,8 @@ app.get("/download", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Build API running on port ${PORT}`);
-  console.log(`📦 Serving builds for ${GITHUB_OWNER}/${GITHUB_REPO}`);
+  logInfo(`Build API running on port ${PORT}`);
+  logInfo(`Serving builds for ${GITHUB_OWNER}/${GITHUB_REPO}`);
 });
 
 export default app;

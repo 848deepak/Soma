@@ -136,9 +136,9 @@ describe('OfflineSyncService – flushOfflineQueue', () => {
 
     it('counts all synced items correctly for multiple successes', async () => {
       const items = [
-        makeSyncItem({ id: 'a' }),
-        makeSyncItem({ id: 'b' }),
-        makeSyncItem({ id: 'c' }),
+        makeSyncItem({ id: 'a', entityId: 'entity-a' }),
+        makeSyncItem({ id: 'b', entityId: 'entity-b' }),
+        makeSyncItem({ id: 'c', entityId: 'entity-c' }),
       ];
       (getPendingSyncItems as jest.Mock).mockResolvedValue(items);
 
@@ -150,7 +150,10 @@ describe('OfflineSyncService – flushOfflineQueue', () => {
     });
 
     it('calls removeSyncItem with each item id', async () => {
-      const items = [makeSyncItem({ id: 'x1' }), makeSyncItem({ id: 'x2' })];
+      const items = [
+        makeSyncItem({ id: 'x1', entityId: 'entity-x1' }),
+        makeSyncItem({ id: 'x2', entityId: 'entity-x2' }),
+      ];
       (getPendingSyncItems as jest.Mock).mockResolvedValue(items);
 
       await flushOfflineQueue();
@@ -207,8 +210,8 @@ describe('OfflineSyncService – flushOfflineQueue', () => {
     });
 
     it('continues processing remaining items after a single item fails', async () => {
-      const failItem = makeSyncItem({ id: 'fail' });
-      const successItem = makeSyncItem({ id: 'success' });
+      const failItem = makeSyncItem({ id: 'fail', entityId: 'entity-fail' });
+      const successItem = makeSyncItem({ id: 'success', entityId: 'entity-success' });
       (getPendingSyncItems as jest.Mock).mockResolvedValue([failItem, successItem]);
       (supabaseService.push as jest.Mock)
         .mockResolvedValueOnce({ ok: false, error: 'Rejected' })
@@ -311,10 +314,10 @@ describe('OfflineSyncService – flushOfflineQueue', () => {
   describe('mixed results', () => {
     it('returns correct synced and failed counts for a mixed queue', async () => {
       const items = [
-        makeSyncItem({ id: '1' }),
-        makeSyncItem({ id: '2' }),
-        makeSyncItem({ id: '3' }),
-        makeSyncItem({ id: '4' }),
+        makeSyncItem({ id: '1', entityId: 'entity-1' }),
+        makeSyncItem({ id: '2', entityId: 'entity-2' }),
+        makeSyncItem({ id: '3', entityId: 'entity-3' }),
+        makeSyncItem({ id: '4', entityId: 'entity-4' }),
       ];
       (getPendingSyncItems as jest.Mock).mockResolvedValue(items);
       (supabaseService.push as jest.Mock)
@@ -326,6 +329,37 @@ describe('OfflineSyncService – flushOfflineQueue', () => {
       const result = await flushOfflineQueue();
 
       expect(result).toEqual({ synced: 2, failed: 2, skipped: false });
+    });
+
+    it('deduplicates repeated queue entries for the same entity before push', async () => {
+      const first = makeSyncItem({
+        id: 'old-item',
+        entityType: 'daily_logs',
+        entityId: 'daily-log:user-1:2026-03-24',
+        encryptedPayload: JSON.stringify({ mood: 'low' }),
+        createdAt: '2026-03-24T10:00:00.000Z',
+      });
+      const second = makeSyncItem({
+        id: 'new-item',
+        entityType: 'daily_logs',
+        entityId: 'daily-log:user-1:2026-03-24',
+        encryptedPayload: JSON.stringify({ mood: 'calm' }),
+        createdAt: '2026-03-24T10:01:00.000Z',
+      });
+
+      (getPendingSyncItems as jest.Mock).mockResolvedValue([first, second]);
+
+      const result = await flushOfflineQueue();
+
+      expect(result).toEqual({ synced: 1, failed: 0, skipped: false });
+      expect(removeSyncItem).toHaveBeenCalledWith('old-item');
+      expect(supabaseService.push).toHaveBeenCalledTimes(1);
+      expect(supabaseService.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityId: 'daily-log:user-1:2026-03-24',
+          payload: { mood: 'calm' },
+        }),
+      );
     });
   });
 });

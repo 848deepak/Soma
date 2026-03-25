@@ -19,6 +19,8 @@ import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { identifyUser } from "@/src/services/analytics";
+import { recordRequiredAuthConsent } from "@/src/services/consentService";
+import { sanitizeInput, validateEmail } from "@/src/utils/validation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function LoginScreen() {
@@ -30,6 +32,7 @@ export function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<"login" | "reset">("login");
   const [resetSent, setResetSent] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(true);
 
   // Required flow: Sign in/up → Welcome → Home
   async function routeAfterLogin(_userId: string) {
@@ -41,9 +44,24 @@ export function LoginScreen() {
       Alert.alert("Missing fields", "Please enter your email and password.");
       return;
     }
+    if (!validateEmail(email)) {
+      Alert.alert("Invalid email", "Please enter a valid email address.");
+      return;
+    }
+    if (!acceptedLegal) {
+      Alert.alert(
+        "Consent required",
+        "Please agree to the Privacy Policy and Terms to continue.",
+      );
+      return;
+    }
     setIsLoading(true);
     try {
-      const user = await signInWithEmail(email.trim(), password);
+      const user = await signInWithEmail(
+        sanitizeInput(email).toLowerCase(),
+        password,
+      );
+      await recordRequiredAuthConsent();
       await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
       if (user) {
         identifyUser(user.id, { auth_method: "email" });
@@ -70,9 +88,13 @@ export function LoginScreen() {
       );
       return;
     }
+    if (!validateEmail(email)) {
+      Alert.alert("Invalid email", "Please enter a valid email address.");
+      return;
+    }
     setIsLoading(true);
     try {
-      await resetPassword(email.trim());
+      await resetPassword(sanitizeInput(email).toLowerCase());
       setResetSent(true);
     } catch (error: unknown) {
       const message =
@@ -238,6 +260,64 @@ export function LoginScreen() {
                 ? "Sign In"
                 : "Send Reset Link"}
           </Typography>
+        </PressableScale>
+
+        <PressableScale
+          onPress={() => setAcceptedLegal((prev) => !prev)}
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          <View
+            style={{
+              width: 20,
+              height: 20,
+              marginTop: 2,
+              borderRadius: 5,
+              borderWidth: 1.5,
+              borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: acceptedLegal
+                ? isDark
+                  ? "#A78BFA"
+                  : "#DDA7A5"
+                : "transparent",
+            }}
+          >
+            {acceptedLegal ? (
+              <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
+            ) : null}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Typography variant="helper" style={{ lineHeight: 18 }}>
+              By continuing, you agree to our
+            </Typography>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+              <PressableScale onPress={() => router.push("/legal/privacy" as never)}>
+                <Typography
+                  variant="helper"
+                  className="text-somaBlush dark:text-darkPrimary"
+                >
+                  Privacy Policy
+                </Typography>
+              </PressableScale>
+              <Typography variant="helper">and</Typography>
+              <PressableScale onPress={() => router.push("/legal/terms" as never)}>
+                <Typography
+                  variant="helper"
+                  className="text-somaBlush dark:text-darkPrimary"
+                >
+                  Terms of Use
+                </Typography>
+              </PressableScale>
+              <Typography variant="helper">.</Typography>
+            </View>
+          </View>
         </PressableScale>
 
         {/* ── Secondary links ──────────────────────────────── */}

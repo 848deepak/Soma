@@ -4,7 +4,6 @@
  * Figma "Quick Check-in" — rendered as a slide-up bottom sheet
  * over a semi-transparent backdrop (presentation: transparentModal).
  */
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
@@ -19,6 +18,7 @@ import Animated, {
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { FlowLevel, MoodOption } from "@/types/database";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -82,12 +82,12 @@ export function QuickCheckinScreen() {
   }));
 
   function handleFlowChange(value: number) {
-    void Haptics.selectionAsync();
+    void HapticsService.selection();
     setFlowLevel(value);
   }
 
   function handleMoodSelect(mood: MoodOption) {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void HapticsService.impactLight();
     setSelectedMood((prev) => (prev === mood ? null : mood));
   }
 
@@ -97,7 +97,7 @@ export function QuickCheckinScreen() {
   }
 
   function handleSave() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void HapticsService.success();
     saveLog.mutate(
       {
         flow_level: flowLevel as FlowLevel,

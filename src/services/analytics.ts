@@ -12,6 +12,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import PostHog from "posthog-react-native";
 import { captureException } from "./errorTracking";
 
+type PostHogStatic = {
+  initPostHog?: (apiKey: string, options: Record<string, unknown>) => Promise<void>;
+  getFeatureFlag?: (key: string) => Promise<unknown> | unknown;
+  reset?: () => void;
+  identify?: (userId: string, properties?: Record<string, unknown>) => void;
+  capture?: (event: string, properties?: Record<string, unknown>) => void;
+  group?: (type: string, properties: Record<string, unknown>) => void;
+};
+
+const posthog = PostHog as unknown as PostHogStatic;
+
 interface UserProperties {
   cycleLength?: number;
   periodLength?: number;
@@ -50,7 +61,13 @@ class AnalyticsService {
       this.hasConsent = consent === "true";
 
       if (apiKey && this.hasConsent) {
-        await PostHog.initPostHog(apiKey, {
+        if (typeof posthog.initPostHog !== "function") {
+          this.isInitialized = true;
+          this.flushPendingEvents();
+          return;
+        }
+
+        await posthog.initPostHog(apiKey, {
           host: "https://app.posthog.com",
           captureApplicationLifecycleEvents: true,
           captureDeepLinks: true,
@@ -105,8 +122,8 @@ class AnalyticsService {
       await AsyncStorage.setItem(ANALYTICS_CONSENT_KEY, "false");
       this.hasConsent = false;
 
-      if (PostHog.getFeatureFlag) {
-        PostHog.reset();
+      if (typeof posthog.getFeatureFlag === "function") {
+        posthog.reset?.();
       }
     } catch (error) {
       captureException(
@@ -123,7 +140,7 @@ class AnalyticsService {
     if (!this.hasConsent) return;
 
     try {
-      PostHog.identify(userId, properties);
+      posthog.identify?.(userId, properties);
     } catch (error) {
       captureException(
         error instanceof Error ? error : new Error(String(error)),
@@ -149,7 +166,7 @@ class AnalyticsService {
     }
 
     try {
-      PostHog.capture(event, enrichedProperties);
+      posthog.capture?.(event, enrichedProperties);
     } catch (error) {
       captureException(
         error instanceof Error ? error : new Error(String(error)),
@@ -213,7 +230,7 @@ class AnalyticsService {
     if (!this.hasConsent) return;
 
     try {
-      PostHog.group("user", properties);
+      posthog.group?.("user", properties);
     } catch (error) {
       captureException(
         error instanceof Error ? error : new Error(String(error)),
@@ -345,14 +362,14 @@ export const trackEvent = track;
 export const identifyUser = identify;
 
 export function resetUser() {
-  if (PostHog.reset) {
-    PostHog.reset();
+  if (posthog.reset) {
+    posthog.reset();
   }
 }
 
 export function _resetClient() {
-  if (PostHog.reset) {
-    PostHog.reset();
+  if (posthog.reset) {
+    posthog.reset();
   }
 }
 

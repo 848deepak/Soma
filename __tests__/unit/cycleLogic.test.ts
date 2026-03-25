@@ -208,6 +208,41 @@ describe('buildMiniCalendar', () => {
     // today (center) should have hasPeriod = true
     expect(calendar[3]!.hasPeriod).toBe(true);
   });
+
+  it('stops period highlight after explicit end_date', () => {
+    const start = new Date();
+    start.setDate(start.getDate() - 3);
+    const end = new Date();
+    end.setDate(end.getDate() - 1);
+
+    const endedCycle: CycleRow = {
+      ...mockCycle,
+      start_date: start.toISOString().split('T')[0]!,
+      end_date: end.toISOString().split('T')[0]!,
+      cycle_length: 3,
+    };
+
+    const calendar = buildMiniCalendar(endedCycle, 7);
+    expect(calendar[3]!.isCurrent).toBe(true);
+    expect(calendar[3]!.hasPeriod).toBe(false);
+  });
+
+  it('does not bleed old cycle highlights into matching day-of-month', () => {
+    const today = new Date();
+    const lastMonth = new Date(today);
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    const oldCycle: CycleRow = {
+      ...mockCycle,
+      start_date: lastMonth.toISOString().split('T')[0]!,
+      end_date: lastMonth.toISOString().split('T')[0]!,
+      cycle_length: 1,
+    };
+
+    const calendar = buildMiniCalendar(oldCycle, 5);
+    expect(calendar[3]!.isCurrent).toBe(true);
+    expect(calendar[3]!.hasPeriod).toBe(false);
+  });
 });
 
 // ─── buildMonthGrid ──────────────────────────────────────────────────────────

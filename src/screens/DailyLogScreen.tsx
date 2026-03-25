@@ -1,22 +1,26 @@
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useMemo, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    TextInput,
-    View,
-    useColorScheme,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+  View,
+  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
 import { useTodayLog } from "@/hooks/useDailyLogs";
+import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useEndCurrentCycle } from "@/hooks/useCycleActions";
+import { useProfile } from "@/hooks/useProfile";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { FlowLevel, SymptomOption } from "@/types/database";
 
 const flowLevels = [
@@ -64,8 +68,14 @@ export function DailyLogScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === "dark";
   const saveLog = useSaveLog();
+  const endCurrentCycle = useEndCurrentCycle();
 
   const { data: todayLog } = useTodayLog();
+  const { data: profile } = useProfile();
+  const { data: cycleData } = useCurrentCycle(
+    profile?.cycle_length_average ?? 28,
+    profile?.period_duration_average ?? 5,
+  );
 
   const [flowLevel, setFlowLevel] = useState<number>(
     Math.min(todayLog?.flow_level ?? 2, 3),
@@ -76,6 +86,7 @@ export function DailyLogScreen() {
   const [notes, setNotes] = useState(todayLog?.notes ?? "");
   const accentPrimary = isDark ? "#A78BFA" : "#DDA7A5";
   const accentPrimaryDark = isDark ? "#7C6BE8" : "#DDA7A5";
+  const hasActivePeriod = Boolean(cycleData?.cycle);
 
   const subtitle = useMemo(
     () =>
@@ -88,12 +99,12 @@ export function DailyLogScreen() {
   );
 
   function handleFlowChange(index: number) {
-    void Haptics.selectionAsync();
+    void HapticsService.selection();
     setFlowLevel(index);
   }
 
   function handleSymptomToggle(symptom: string) {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void HapticsService.impactLight();
     setSelectedSymptoms((previous) =>
       previous.includes(symptom)
         ? previous.filter((item) => item !== symptom)
@@ -102,7 +113,7 @@ export function DailyLogScreen() {
   }
 
   function handleSave() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void HapticsService.success();
     saveLog.mutate(
       {
         flow_level: flowLevel as FlowLevel,
@@ -112,6 +123,79 @@ export function DailyLogScreen() {
       {
         onSuccess: () => router.back(),
       },
+    );
+  }
+
+  function handleEndPeriod() {
+    if (endCurrentCycle.isPending) {
+      return;
+    }
+
+    Alert.alert(
+      "End Current Period",
+      "Mark today as the end of your current period?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "End",
+          onPress: async () => {
+            if (endCurrentCycle.isPending) {
+              return;
+            }
+
+            try {
+              await HapticsService.impactMedium();
+              await endCurrentCycle.mutateAsync();
+              await HapticsService.success();
+              Alert.alert("Saved", "Current period ended today.");
+            } catch (error: unknown) {
+              await HapticsService.error();
+              const message = error instanceof Error ? error.message : "";
+
+              // IMPROVED: Better error messages with user-friendly copy
+              if (
+                message.includes("No active period") ||
+                message.includes("already ended")
+              ) {
+                Alert.alert(
+                  "No Active Period",
+                  "There's no active period to end. Start a new period first.",
+                  [{ text: "OK" }],
+                );
+              } else if (
+                message.includes("network") ||
+                message.includes("offline") ||
+                message.includes("Failed")
+              ) {
+                Alert.alert(
+                  "Connection Issue",
+                  message.includes("sync") || message.includes("offline")
+                    ? "You're offline. The period will be ended when you're online again."
+                    : "Connection error. Please check your internet and try again.",
+                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
+                );
+              } else if (
+                message.includes("Invalid") ||
+                message.includes("format")
+              ) {
+                Alert.alert(
+                  "Data Error",
+                  "Your period data appears corrupted. Please contact support.",
+                  [{ text: "OK" }],
+                );
+              } else {
+                const fallbackMessage =
+                  message || "Could not end the current period.";
+                Alert.alert(
+                  "Action Failed",
+                  fallbackMessage,
+                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
+                );
+              }
+            }
+          },
+        },
+      ],
     );
   }
 
@@ -189,6 +273,33 @@ export function DailyLogScreen() {
               >
                 {subtitle}
               </Typography>
+
+              {hasActivePeriod ? (
+                <PressableScale
+                  onPress={handleEndPeriod}
+                  style={{
+                    marginTop: 12,
+                    alignSelf: "flex-start",
+                    borderRadius: 999,
+                    backgroundColor: "rgba(221, 167, 165, 0.2)",
+                    borderWidth: 1,
+                    borderColor: "rgba(221, 167, 165, 0.45)",
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    opacity: endCurrentCycle.isPending ? 0.7 : 1,
+                  }}
+                >
+                  <Typography
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: isDark ? "#F2F2F2" : "#2D2327",
+                    }}
+                  >
+                    {endCurrentCycle.isPending ? "Ending…" : "End Period"}
+                  </Typography>
+                </PressableScale>
+              ) : null}
             </View>
             <PressableScale
               onPress={() => router.back()}

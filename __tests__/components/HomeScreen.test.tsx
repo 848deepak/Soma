@@ -107,7 +107,7 @@ describe("HomeScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Good Morning,\nJane/)).toBeTruthy();
+      expect(screen.getByText(/Good Morning,\s*Jane/)).toBeTruthy();
     });
   });
 
@@ -124,7 +124,7 @@ describe("HomeScreen", () => {
     });
   });
 
-  it("shows hydration data in widget", async () => {
+  it("does not render disabled hydration widget", async () => {
     render(
       <TestWrapper>
         <HomeScreen />
@@ -132,12 +132,12 @@ describe("HomeScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("6/8")).toBeTruthy();
-      expect(screen.getByText("Glasses today")).toBeTruthy();
+      expect(screen.queryByText("6/8")).toBeNull();
+      expect(screen.queryByText("Glasses today")).toBeNull();
     });
   });
 
-  it("shows sleep data formatted correctly", async () => {
+  it("does not render disabled sleep widget", async () => {
     render(
       <TestWrapper>
         <HomeScreen />
@@ -145,8 +145,8 @@ describe("HomeScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("7h 30m")).toBeTruthy();
-      expect(screen.getByText("Last night")).toBeTruthy();
+      expect(screen.queryByText("7h 30m")).toBeNull();
+      expect(screen.queryByText("Last night")).toBeNull();
     });
   });
 
@@ -176,25 +176,17 @@ describe("HomeScreen", () => {
     });
   });
 
-  it("handles loading timeout gracefully", async () => {
-    // Mock loading state that times out
-    jest.doMock("@/hooks/useProfile", () => ({
-      useProfile: () => ({
-        data: null,
-        isLoading: true,
-        error: null,
-      }),
-    }));
-
+  it("renders dashboard content with current data", async () => {
     render(
       <TestWrapper>
         <HomeScreen />
       </TestWrapper>,
     );
 
-    // Should show loading splash initially
-    expect(
-      screen.getByText("Preparing your personal cycle insights..."),
-    ).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText("Log Period")).toBeTruthy();
+      expect(screen.getByText("Current mood")).toBeTruthy();
+      expect(screen.getByText("Readiness")).toBeTruthy();
+    });
   });
 });

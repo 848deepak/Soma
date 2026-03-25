@@ -33,12 +33,40 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test -- --runInBand
+
   # ===========================
   # JOB 1: Determine what to build
   # ===========================
   check-build-needed:
     name: Check Build Requirements
     runs-on: ubuntu-latest
+    needs: quality-gates
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
     outputs:
       should-build: ${{ steps.check.outputs.should-build }}
       build-profile: ${{ steps.check.outputs.build-profile }}
@@ -194,7 +222,8 @@ jobs:
           for i in {1..60}; do
             echo "⏱️ Check $i/60 ($(($i * 30)) seconds elapsed)..."
 
-            BUILD_STATUS=$(eas build:view $BUILD_ID --json | jq -r '.[0].status')
+            BUILD_JSON=$(eas build:view $BUILD_ID --json)
+            BUILD_STATUS=$(echo "$BUILD_JSON" | jq -r 'if type=="array" then .[0].status else .status end' | tr '[:upper:]' '[:lower:]')
 
             if [ "$BUILD_STATUS" = "finished" ]; then
               echo "✅ Build finished successfully!"
@@ -215,7 +244,13 @@ jobs:
         id: get-artifact
         run: |
           BUILD_ID="${{ steps.submit-build.outputs.build-id }}"
-          APK_URL=$(eas build:view $BUILD_ID --json | jq -r '.[0].artifacts.buildUrl')
+          BUILD_JSON=$(eas build:view $BUILD_ID --json)
+          APK_URL=$(echo "$BUILD_JSON" | jq -r 'if type=="array" then (.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl) else (.artifacts.applicationArchiveUrl // .artifacts.buildUrl) end')
+
+          if [ -z "$APK_URL" ] || [ "$APK_URL" = "null" ]; then
+            echo "❌ Could not resolve APK URL from EAS build metadata"
+            exit 1
+          fi
 
           echo "apk-url=$APK_URL" >> $GITHUB_OUTPUT
           echo "📦 APK URL: $APK_URL"
@@ -283,11 +318,16 @@ jobs:
       - name: Create build metadata
         run: |
           mkdir -p build-artifacts
+          mkdir -p web/public
+
+          RELEASE_APK_URL="https://github.com/${{ github.repository }}/releases/latest/download/soma-health.apk"
+
           cat > build-artifacts/latest-build.json << EOF
           {
             "version": "${{ needs.build-android.outputs.version }}",
             "buildId": "${{ needs.build-android.outputs.build-id }}",
             "apkUrl": "${{ needs.build-android.outputs.apk-url }}",
+            "releaseApkUrl": "$RELEASE_APK_URL",
             "platform": "android",
             "profile": "${{ needs.check-build-needed.outputs.build-profile }}",
             "buildDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
@@ -297,14 +337,40 @@ jobs:
           }
           EOF
 
+          cat > web/public/download.json << EOF
+          {
+            "version": "${{ needs.build-android.outputs.version }}",
+            "buildId": "${{ needs.build-android.outputs.build-id }}",
+            "apkUrl": "${{ needs.build-android.outputs.apk-url }}",
+            "downloadUrl": "$RELEASE_APK_URL",
+            "buildDate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commitSha": "${{ github.sha }}"
+          }
+          EOF
+
           echo "📄 Build metadata created:"
           cat build-artifacts/latest-build.json
+          echo "📄 Website download metadata created:"
+          cat web/public/download.json
+
+          node -e '
+            const fs = require("fs");
+            const data = JSON.parse(fs.readFileSync("web/public/download.json", "utf8"));
+            if (!data.buildId || !data.version) {
+              throw new Error("download.json missing buildId/version");
+            }
+            if (!data.downloadUrl || !/^https?:\/\//.test(data.downloadUrl)) {
+              throw new Error("download.json missing valid downloadUrl");
+            }
+          '
+          echo "✅ download.json validation passed"
 
       - name: Commit metadata
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add build-artifacts/latest-build.json
+          git add web/public/download.json
           git diff --staged --quiet || git commit -m "chore: update build metadata [skip ci]"
           git push
 

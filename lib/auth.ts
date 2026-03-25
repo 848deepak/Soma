@@ -9,6 +9,72 @@
  */
 import { supabase } from '@/lib/supabase';
 
+function calculateAgeFromIsoDate(isoDate: string): number | null {
+  const parts = isoDate.split('-').map(Number);
+  if (parts.length !== 3) return null;
+  const [year, month, day] = parts;
+  const birthDate = new Date(year, month - 1, day);
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const monthDiff = today.getMonth() - (month - 1);
+  const dayDiff = today.getDate() - day;
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+  return age;
+}
+
+async function enforceParentalConsentIfRequired(userId: string): Promise<void> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('date_of_birth')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(profileError.message || 'Could not verify age requirements.');
+  }
+
+  const dob = profile?.date_of_birth as string | null | undefined;
+  if (!dob) return;
+
+  const age = calculateAgeFromIsoDate(dob);
+  if (age === null || age >= 13) return;
+
+  const { data: consent, error: consentError } = await supabase
+    .from('parental_consents')
+    .select('status, expires_at, revoked_at')
+    .eq('child_id', userId)
+    .order('requested_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (consentError) {
+    throw new Error(consentError.message || 'Could not verify parental consent status.');
+  }
+
+  const now = Date.now();
+  const expiresAt = consent?.expires_at ? new Date(consent.expires_at).getTime() : 0;
+  const verified =
+    consent?.status === 'verified' &&
+    !consent?.revoked_at &&
+    expiresAt > now;
+
+  if (!verified) {
+    throw new Error(
+      'Parental consent is required for accounts under 13. Please complete parent verification to continue.',
+    );
+  }
+}
+
 function normalizeAuthError(error: unknown): Error {
   if (error instanceof Error) {
     const lower = error.message.toLowerCase();
@@ -95,6 +161,14 @@ export async function signInWithEmail(email: string, password: string) {
     password,
   });
   if (error) throw normalizeAuthError(error);
+  if (data.user?.id) {
+    try {
+      await enforceParentalConsentIfRequired(data.user.id);
+    } catch (consentError) {
+      await supabase.auth.signOut();
+      throw consentError;
+    }
+  }
   return data.user;
 }
 

@@ -18,9 +18,19 @@ const sections = [
       "Soma processes cycle data, daily logs, profile settings, and partner-sharing preferences to provide tracking, predictions, and partner features.",
   },
   {
+    title: "Health data categories",
+    content:
+      "Depending on your usage, this can include period dates, cycle length patterns, symptoms, mood, energy, notes, hydration and sleep entries, and reminder preferences.",
+  },
+  {
+    title: "Legal basis and consent",
+    content:
+      "Core processing is required to provide Soma. Optional analytics and optional partner-sharing settings are consent-based and can be managed in-app from Data Consent Center.",
+  },
+  {
     title: "Storage and transport",
     content:
-      "Data is transmitted over secure network connections and stored for app functionality such as insights, history, and partner sharing.",
+      "Data is transmitted over secure network connections and stored for app functionality such as insights, history, and partner sharing. Sensitive actions are controlled with authentication and row-level access rules.",
   },
   {
     title: "Partner Sync",
@@ -35,7 +45,22 @@ const sections = [
   {
     title: "Analytics and crash reporting",
     content:
-      "Soma may use privacy-conscious product analytics and crash reporting to improve reliability and usability. We do not sell your data, and we avoid sending personal health note content in analytics payloads.",
+      "Soma may use PostHog for product analytics and Sentry for crash/error monitoring when enabled. We do not sell your data, and we avoid sending personal health note content in telemetry payloads.",
+  },
+  {
+    title: "Retention and deletion",
+    content:
+      "Account data is retained until deletion by you. Operational logs and telemetry are retained only as needed for security, reliability, and legal obligations, then removed or anonymized.",
+  },
+  {
+    title: "Your privacy rights",
+    content:
+      "You may request access, export, correction, or deletion of your data. If you are in the EEA/UK, GDPR rights may include portability, objection, and complaint rights with your local authority.",
+  },
+  {
+    title: "Cookies and similar technologies",
+    content:
+      "Our website may use essential storage mechanisms and, when enabled, analytics identifiers to keep the experience functional and improve performance. See our Cookie Notice for details.",
   },
   {
     title: "Data deletion",
@@ -113,6 +138,14 @@ export default function PrivacyPage() {
           >
             Read our Terms of Use →
           </Link>
+          <div className="mt-3">
+            <Link
+              href="/cookies"
+              className="text-sm font-semibold text-rose hover:underline underline-offset-2"
+            >
+              Read our Cookie Notice →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

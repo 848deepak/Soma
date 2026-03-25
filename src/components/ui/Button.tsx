@@ -1,9 +1,9 @@
-import * as Haptics from 'expo-haptics';
 import { ReactNode } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 
 import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Typography } from '@/src/components/ui/Typography';
+import { HapticsService } from '@/src/services/haptics/HapticsService';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -53,7 +53,7 @@ export function Button({
       style={[{ opacity: disabled || loading ? 0.6 : 1 }, style as ViewStyle]}
       onPress={async () => {
         if (disabled || loading) return;
-        await Haptics.selectionAsync();
+        await HapticsService.selection();
         onPress();
       }}>
       {icon}

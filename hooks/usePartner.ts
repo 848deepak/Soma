@@ -10,6 +10,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
+import { logDataAccess } from '@/src/services/auditService';
 import type { PartnerRow } from '@/types/database';
 
 export const PARTNER_KEY = ['partner'] as const;
@@ -45,10 +46,17 @@ export function usePartner() {
           .maybeSingle(),
       ]);
 
-      return {
+      const result = {
         asPrimary: (primaryResult.data as unknown as PartnerRow) ?? null,
         asViewer: (viewerResult.data as unknown as PartnerRow) ?? null,
       };
+      void logDataAccess('partner_data', 'view', {
+        source: 'usePartner',
+        hasPrimaryRelationship: !!result.asPrimary,
+        hasViewerRelationship: !!result.asViewer,
+      });
+
+      return result;
     },
     staleTime: 5 * 60 * 1000,
   });

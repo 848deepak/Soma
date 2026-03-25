@@ -187,7 +187,7 @@ export function buildTrendInsight(
 /** Returns the last `n` completed cycles sorted oldest → newest. */
 function lastNCycles(cycles: CompletedCycle[], n: number): CompletedCycle[] {
   return [...cycles]
-    .filter((c) => c.cycle_length != null)
+    .filter((c) => c.cycle_length != null && c.end_date != null)
     .sort((a, b) => a.start_date.localeCompare(b.start_date))
     .slice(-n);
 }
@@ -234,6 +234,61 @@ export interface FertileWindowPrediction {
   averageCycleLength: number;
   /** How many completed cycles contributed to the average (max 6). */
   cyclesUsed: number;
+}
+
+export interface PeriodVisualizationInput {
+  month: number;
+  year: number;
+  periodLength: number;
+  loggedPeriodDays: number[];
+  predictedPeriodStartDate?: string | null;
+}
+
+export interface PeriodVisualizationDays {
+  periodDays: number[];
+  predictedPeriodDays: number[];
+}
+
+/**
+ * Builds calendar day buckets for period visualization.
+ * Logged period days are always source-of-truth and predictions never overlap them.
+ */
+export function derivePeriodVisualizationDays({
+  month,
+  year,
+  periodLength,
+  loggedPeriodDays,
+  predictedPeriodStartDate,
+}: PeriodVisualizationInput): PeriodVisualizationDays {
+  const periodDays = [...new Set(loggedPeriodDays)]
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 31)
+    .sort((a, b) => a - b);
+
+  if (!predictedPeriodStartDate || periodLength <= 0) {
+    return { periodDays, predictedPeriodDays: [] };
+  }
+
+  const loggedDaySet = new Set(periodDays);
+  const predictedPeriodDays: number[] = [];
+
+  for (let i = 0; i < periodLength; i += 1) {
+    const predictedDate = addDays(predictedPeriodStartDate, i);
+    const date = new Date(`${predictedDate}T00:00:00Z`);
+
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month) {
+      continue;
+    }
+
+    const day = date.getUTCDate();
+    if (!loggedDaySet.has(day)) {
+      predictedPeriodDays.push(day);
+    }
+  }
+
+  return {
+    periodDays,
+    predictedPeriodDays: [...new Set(predictedPeriodDays)].sort((a, b) => a - b),
+  };
 }
 
 export function predictFertileWindow(
@@ -290,7 +345,7 @@ export function estimateOvulation(
   cycles: CompletedCycle[],
   currentCycleStartDate: string,
 ): OvulationEstimate | null {
-  const valid = cycles.filter((c) => c.cycle_length != null);
+  const valid = cycles.filter((c) => c.cycle_length != null && c.end_date != null);
   if (valid.length === 0) return null;
 
   const recent = lastNCycles(cycles, 6);

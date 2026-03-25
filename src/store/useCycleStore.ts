@@ -86,6 +86,7 @@ export const useCycleStore = create<CycleState>((set) => ({
         supabase
           .from("cycles")
           .select("*")
+          .eq("user_id", user.id)
           .is("end_date", null)
           .order("start_date", { ascending: false })
           .limit(1)
@@ -93,6 +94,7 @@ export const useCycleStore = create<CycleState>((set) => ({
         supabase
           .from("daily_logs")
           .select("mood, energy_level")
+          .eq("user_id", user.id)
           .eq("date", today)
           .maybeSingle(),
         supabase

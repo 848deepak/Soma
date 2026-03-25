@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
+import { logDataAccess } from "@/src/services/auditService";
 import type { DailyLogRow } from "@/types/database";
 
 export const DAILY_LOGS_KEY = (limit: number) => ["daily-logs", limit] as const;
@@ -23,14 +24,26 @@ export function useDailyLogs(limit: number = 90) {
   return useQuery<DailyLogRow[]>({
     queryKey: DAILY_LOGS_KEY(limit),
     queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from("daily_logs")
         .select("*")
+        .eq("user_id", user.id)
         .order("date", { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return (data ?? []) as unknown as DailyLogRow[];
+      const rows = (data ?? []) as unknown as DailyLogRow[];
+      void logDataAccess("daily_logs", "view", {
+        source: "useDailyLogs",
+        resultCount: rows.length,
+        limit,
+      });
+      return rows;
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -44,6 +57,11 @@ export function useTodayLog() {
   return useQuery<DailyLogRow | null>({
     queryKey: TODAY_LOG_KEY(),
     queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
       // Add timeout protection
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
@@ -54,13 +72,19 @@ export function useTodayLog() {
       const logPromise = supabase
         .from("daily_logs")
         .select("*")
+        .eq("user_id", user.id)
         .eq("date", todayIso())
         .maybeSingle();
 
       const { data, error } = await Promise.race([logPromise, timeoutPromise]);
 
       if (error) throw error;
-      return data as unknown as DailyLogRow | null;
+      const row = data as unknown as DailyLogRow | null;
+      void logDataAccess("daily_logs", "view", {
+        source: "useTodayLog",
+        hasLog: !!row,
+      });
+      return row;
     },
     // Today's log changes when the user logs – keep stale time short
     staleTime: 60 * 1000,

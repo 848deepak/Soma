@@ -14,7 +14,10 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 const runtimeExtra =
-  Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {};
+  (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<
+    string,
+    string | undefined
+  >;
 
 const supabaseUrl =
   process.env.EXPO_PUBLIC_SUPABASE_URL ?? runtimeExtra.EXPO_PUBLIC_SUPABASE_URL;

@@ -30,6 +30,7 @@ export type MonthCalendarMeta = {
   year: number;
   currentDay: number;
   periodDays: number[];
+  predictedPeriodDays: number[];
   fertileWindow: number[];
   ovulationDay: number;
 };
@@ -81,6 +82,7 @@ export const monthCalendarMeta: MonthCalendarMeta = {
   year: 2026,
   currentDay: 6,
   periodDays: [16, 17, 18, 19, 20],
+  predictedPeriodDays: [27, 28, 29, 30],
   fertileWindow: [10, 11, 12, 13, 14],
   ovulationDay: 12,
 };

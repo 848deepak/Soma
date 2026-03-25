@@ -12,6 +12,12 @@
  */
 import { supabase } from '@/lib/supabase';
 
+function conflictTargetForTable(table: string): string {
+  if (table === 'daily_logs') return 'user_id,date';
+  if (table === 'cycles') return 'user_id,start_date';
+  return 'id';
+}
+
 export type SupabaseSyncPayload = {
   /** The Supabase table name (e.g. 'symptom_logs', 'cycle_entries'). */
   table: string;
@@ -30,9 +36,10 @@ export type PushResult = {
 export const supabaseService = {
   push: async ({ table, operation, payload, entityId }: SupabaseSyncPayload): Promise<PushResult> => {
     if (operation === 'upsert') {
+      const onConflict = conflictTargetForTable(table);
       const { error } = await supabase
         .from(table)
-        .upsert(payload, { onConflict: 'id' });
+        .upsert(payload, { onConflict });
 
       if (error) return { ok: false, error: error.message };
       return { ok: true };
