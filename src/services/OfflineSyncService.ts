@@ -45,10 +45,30 @@ export async function flushOfflineQueue(): Promise<FlushResult> {
   }
 
   const items = await getPendingSyncItems(MAX_ATTEMPTS);
+  const latestByEntity = new Map<string, (typeof items)[number]>();
+  const staleItemIds: string[] = [];
+
+  for (const item of items) {
+    const dedupeKey = `${item.entityType}:${item.entityId}`;
+    const existing = latestByEntity.get(dedupeKey);
+    if (existing) {
+      staleItemIds.push(existing.id);
+    }
+    latestByEntity.set(dedupeKey, item);
+  }
+
+  for (const staleId of staleItemIds) {
+    await removeSyncItem(staleId);
+  }
+
+  const dedupedItems = [...latestByEntity.values()].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
+
   let synced = 0;
   let failed = 0;
 
-  for (const item of items) {
+  for (const item of dedupedItems) {
     try {
       // Decryption boundary: unwrap AES envelope when encryption is real.
       // With the pass-through stub this is a no-op.

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Switch, TextInput, View, useColorScheme } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import { HeaderBar } from '@/src/components/ui/HeaderBar';
 import { PressableScale } from '@/src/components/ui/PressableScale';
@@ -8,14 +9,18 @@ import { Typography } from '@/src/components/ui/Typography';
 import { PartnerView } from '@/src/components/PartnerView';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { usePartner } from '@/hooks/usePartner';
-import { useLinkPartner } from '@/hooks/useLinkPartner';
+import { isInviteCodeFormat, useEnsurePartnerInviteCode, useLinkPartner } from '@/hooks/useLinkPartner';
 import type { PartnerPermissions } from '@/types/database';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Splits a 6-char code into 3 display groups: "A792B1" → ["A7", "92", "B1"] */
 function splitCode(code: string): string[] {
-  return [code.slice(0, 2), code.slice(2, 4), code.slice(4, 6)];
+  const cleaned = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.length < 6) {
+    return ['··', '··', '··'];
+  }
+  return [cleaned.slice(0, 2), cleaned.slice(2, 4), cleaned.slice(4, 6)];
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -66,6 +71,34 @@ export function PartnerSyncScreen() {
   const { data: partnerState } = usePartner();
   const updateProfile = useUpdateProfile();
   const linkPartner = useLinkPartner();
+  const ensureInviteCode = useEnsurePartnerInviteCode();
+  const ensureInviteCodeMutate = ensureInviteCode.mutate;
+  const ensuredInviteCode = ensureInviteCode.data;
+  const isEnsuringInviteCode = ensureInviteCode.isPending;
+
+  const profileInviteCode = profile?.partner_link_code ?? null;
+
+  useEffect(() => {
+    if (profileLoading) return;
+    if (isInviteCodeFormat(profileInviteCode)) return;
+    if (isEnsuringInviteCode) return;
+    ensureInviteCodeMutate(profileInviteCode);
+  }, [
+    profileLoading,
+    profileInviteCode,
+    isEnsuringInviteCode,
+    ensureInviteCodeMutate,
+  ]);
+
+  const inviteCode = useMemo(() => {
+    if (isInviteCodeFormat(ensuredInviteCode)) {
+      return ensuredInviteCode!;
+    }
+    if (isInviteCodeFormat(profileInviteCode)) {
+      return profileInviteCode!;
+    }
+    return null;
+  }, [ensuredInviteCode, profileInviteCode]);
 
   const permissions: PartnerPermissions = profile?.partner_permissions ?? {
     share_mood: true,
@@ -73,9 +106,11 @@ export function PartnerSyncScreen() {
     share_symptoms: false,
   };
 
-  const codeSegments = profile?.partner_link_code
-    ? splitCode(profile.partner_link_code)
+  const codeSegments = inviteCode
+    ? splitCode(inviteCode)
     : ['··', '··', '··'];
+  const isInviteCodeLoading = profileLoading || isEnsuringInviteCode;
+  const hasInviteCode = Boolean(inviteCode);
 
   const isLinkedAsViewer = partnerState?.asViewer != null;
   const isUpdatingPermissions = updateProfile.isPending;
@@ -99,9 +134,9 @@ export function PartnerSyncScreen() {
   }
 
   function handleLinkPartner() {
-    const code = linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (code.length !== 6) return;
-    linkPartner.mutate(code, { onSuccess: () => setLinkCode('') });
+    const normalizedLength = linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').length;
+    if (normalizedLength !== 6) return;
+    linkPartner.mutate(linkCode, { onSuccess: () => setLinkCode('') });
   }
 
   return (
@@ -121,7 +156,7 @@ export function PartnerSyncScreen() {
           Your Access Key
         </Typography>
 
-        {/* QR code placeholder */}
+        {/* QR invite code */}
         <View
           style={{
             width: 140,
@@ -135,12 +170,40 @@ export function PartnerSyncScreen() {
             borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(221,167,165,0.2)',
           }}
         >
-          <Typography
-            variant="helper"
-            style={{ letterSpacing: 3, textAlign: 'center' }}
-          >
-            QR CODE
-          </Typography>
+          {isInviteCodeLoading ? (
+            <View style={{ alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator size="small" color="#DDA7A5" />
+              <Typography variant="helper">Preparing access key…</Typography>
+            </View>
+          ) : hasInviteCode ? (
+            <QRCode
+              testID="partner-invite-qr"
+              value={inviteCode!}
+              size={112}
+              color={isDark ? '#F2F2F2' : '#2D2327'}
+              backgroundColor="transparent"
+            />
+          ) : (
+            <View style={{ alignItems: 'center', gap: 8, paddingHorizontal: 8 }}>
+              <Typography variant="helper" style={{ textAlign: 'center' }}>
+                Could not load code
+              </Typography>
+              <PressableScale
+                onPress={() => ensureInviteCodeMutate(profileInviteCode)}
+                style={{
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(221,167,165,0.35)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Typography style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#F2F2F2' : '#2D2327' }}>
+                  Retry
+                </Typography>
+              </PressableScale>
+            </View>
+          )}
         </View>
 
         {/* Code segments */}
@@ -172,7 +235,7 @@ export function PartnerSyncScreen() {
         </View>
 
         <Typography variant="helper" style={{ marginTop: 12 }}>
-          Share this code with your partner
+          Share this code or QR with your partner
         </Typography>
       </View>
 
@@ -249,7 +312,7 @@ export function PartnerSyncScreen() {
               placeholderTextColor="#B0A8A4"
               autoCapitalize="characters"
               autoCorrect={false}
-              maxLength={6}
+              maxLength={8}
               value={linkCode}
               onChangeText={(t) => setLinkCode(t.toUpperCase())}
             />
@@ -262,7 +325,11 @@ export function PartnerSyncScreen() {
                 paddingVertical: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: linkCode.trim().length !== 6 || linkPartner.isPending ? 0.5 : 1,
+                opacity:
+                  linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').length !== 6 ||
+                  linkPartner.isPending
+                    ? 0.5
+                    : 1,
                 shadowColor: '#DDA7A5',
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.3,

@@ -16,6 +16,13 @@ import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { trackEvent } from "@/src/services/analytics";
 import { captureException } from "@/src/services/errorTracking";
+import { requestParentalConsent } from "@/src/services/parentalConsentService";
+import {
+  sanitizeInput,
+  validateEmail,
+  validateIsoDate,
+  validateMinimumAge,
+} from "@/src/utils/validation";
 
 export function SetupScreen() {
   const router = useRouter();
@@ -24,6 +31,7 @@ export function SetupScreen() {
   const [firstName, setFirstName] = useState("");
   const [username, setUsername] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [parentEmail, setParentEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -53,22 +61,32 @@ export function SetupScreen() {
 
   async function handleContinue() {
     if (isLoading) return;
-    if (!firstName.trim()) {
+    if (!sanitizeInput(firstName)) {
       Alert.alert("Missing name", "Please enter your first name.");
       return;
     }
 
-    const normalizedUsername = username
-      .trim()
+    const normalizedUsername = sanitizeInput(username)
       .replace(/\s+/g, "")
       .toLowerCase();
-    const normalizedDob = dateOfBirth.trim();
+    const normalizedDob = sanitizeInput(dateOfBirth);
     if (!normalizedUsername) {
       Alert.alert("Missing username", "Please choose a username.");
       return;
     }
-    if (normalizedDob && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDob)) {
+    if (normalizedDob && !validateIsoDate(normalizedDob)) {
       Alert.alert("Invalid date", "Use YYYY-MM-DD for date of birth.");
+      return;
+    }
+    const requiresParentalConsent =
+      normalizedDob && !validateMinimumAge(normalizedDob, 13);
+    const normalizedParentEmail = sanitizeInput(parentEmail).toLowerCase();
+
+    if (requiresParentalConsent && !validateEmail(normalizedParentEmail)) {
+      Alert.alert(
+        "Parent email required",
+        "Enter a valid parent or guardian email to request consent.",
+      );
       return;
     }
 
@@ -76,6 +94,34 @@ export function SetupScreen() {
     try {
       const user = await ensureAnonymousSession();
       if (!user) throw new Error("Could not establish a session.");
+
+      if (requiresParentalConsent) {
+        const consentRequest = await requestParentalConsent(
+          user.id,
+          normalizedParentEmail,
+          normalizedDob,
+        );
+        await supabase
+          .from("profiles")
+          .update({
+            date_of_birth: normalizedDob,
+            is_onboarded: false,
+          })
+          .eq("id", user.id);
+
+        if (consentRequest.emailSent) {
+          Alert.alert(
+            "Parental consent requested",
+            "We sent a verification request to your parent/guardian email. Complete verification to continue.",
+          );
+        } else {
+          Alert.alert(
+            "Parental consent pending",
+            "Your request was saved, but email delivery is not configured yet. Please contact support to complete guardian verification.",
+          );
+        }
+        return;
+      }
 
       const today = new Date();
       const startDate = [
@@ -105,7 +151,7 @@ export function SetupScreen() {
       const { error: profileError } = await supabase
         .from("profiles")
         .update({
-          first_name: firstName.trim(),
+          first_name: sanitizeInput(firstName),
           username: normalizedUsername,
           date_of_birth: normalizedDob || null,
           is_onboarded: true,
@@ -217,6 +263,33 @@ export function SetupScreen() {
             style={{ fontSize: 16, color: "#2D2327" }}
           />
         </View>
+
+        {dateOfBirth && !validateMinimumAge(sanitizeInput(dateOfBirth), 13) ? (
+          <View
+            style={{
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: "rgba(221,167,165,0.25)",
+              backgroundColor: "rgba(255,255,255,0.85)",
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              marginTop: 10,
+            }}
+          >
+            <Typography variant="helper" className="mb-1">
+              Parent/guardian email (required under 13)
+            </Typography>
+            <TextInput
+              value={parentEmail}
+              onChangeText={setParentEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="parent@example.com"
+              placeholderTextColor="#9B7E8C"
+              style={{ fontSize: 16, color: "#2D2327" }}
+            />
+          </View>
+        ) : null}
       </View>
 
       {/* ── Date picker card ─────────────────────────── */}

@@ -24,6 +24,26 @@ jest.mock("@/hooks/useSaveLog", () => ({
   useSaveLog: jest.fn(),
 }));
 
+jest.mock("@/hooks/useProfile", () => ({
+  useProfile: jest.fn(() => ({
+    data: { cycle_length_average: 28, period_duration_average: 5 },
+    isLoading: false,
+  })),
+}));
+
+jest.mock("@/hooks/useCurrentCycle", () => ({
+  useCurrentCycle: jest.fn(() => ({
+    data: { cycle: null },
+  })),
+}));
+
+jest.mock("@/hooks/useCycleActions", () => ({
+  useEndCurrentCycle: jest.fn(() => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  })),
+}));
+
 import { useTodayLog } from "@/hooks/useDailyLogs";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { DailyLogScreen } from "@/src/screens/DailyLogScreen";
@@ -133,6 +153,7 @@ describe("DailyLogScreen (SymptomLog)", () => {
     expect(mockMutate).toHaveBeenCalledWith(
       expect.objectContaining({
         flow_level: expect.any(Number),
+        symptoms: expect.any(Array),
       }),
       expect.objectContaining({
         onSuccess: expect.any(Function),

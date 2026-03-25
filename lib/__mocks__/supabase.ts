@@ -34,6 +34,9 @@ const mockChannelInstance = {
 export const supabase = {
   from: jest.fn().mockImplementation(() => buildChainedMock()),
   rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+  functions: {
+    invoke: jest.fn().mockResolvedValue({ data: null, error: null }),
+  },
   channel: jest.fn().mockReturnValue(mockChannelInstance),
   removeChannel: jest.fn().mockResolvedValue('ok'),
   auth: {

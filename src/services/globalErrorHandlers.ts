@@ -5,17 +5,47 @@
  * network errors, and other runtime exceptions.
  */
 
-import { captureException, captureMessage } from "@/src/services/errorTracking";
+import {
+  captureException,
+  captureMessage,
+  sanitizeErrorForTelemetry,
+} from "@/src/services/errorTracking";
+
+type PromiseRejectionHandler = (event: PromiseRejectionEvent) => void;
+
+type ErrorUtilsLike = {
+  getGlobalHandler: () => (error: Error, isFatal?: boolean) => void;
+  setGlobalHandler: (handler: (error: Error, isFatal: boolean) => void) => void;
+};
+
+type PerformanceWithMemory = Performance & {
+  memory?: {
+    usedJSHeapSize: number;
+    totalJSHeapSize: number;
+  };
+};
+
+type GlobalWithHandlers = typeof globalThis & {
+  onunhandledrejection?: PromiseRejectionHandler;
+  ErrorUtils?: ErrorUtilsLike;
+  performance?: PerformanceWithMemory;
+};
+
+const globalObj = globalThis as GlobalWithHandlers;
 
 /**
  * Setup global error handlers for the application
  */
 export function setupGlobalErrorHandlers() {
   // Handle unhandled promise rejections
-  if (typeof global !== "undefined" && global.Error) {
-    const originalHandler = global.onunhandledrejection;
-    global.onunhandledrejection = (event: PromiseRejectionEvent) => {
-      console.error("[Global] Unhandled promise rejection:", event.reason);
+  if (typeof globalObj !== "undefined") {
+    const originalHandler = globalObj.onunhandledrejection;
+    globalObj.onunhandledrejection = (event: PromiseRejectionEvent) => {
+      const safeReason =
+        event.reason instanceof Error
+          ? sanitizeErrorForTelemetry(event.reason)
+          : { name: "UnhandledRejection", message: "Unhandled promise rejection" };
+      console.error("[Global] Unhandled promise rejection:", safeReason);
 
       // Report to error tracking
       const error =
@@ -30,7 +60,7 @@ export function setupGlobalErrorHandlers() {
 
       // Call original handler if it exists
       if (originalHandler) {
-        originalHandler.call(global, event);
+        originalHandler(event);
       }
 
       // Prevent default warning in console
@@ -40,12 +70,15 @@ export function setupGlobalErrorHandlers() {
 
   // Handle other global errors
   if (
-    typeof global !== "undefined" &&
-    typeof global.ErrorUtils !== "undefined"
+    typeof globalObj !== "undefined" &&
+    typeof globalObj.ErrorUtils !== "undefined"
   ) {
-    const originalHandler = global.ErrorUtils.getGlobalHandler();
-    global.ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
-      console.error("[Global] Uncaught JS error:", error, { isFatal });
+    const originalHandler = globalObj.ErrorUtils.getGlobalHandler();
+    globalObj.ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
+      console.error("[Global] Uncaught JS error:", {
+        ...sanitizeErrorForTelemetry(error),
+        isFatal,
+      });
 
       captureException(error, {
         screen: "global",
@@ -76,7 +109,7 @@ export function setupGlobalErrorHandlers() {
 function setupNetworkErrorMonitoring() {
   // Monitor fetch errors
   const originalFetch = global.fetch;
-  global.fetch = async (...args) => {
+  globalObj.fetch = async (...args) => {
     try {
       const response = await originalFetch(...args);
 
@@ -120,7 +153,7 @@ function setupPerformanceMonitoring() {
     let slowRenderCount = 0;
     const checkRenderPerformance = () => {
       const start = Date.now();
-      global.requestIdleCallback(() => {
+      globalObj.requestIdleCallback?.(() => {
         const renderTime = Date.now() - start;
         if (renderTime > 100) {
           // Slow render threshold
@@ -143,9 +176,10 @@ function setupPerformanceMonitoring() {
   }
 
   // Monitor memory usage (if available)
-  if (typeof global.performance !== "undefined" && global.performance.memory) {
+  if (typeof globalObj.performance !== "undefined" && globalObj.performance.memory) {
     setInterval(() => {
-      const memory = global.performance.memory;
+      const memory = globalObj.performance?.memory;
+      if (!memory) return;
       const memoryUsage = memory.usedJSHeapSize / memory.totalJSHeapSize;
 
       if (memoryUsage > 0.9) {

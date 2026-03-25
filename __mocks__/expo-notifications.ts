@@ -37,12 +37,40 @@ export const getPermissionsAsync = jest
   .fn()
   .mockResolvedValue({ granted: true, canAskAgain: true, status: 'granted' });
 
+export const getDevicePushTokenAsync = jest
+  .fn()
+  .mockResolvedValue({ type: 'fcm', data: 'mock-device-token' });
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const setNotificationHandler = jest.fn();
+
+export const addNotificationResponseReceivedListener = jest.fn(() => ({
+  remove: jest.fn(),
+}));
+
+export const addNotificationReceivedListener = jest.fn(() => ({
+  remove: jest.fn(),
+}));
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
 
 export const getBadgeCountAsync = jest.fn().mockResolvedValue(0);
 
 export const setBadgeCountAsync = jest.fn().mockResolvedValue(true);
+
+export default {
+  SchedulableTriggerInputTypes,
+  scheduleNotificationAsync,
+  cancelScheduledNotificationAsync,
+  cancelAllScheduledNotificationsAsync,
+  getAllScheduledNotificationsAsync,
+  requestPermissionsAsync,
+  getPermissionsAsync,
+  getDevicePushTokenAsync,
+  setNotificationHandler,
+  addNotificationResponseReceivedListener,
+  addNotificationReceivedListener,
+  getBadgeCountAsync,
+  setBadgeCountAsync,
+};

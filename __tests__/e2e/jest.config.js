@@ -3,12 +3,16 @@
  * Jest configuration specific to E2E tests
  */
 module.exports = {
-  preset: 'ts-jest',
+  transform: {
+    '^.+\\.(js|ts)$': 'babel-jest',
+  },
   testEnvironment: 'node',
   testRegex: '\\.e2e\\.(js|ts)$',
   testTimeout: 120000,
   verbose: true,
   maxWorkers: 1, // Run E2E tests serially to avoid conflicts
-  globalSetup: './setup.js',
-  globalTeardown: './teardown.js',
+  globalSetup: 'detox/runners/jest/globalSetup',
+  globalTeardown: 'detox/runners/jest/globalTeardown',
+  reporters: ['detox/runners/jest/reporter'],
+  setupFilesAfterEnv: ['detox/runners/jest/setup'],
 };

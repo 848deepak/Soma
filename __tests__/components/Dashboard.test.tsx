@@ -143,12 +143,12 @@ describe("HomeScreen (Dashboard)", () => {
     expect(screen.getByText("Ovulation Phase")).toBeTruthy();
   });
 
-  it("renders home widgets (hydration, sleep, mood, energy)", () => {
+  it("renders only production-ready home widgets", () => {
     render(<HomeScreen />);
-    expect(screen.getByText("Glasses today")).toBeTruthy();
-    expect(screen.getByText("Last night")).toBeTruthy();
     expect(screen.getByText("Current mood")).toBeTruthy();
     expect(screen.getByText("Readiness")).toBeTruthy();
+    expect(screen.queryByText("Glasses today")).toBeNull();
+    expect(screen.queryByText("Last night")).toBeNull();
   });
 
   it("shows placeholder dashes when no today log exists", () => {
@@ -162,7 +162,7 @@ describe("HomeScreen (Dashboard)", () => {
     expect(dashCells.length).toBeGreaterThan(0);
   });
 
-  it("shows hydration count from today log", () => {
+  it("does not render hydration widget while feature is disabled", () => {
     (useTodayLog as jest.Mock).mockReturnValue({
       data: {
         id: "log-1",
@@ -184,10 +184,11 @@ describe("HomeScreen (Dashboard)", () => {
       isLoading: false,
     });
     render(<HomeScreen />);
-    expect(screen.getByText("6/8")).toBeTruthy();
+    expect(screen.queryByText("Glasses today")).toBeNull();
+    expect(screen.queryByText("6/8")).toBeNull();
   });
 
-  it("shows sleep hours from today log", () => {
+  it("does not render sleep widget while feature is disabled", () => {
     (useTodayLog as jest.Mock).mockReturnValue({
       data: {
         id: "log-1",
@@ -209,7 +210,8 @@ describe("HomeScreen (Dashboard)", () => {
       isLoading: false,
     });
     render(<HomeScreen />);
-    expect(screen.getByText("7h 0m")).toBeTruthy();
+    expect(screen.queryByText("Last night")).toBeNull();
+    expect(screen.queryByText("7h 0m")).toBeNull();
   });
 
   it("shows mood from today log", () => {

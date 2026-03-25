@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms of Use — Soma",
@@ -98,6 +99,23 @@ export default function TermsPage() {
               )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 text-center md:text-left">
+          <Link
+            href="/privacy"
+            className="text-sm font-semibold text-rose hover:underline underline-offset-2"
+          >
+            Read our Privacy Policy →
+          </Link>
+          <div className="mt-3">
+            <Link
+              href="/cookies"
+              className="text-sm font-semibold text-rose hover:underline underline-offset-2"
+            >
+              Read our Cookie Notice →
+            </Link>
+          </div>
         </div>
       </div>
     </div>

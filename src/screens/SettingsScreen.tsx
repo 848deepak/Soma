@@ -20,6 +20,7 @@ import { useCurrentCycle } from "@/hooks/useCurrentCycle";
 import {
   useDeleteAllData,
   useEndCurrentCycle,
+  useResetPredictions,
   useStartNewCycle,
 } from "@/hooks/useCycleActions";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
@@ -29,12 +30,24 @@ import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
-import { track } from "@/src/services/analytics";
+import {
+  getAnalyticsConsentStatus,
+  requestAnalyticsConsent,
+  revokeAnalyticsConsent,
+  track,
+} from "@/src/services/analytics";
+import {
+  getConsentSnapshot,
+  setAnalyticsConsent,
+} from "@/src/services/consentService";
+import { HapticsService } from "@/src/services/haptics/HapticsService";
 import {
   cancelAllNotifications,
   requestPermissions,
   scheduleDailyLogReminder,
 } from "@/src/services/notificationService";
+import { logDataAccess } from "@/src/services/auditService";
+import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
 
 function SectionLabel({ label, isDark }: { label: string; isDark: boolean }) {
   return (
@@ -163,9 +176,11 @@ export function SettingsScreen() {
   const updateProfile = useUpdateProfile();
   const startNewCycle = useStartNewCycle();
   const endCurrentCycle = useEndCurrentCycle();
+  const resetPredictions = useResetPredictions();
   const deleteAllData = useDeleteAllData();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [username, setUsername] = useState("");
@@ -190,6 +205,16 @@ export function SettingsScreen() {
     setCycleLength(String(profile.cycle_length_average ?? 28));
     setPeriodDuration(String(profile.period_duration_average ?? 5));
   }, [profile]);
+
+  useEffect(() => {
+    void (async () => {
+      const consent =
+        typeof getAnalyticsConsentStatus === "function"
+          ? await getAnalyticsConsentStatus()
+          : false;
+      setAnalyticsEnabled(consent);
+    })();
+  }, []);
 
   function handleThemeSelect(themeId: "Cream" | "Midnight") {
     setActiveTheme(themeId);
@@ -234,13 +259,16 @@ export function SettingsScreen() {
   };
 
   async function handleNotificationToggle(value: boolean) {
+    void HapticsService.selection();
     setNotificationsEnabled(value);
     if (value) {
       const result = await requestPermissions();
       if (result.granted) {
         await scheduleDailyLogReminder(20, 0);
+        void HapticsService.success();
       } else {
         setNotificationsEnabled(false);
+        void HapticsService.error();
         Alert.alert(
           "Permission Required",
           "Please enable notifications in your device settings.",
@@ -248,6 +276,32 @@ export function SettingsScreen() {
       }
     } else {
       await cancelAllNotifications();
+      void HapticsService.selection();
+    }
+  }
+
+  async function handleAnalyticsToggle(value: boolean) {
+    void HapticsService.selection();
+    setAnalyticsEnabled(value);
+    try {
+      await setAnalyticsConsent(value);
+      if (value) {
+        if (typeof requestAnalyticsConsent === "function") {
+          await requestAnalyticsConsent();
+        }
+      } else {
+        if (typeof revokeAnalyticsConsent === "function") {
+          await revokeAnalyticsConsent();
+        }
+      }
+      track("analytics_consent_updated", { granted: value });
+    } catch (error: unknown) {
+      setAnalyticsEnabled(!value);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not update analytics consent.";
+      Alert.alert("Consent Update Failed", message);
     }
   }
 
@@ -262,15 +316,26 @@ export function SettingsScreen() {
     const periodDurationValue = Number(periodDuration);
 
     if (!normalizedFirstName) {
+      void HapticsService.error();
       Alert.alert("Missing name", "Please enter your first name.");
       return;
     }
     if (!normalizedUsername) {
+      void HapticsService.error();
       Alert.alert("Missing username", "Please choose a username.");
       return;
     }
-    if (normalizedDob && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDob)) {
+    if (normalizedDob && !validateIsoDate(normalizedDob)) {
+      void HapticsService.error();
       Alert.alert("Invalid date", "Use YYYY-MM-DD format for date of birth.");
+      return;
+    }
+    if (normalizedDob && !validateMinimumAge(normalizedDob, 13)) {
+      void HapticsService.error();
+      Alert.alert(
+        "Age requirement",
+        "You must be at least 13 years old to use Soma without parental consent.",
+      );
       return;
     }
     if (
@@ -278,6 +343,7 @@ export function SettingsScreen() {
       cycleLengthValue < 15 ||
       cycleLengthValue > 60
     ) {
+      void HapticsService.error();
       Alert.alert(
         "Invalid cycle length",
         "Cycle length must be between 15 and 60 days.",
@@ -289,6 +355,7 @@ export function SettingsScreen() {
       periodDurationValue < 1 ||
       periodDurationValue > 15
     ) {
+      void HapticsService.error();
       Alert.alert(
         "Invalid period duration",
         "Period duration must be between 1 and 15 days.",
@@ -297,6 +364,7 @@ export function SettingsScreen() {
     }
 
     try {
+      await HapticsService.impactMedium();
       await updateProfile.mutateAsync({
         first_name: normalizedFirstName,
         username: normalizedUsername,
@@ -304,8 +372,10 @@ export function SettingsScreen() {
         cycle_length_average: cycleLengthValue,
         period_duration_average: periodDurationValue,
       });
+      await HapticsService.success();
       Alert.alert("Saved", "Your settings were updated.");
     } catch (error: unknown) {
+      await HapticsService.error();
       const message =
         error instanceof Error
           ? error.message
@@ -315,6 +385,7 @@ export function SettingsScreen() {
   }
 
   async function handleLogout() {
+    void HapticsService.impactMedium();
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -324,8 +395,10 @@ export function SettingsScreen() {
           setIsLoggingOut(true);
           try {
             await signOut();
+            await HapticsService.success();
             router.replace("/auth/login" as never);
           } catch (error: unknown) {
+            await HapticsService.error();
             const message =
               error instanceof Error ? error.message : "Sign out failed.";
             Alert.alert("Error", message);
@@ -375,7 +448,37 @@ export function SettingsScreen() {
                 error instanceof Error
                   ? error.message
                   : "Could not end the current period.";
-              Alert.alert("Action Failed", message);
+
+              // IMPROVED: Better error messages
+              if (
+                message.includes("No active period") ||
+                message.includes("already ended")
+              ) {
+                Alert.alert(
+                  "No Active Period",
+                  "There's no active period to end. Start a new period first.",
+                );
+              } else if (
+                message.includes("network") ||
+                message.includes("offline")
+              ) {
+                Alert.alert(
+                  "Connection Issue",
+                  message.includes("offline")
+                    ? "You're offline. The period will be ended when you're online again."
+                    : "Connection error. Please check your internet and try again.",
+                );
+              } else if (
+                message.includes("Invalid") ||
+                message.includes("format")
+              ) {
+                Alert.alert(
+                  "Data Error",
+                  "Your period data appears corrupted. Please contact support.",
+                );
+              } else {
+                Alert.alert("Action Failed", message);
+              }
             }
           },
         },
@@ -385,7 +488,7 @@ export function SettingsScreen() {
 
   function handleDeleteAllData() {
     Alert.alert(
-      "Delete Account Data",
+      "Delete all data?",
       "This permanently deletes your cycle history, logs, and partner links. You will be signed out after deletion. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
@@ -407,6 +510,43 @@ export function SettingsScreen() {
                   ? error.message
                   : "Could not delete your data.";
               Alert.alert("Delete Failed", message);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleResetPredictions() {
+    const cycleLengthValue = Number(cycleLength);
+    const periodDurationValue = Number(periodDuration);
+
+    Alert.alert(
+      "Reset predictions?",
+      "This recalculates predictions using your current cycle settings. Your logs and cycle history will remain unchanged.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          onPress: async () => {
+            try {
+              const result = await resetPredictions.mutateAsync({
+                cycleLength: cycleLengthValue,
+                periodLength: periodDurationValue,
+              });
+
+              Alert.alert(
+                "Predictions updated",
+                result.updatedCycles > 0
+                  ? "Cycle predictions were recalculated successfully."
+                  : "No active cycle found. Logs and history are unchanged.",
+              );
+            } catch (error: unknown) {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Could not reset predictions.";
+              Alert.alert("Action Failed", message);
             }
           },
         },
@@ -456,11 +596,14 @@ export function SettingsScreen() {
       if (cyclesError) throw cyclesError;
       if (logsError) throw logsError;
 
+      const consentSnapshot = await getConsentSnapshot();
+
       const exportJson = {
         exported_at: new Date().toISOString(),
         profile: profileRow,
         cycles: cycles ?? [],
         daily_logs: logs ?? [],
+        consent_snapshot: consentSnapshot,
       };
 
       const csvHeader =
@@ -488,12 +631,21 @@ export function SettingsScreen() {
         {
           text: "JSON",
           onPress: async () => {
+            await logDataAccess("gdpr_data_rights", "export", {
+              format: "json",
+              cycle_count: (cycles ?? []).length,
+              log_count: (logs ?? []).length,
+            });
             await Share.share({ message: JSON.stringify(exportJson, null, 2) });
           },
         },
         {
           text: "CSV",
           onPress: async () => {
+            await logDataAccess("gdpr_data_rights", "export", {
+              format: "csv",
+              log_count: (logs ?? []).length,
+            });
             await Share.share({ message: csv });
           },
         },
@@ -506,9 +658,13 @@ export function SettingsScreen() {
   }
 
   async function handleSendFeedback() {
+    const manifestExtra = (Constants.manifest2?.extra ?? {}) as Record<
+      string,
+      string | undefined
+    >;
     const appVersion =
       Constants.expoConfig?.version ??
-      Constants.manifest2?.extra?.version ??
+      manifestExtra.version ??
       "unknown";
     const userHint = profile?.username ? `@${profile.username}` : "anonymous";
     const body = [
@@ -657,21 +813,38 @@ export function SettingsScreen() {
         <SectionLabel label="Cycle Actions" isDark={isDark} />
 
         <SettingsRow
+          title={
+            resetPredictions.isPending
+              ? "Resetting Predictions…"
+              : "Reset Predictions"
+          }
+          isDark={isDark}
+          onPress={handleResetPredictions}
+        />
+
+        <SettingsRow
           title={startNewCycle.isPending ? "Starting…" : "Start Period Today"}
           isDark={isDark}
           onPress={handleStartPeriodToday}
         />
 
-        <SettingsRow
-          title={endCurrentCycle.isPending ? "Ending…" : "End Current Period"}
-          isDark={isDark}
-          onPress={handleEndPeriodToday}
-        />
+        {/* FIX: Only show "End Period" button when there's an active cycle */}
+        {currentCycleData?.cycle ? (
+          <SettingsRow
+            title={endCurrentCycle.isPending ? "Ending…" : "End Current Period"}
+            isDark={isDark}
+            onPress={handleEndPeriodToday}
+          />
+        ) : null}
 
         <Typography variant="helper" style={{ marginTop: 6 }}>
           {currentCycleData?.cycle
             ? `Active cycle started ${currentCycleData.cycle.start_date}`
             : "No active cycle right now."}
+        </Typography>
+
+        <Typography variant="helper" style={{ marginTop: 6 }}>
+          Reset Predictions updates forecast dates only. It never deletes logs.
         </Typography>
       </View>
 
@@ -714,6 +887,71 @@ export function SettingsScreen() {
           title="Partner Sync"
           isDark={isDark}
           onPress={() => router.push("/partner" as never)}
+        />
+
+        <View
+          style={{
+            marginTop: 8,
+            borderRadius: 16,
+            backgroundColor: isDark
+              ? "rgba(255,255,255,0.06)"
+              : "rgba(255,218,185,0.2)",
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Typography
+            style={{
+              fontSize: 15,
+              color: isDark ? "#F2F2F2" : "#2D2327",
+            }}
+          >
+            Analytics Consent
+          </Typography>
+          <Switch
+            value={analyticsEnabled}
+            onValueChange={handleAnalyticsToggle}
+            trackColor={{ false: "#D7CFCA", true: "#DDA7A5" }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+      </View>
+
+      {/* ── Legal ─────────────────────────────────────────────────── */}
+      <View style={sectionCardStyle}>
+        <SectionLabel label="Legal" isDark={isDark} />
+        <SettingsRow
+          title="Data Consent Center"
+          isDark={isDark}
+          onPress={() => router.push("/legal/data-consent" as never)}
+        />
+        <SettingsRow
+          title="Data Practices"
+          isDark={isDark}
+          onPress={() => router.push("/legal/data-practices" as never)}
+        />
+        <SettingsRow
+          title="Data Rights Requests"
+          isDark={isDark}
+          onPress={() => router.push("/legal/data-rights" as never)}
+        />
+        <SettingsRow
+          title="Privacy Policy"
+          isDark={isDark}
+          onPress={() => router.push("/legal/privacy" as never)}
+        />
+        <SettingsRow
+          title="Terms of Use"
+          isDark={isDark}
+          onPress={() => router.push("/legal/terms" as never)}
+        />
+        <SettingsRow
+          title="Medical Disclaimer"
+          isDark={isDark}
+          onPress={() => router.push("/legal/medical-disclaimer" as never)}
         />
       </View>
 
@@ -782,7 +1020,7 @@ export function SettingsScreen() {
         <Typography variant="helper" style={{ marginTop: 6 }}>
           {deleteAllData.isPending
             ? "Deleting your data…"
-            : "Delete is permanent. Local and synced health data are removed."}
+            : "Danger zone: Delete all data is permanent and cannot be undone."}
         </Typography>
       </View>
 

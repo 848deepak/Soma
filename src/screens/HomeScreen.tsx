@@ -15,7 +15,9 @@ import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useCycleStore } from "@/src/store/useCycleStore";
+import { useOfflineQueue } from "@/src/store/useOfflineQueue";
 import { SymbolView } from "expo-symbols";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PHASE_INSIGHT: Record<string, string> = {
   menstrual:
@@ -27,6 +29,11 @@ const PHASE_INSIGHT: Record<string, string> = {
   luteal:
     "Progesterone is rising. Honour rest, reduce stimulants, and be gentle with yourself.",
 };
+
+const featureFlags = {
+  waterTracking: false,
+  sleepTracking: false,
+} as const;
 
 // ── Gradient Orb — hero element matching Figma ─────────────────────────────
 const CycleOrb = React.memo(function CycleOrb({
@@ -166,12 +173,14 @@ const CycleOrb = React.memo(function CycleOrb({
 export function HomeScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === "dark";
+  const insets = useSafeAreaInsets();
   const hydrate = useCycleStore((s) => s.hydrate);
   const { user } = useAuthContext();
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
   const [forceShow, setForceShow] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const { pendingCount, isSyncing, flush } = useOfflineQueue();
 
   // ─── Real-time Supabase sync ─────────────────────────────────────────────
   useRealtimeSync(user?.id);
@@ -255,6 +264,9 @@ export function HomeScreen() {
         await logPeriodRangeAction({
           startDate,
           endDate: endDate || undefined,
+          fallbackActiveCycle: cycleData?.cycle
+            ? { id: cycleData.cycle.id, start_date: cycleData.cycle.start_date }
+            : null,
         });
         await refetchCurrentCycle();
         setShowPeriodModal(false);
@@ -299,6 +311,56 @@ export function HomeScreen() {
   const energyValue = todayLog?.energy_level
     ? `${todayLog.energy_level} Energy`
     : "--";
+
+  const homeWidgets = [
+    {
+      key: "hydration",
+      icon: {
+        ios: "drop.fill",
+        android: "water_drop",
+        web: "water_drop",
+      },
+      iconColor: "#8BA888",
+      value: hydrationValue,
+      label: "Glasses today",
+      bg: "rgba(139,168,136,0.16)",
+      isEnabled: featureFlags.waterTracking,
+    },
+    {
+      key: "sleep",
+      icon: {
+        ios: "moon.fill",
+        android: "nights_stay",
+        web: "nights_stay",
+      },
+      iconColor: "#9B7E8C",
+      value: sleepValue,
+      label: "Last night",
+      bg: "rgba(155,126,140,0.16)",
+      isEnabled: featureFlags.sleepTracking,
+    },
+    {
+      key: "mood",
+      icon: { ios: "face.smiling.fill", android: "mood", web: "mood" },
+      iconColor: "#FFDAB9",
+      value: moodValue,
+      label: "Current mood",
+      bg: "rgba(255,218,185,0.2)",
+      isEnabled: true,
+    },
+    {
+      key: "energy",
+      icon: { ios: "bolt.fill", android: "bolt", web: "bolt" },
+      iconColor: "#DDA7A5",
+      value: energyValue,
+      label: "Readiness",
+      bg: "rgba(221,167,165,0.2)",
+      isEnabled: true,
+    },
+  ].filter((item) => item.isEnabled);
+
+  const actionSectionBottomSpacing = Math.max(20, insets.bottom + 14);
+  const fabBottomSpacing = Math.max(10, insets.bottom + 4);
 
   return (
     <Screen>
@@ -542,48 +604,7 @@ export function HomeScreen() {
           rowGap: 12,
         }}
       >
-        {[
-          {
-            key: "hydration",
-            icon: {
-              ios: "drop.fill",
-              android: "water_drop",
-              web: "water_drop",
-            },
-            iconColor: "#8BA888",
-            value: hydrationValue,
-            label: "Glasses today",
-            bg: "rgba(139,168,136,0.16)",
-          },
-          {
-            key: "sleep",
-            icon: {
-              ios: "moon.fill",
-              android: "nights_stay",
-              web: "nights_stay",
-            },
-            iconColor: "#9B7E8C",
-            value: sleepValue,
-            label: "Last night",
-            bg: "rgba(155,126,140,0.16)",
-          },
-          {
-            key: "mood",
-            icon: { ios: "face.smiling.fill", android: "mood", web: "mood" },
-            iconColor: "#FFDAB9",
-            value: moodValue,
-            label: "Current mood",
-            bg: "rgba(255,218,185,0.2)",
-          },
-          {
-            key: "energy",
-            icon: { ios: "bolt.fill", android: "bolt", web: "bolt" },
-            iconColor: "#DDA7A5",
-            value: energyValue,
-            label: "Readiness",
-            bg: "rgba(221,167,165,0.2)",
-          },
-        ].map((item) => (
+        {homeWidgets.map((item) => (
           <View
             key={item.key}
             style={{
@@ -638,9 +659,40 @@ export function HomeScreen() {
       {/* ── Primary action pill + FAB-style secondary action ───────── */}
       <View
         style={{
-          marginBottom: 130,
+          marginBottom: actionSectionBottomSpacing,
         }}
       >
+        {(pendingCount > 0 || isSyncing) && (
+          <PressableScale
+            onPress={() => {
+              void flush();
+            }}
+            style={{
+              marginBottom: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: isDark
+                ? "rgba(167,139,250,0.5)"
+                : "rgba(155,126,140,0.45)",
+              backgroundColor: isDark
+                ? "rgba(167,139,250,0.12)"
+                : "rgba(255,218,185,0.35)",
+              paddingVertical: 10,
+            }}
+          >
+            <Typography
+              variant="helper"
+              style={{ fontWeight: "600", color: isDark ? "#F2F2F2" : "#2D2327" }}
+            >
+              {isSyncing
+                ? "Syncing offline changes..."
+                : `${pendingCount} pending sync item${pendingCount === 1 ? "" : "s"}`}
+            </Typography>
+          </PressableScale>
+        )}
+
         <PressableScale
           onPress={handleOpenPeriodModal}
           style={{
@@ -698,9 +750,10 @@ export function HomeScreen() {
       <PressableScale
         onPress={handleLogFlow}
         style={{
-          position: "absolute",
-          right: 28,
-          bottom: 144,
+          alignSelf: "flex-end",
+          marginTop: 14,
+          marginRight: 4,
+          marginBottom: fabBottomSpacing,
           width: 64,
           height: 64,
           borderRadius: 32,

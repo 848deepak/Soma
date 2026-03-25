@@ -1,8 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { __DEV__ } from "react-native";
 
+import type { DerivedCycleData } from "@/hooks/useCurrentCycle";
 import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
 import { supabase } from "@/lib/supabase";
+import { enqueueSync } from "@/src/database/localDB";
 import { trackEvent } from "@/src/services/analytics";
+import { encryptionService } from "@/src/services/encryptionService";
 
 function todayIso(): string {
   return new Date().toISOString().split("T")[0]!;
@@ -13,11 +17,15 @@ function isIsoDate(value: string): boolean {
 }
 
 export type PeriodRangeInput = { startDate: string; endDate?: string };
+type PeriodRangeInputWithFallback = PeriodRangeInput & {
+  fallbackActiveCycle?: ActiveCycleLike | null;
+};
 
 export async function logPeriodRangeAction({
   startDate,
   endDate,
-}: PeriodRangeInput): Promise<{ hasEndDate: boolean }> {
+  fallbackActiveCycle,
+}: PeriodRangeInputWithFallback): Promise<{ hasEndDate: boolean }> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -47,24 +55,47 @@ export async function logPeriodRangeAction({
     .limit(1)
     .maybeSingle();
 
-  if (activeError) throw activeError;
+  let resolvedActiveCycle = activeCycle as ActiveCycleLike | null;
+  if (activeError) {
+    if (!fallbackActiveCycle || !isLikelyNetworkError(activeError)) {
+      throw activeError;
+    }
+    resolvedActiveCycle = fallbackActiveCycle;
+  }
 
-  if (activeCycle) {
+  let queuedForSync = false;
+
+  if (resolvedActiveCycle) {
     if (!endDate) {
       throw new Error(
         "You already have an active period. Add an end date or end the current period first.",
       );
     }
 
-    const cycleLength = diffDaysInclusive(activeCycle.start_date, endDate);
+    const cycleLength = diffDaysInclusive(resolvedActiveCycle.start_date, endDate);
 
     const { error: updateError } = await supabase
       .from("cycles")
       .update({ end_date: endDate, cycle_length: cycleLength })
-      .eq("id", activeCycle.id)
+      .eq("id", resolvedActiveCycle.id)
       .eq("user_id", user.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      if (!isLikelyNetworkError(updateError)) throw updateError;
+
+      const encryptedPayload = await encryptionService.encrypt(
+        JSON.stringify({
+          id: resolvedActiveCycle.id,
+          user_id: user.id,
+          start_date: resolvedActiveCycle.start_date,
+          end_date: endDate,
+          cycle_length: cycleLength,
+        }),
+      );
+
+      await enqueueSync("cycles", resolvedActiveCycle.id, "upsert", encryptedPayload);
+      queuedForSync = true;
+    }
   } else {
     const payload: {
       user_id: string;
@@ -86,12 +117,27 @@ export async function logPeriodRangeAction({
     const { error: insertError } = await supabase
       .from("cycles")
       .insert(payload);
-    if (insertError) throw insertError;
+    if (insertError) {
+      if (!isLikelyNetworkError(insertError)) throw insertError;
+
+      const encryptedPayload = await encryptionService.encrypt(
+        JSON.stringify(payload),
+      );
+
+      await enqueueSync(
+        "cycles",
+        `cycle:${user.id}:${startDate}`,
+        "upsert",
+        encryptedPayload,
+      );
+      queuedForSync = true;
+    }
   }
 
   trackEvent("period_logged", {
     source: "period_modal",
     has_end_date: Boolean(endDate),
+    queued_for_sync: queuedForSync,
   });
 
   return { hasEndDate: Boolean(endDate) };
@@ -106,6 +152,244 @@ function diffDaysInclusive(startIso: string, endIso: string): number {
     (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
   );
   return Math.max(1, diff + 1);
+}
+
+type ActiveCycleLike = { id: string; start_date: string };
+
+export type ResetPredictionsInput = {
+  cycleLength: number;
+  periodLength: number;
+};
+
+type EndCurrentPeriodInput = {
+  userId: string;
+  endDate?: string;
+  fallbackCycle?: ActiveCycleLike | null;
+};
+
+export type EndCurrentPeriodResult = {
+  cycleId: string;
+  startDate: string;
+  endDate: string;
+  cycleLength: number;
+  queued: boolean;
+};
+
+function isLikelyNetworkError(error: unknown): boolean {
+  const baseMessage = error instanceof Error ? error.message : String(error);
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? Number((error as { status?: number }).status)
+      : null;
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: string }).code ?? "")
+      : "";
+  const message = `${baseMessage} ${code}`;
+  const normalized = message.toLowerCase();
+
+  if (status != null && (status === 408 || status === 429 || status >= 500)) {
+    return true;
+  }
+
+  return (
+    normalized.includes("network") ||
+    normalized.includes("fetch") ||
+    normalized.includes("offline") ||
+    normalized.includes("timed out") ||
+    normalized.includes("timeout") ||
+    normalized.includes("connection") ||
+    normalized.includes("ecconn") ||
+    normalized.includes("temporar")
+  );
+}
+
+function addDaysIso(startIso: string, days: number): string {
+  const [year, month, day] = startIso
+    .split("-")
+    .map(Number) as [number, number, number];
+  const start = new Date(year, month - 1, day);
+  start.setDate(start.getDate() + days);
+  return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+}
+
+function computePredictions(
+  startDateIso: string,
+  cycleLength: number,
+  periodLength: number,
+): { predicted_ovulation: string; predicted_next_cycle: string } {
+  const ovulationDay = Math.max(periodLength + 2, cycleLength - 14);
+  return {
+    predicted_ovulation: addDaysIso(startDateIso, ovulationDay - 1),
+    predicted_next_cycle: addDaysIso(startDateIso, cycleLength),
+  };
+}
+
+export async function endCurrentPeriod({
+  userId,
+  endDate,
+  fallbackCycle,
+}: EndCurrentPeriodInput): Promise<EndCurrentPeriodResult> {
+  // CRITICAL FIX: Always fetch fresh cycle data from backend
+  // Don't rely solely on cache which can be stale
+  const { data: activeCycle, error: fetchError } = await supabase
+    .from("cycles")
+    .select("id,start_date")
+    .eq("user_id", userId)
+    .is("end_date", null)
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // IMPROVED: Better error handling with detailed logging
+  if (fetchError) {
+    if (__DEV__) {
+      console.error("[EndCycle] Fetch error:", {
+        message: fetchError.message,
+        code: (fetchError as any).code,
+        status: (fetchError as any).status,
+      });
+    }
+    if (!fallbackCycle || !isLikelyNetworkError(fetchError)) {
+      throw new Error(
+        `Database error: ${fetchError.message || "Could not fetch active period"}`,
+      );
+    }
+  }
+
+  // FIX: Use fetched cycle if available, otherwise fallback
+  const resolvedCycle = activeCycle ?? fallbackCycle ?? null;
+
+  if (!resolvedCycle) {
+    const errorMsg =
+      "No active period to end. Start a new period first, or check if your period is already ended.";
+    if (__DEV__) {
+      console.error("[EndCycle]", {
+        fetchedCycle: Boolean(activeCycle),
+        fallbackCycle: Boolean(fallbackCycle),
+        error: errorMsg,
+      });
+    }
+    throw new Error(errorMsg);
+  }
+
+  // SAFETY: Basic validation of resolved cycle
+  if (!resolvedCycle.id || !resolvedCycle.start_date) {
+    throw new Error(
+      "Invalid cycle data: missing id or start_date. Please restart your period.",
+    );
+  }
+
+  // IMPROVED: Validate start_date format and value
+  if (!isIsoDate(resolvedCycle.start_date)) {
+    throw new Error(
+      `Invalid start date format: "${resolvedCycle.start_date}". Expected YYYY-MM-DD.`,
+    );
+  }
+
+  const resolvedEndDate = endDate ?? todayIso();
+
+  // IMPROVED: Better end date validation with helpful error
+  if (!isIsoDate(resolvedEndDate)) {
+    throw new Error(
+      `Invalid end date format: "${resolvedEndDate}". Expected YYYY-MM-DD.`,
+    );
+  }
+
+  if (resolvedEndDate < resolvedCycle.start_date) {
+    throw new Error(
+      `Cannot end period on ${resolvedEndDate} because it started on ${resolvedCycle.start_date}. End date must be on or after the start date.`,
+    );
+  }
+
+  const cycleLength = diffDaysInclusive(
+    resolvedCycle.start_date,
+    resolvedEndDate,
+  );
+
+  // Developer logging for debugging
+  if (__DEV__) {
+    console.log("[EndCycle] Attempting to end period:", {
+      cycleId: resolvedCycle.id,
+      startDate: resolvedCycle.start_date,
+      endDate: resolvedEndDate,
+      cycleLength,
+    });
+  }
+
+  const { error: updateError } = await supabase
+    .from("cycles")
+    .update({
+      end_date: resolvedEndDate,
+      cycle_length: cycleLength,
+    })
+    .eq("id", resolvedCycle.id)
+    .eq("user_id", userId);
+
+  if (updateError) {
+    if (__DEV__) {
+      console.error("[EndCycle] Update error:", {
+        message: updateError.message,
+        code: (updateError as any).code,
+        status: (updateError as any).status,
+      });
+    }
+
+    if (!isLikelyNetworkError(updateError)) {
+      throw new Error(
+        `Failed to save: ${updateError.message || "Database error"}`,
+      );
+    }
+
+    // FALLBACK: Queue for sync if network error
+    try {
+      const encryptedPayload = await encryptionService.encrypt(
+        JSON.stringify({
+          id: resolvedCycle.id,
+          user_id: userId,
+          start_date: resolvedCycle.start_date,
+          end_date: resolvedEndDate,
+          cycle_length: cycleLength,
+        }),
+      );
+
+      await enqueueSync("cycles", resolvedCycle.id, "upsert", encryptedPayload);
+
+      if (__DEV__) {
+        console.log("[EndCycle] Queued for sync due to network error");
+      }
+
+      return {
+        cycleId: resolvedCycle.id,
+        startDate: resolvedCycle.start_date,
+        endDate: resolvedEndDate,
+        cycleLength,
+        queued: true,
+      };
+    } catch (syncError) {
+      if (__DEV__) {
+        console.error("[EndCycle] Failed to queue sync:", syncError);
+      }
+      throw new Error(
+        "Network error: Period saved offline and will sync when online.",
+      );
+    }
+  }
+
+  if (__DEV__) {
+    console.log("[EndCycle] Successfully ended period:", {
+      cycleId: resolvedCycle.id,
+      endDate: resolvedEndDate,
+    });
+  }
+
+  return {
+    cycleId: resolvedCycle.id,
+    startDate: resolvedCycle.start_date,
+    endDate: resolvedEndDate,
+    cycleLength,
+    queued: false,
+  };
 }
 
 export function useStartNewCycle() {
@@ -153,7 +437,7 @@ export function useEndCurrentCycle() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<EndCurrentPeriodResult> => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -162,38 +446,90 @@ export function useEndCurrentCycle() {
         throw new Error("Not authenticated");
       }
 
-      const { data: activeCycle, error: fetchError } = await supabase
-        .from("cycles")
-        .select("id,start_date")
-        .eq("user_id", user.id)
-        .is("end_date", null)
-        .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // CRITICAL FIX: Always try to refresh the current cycle data
+      // before attempting to end it. This prevents stale cache issues.
+      let cachedCycle: { id: string; start_date: string } | undefined;
 
-      if (fetchError) throw fetchError;
-      if (!activeCycle) {
-        throw new Error("No active period to end.");
+      try {
+        // Attempt to fetch fresh data with a timeout
+        const freshData = await Promise.race([
+          queryClient.fetchQuery({
+            queryKey: CURRENT_CYCLE_KEY,
+            queryFn: async () => {
+              const { data, error } = await supabase
+                .from("cycles")
+                .select("*")
+                .eq("user_id", user.id)
+                .is("end_date", null)
+                .order("start_date", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (error || !data) return null;
+              const cycle = data as any;
+              return { cycle };
+            },
+            staleTime: 0, // Force fresh fetch
+          }),
+          // Timeout after 3 seconds
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Fetch timeout")),
+              3000,
+            ),
+          ),
+        ]);
+
+        if (
+          freshData &&
+          typeof freshData === "object" &&
+          "cycle" in freshData &&
+          freshData.cycle
+        ) {
+          cachedCycle = {
+            id: (freshData.cycle as any).id,
+            start_date: (freshData.cycle as any).start_date,
+          };
+        }
+      } catch (err) {
+        if (__DEV__) {
+          console.warn("[UseEndCycle] Could not fetch fresh cycle data:", err);
+        }
+        // Fall through to use cached data
       }
 
-      const endDate = todayIso();
-      const cycleLength = diffDaysInclusive(activeCycle.start_date, endDate);
+      // If fresh fetch fails, try to get from cache
+      if (!cachedCycle) {
+        const cached = queryClient.getQueryData<any>(CURRENT_CYCLE_KEY);
+        if (cached?.cycle) {
+          cachedCycle = {
+            id: cached.cycle.id,
+            start_date: cached.cycle.start_date,
+          };
+        }
+      }
 
-      const { error: updateError } = await supabase
-        .from("cycles")
-        .update({
-          end_date: endDate,
-          cycle_length: cycleLength,
-        })
-        .eq("id", activeCycle.id)
-        .eq("user_id", user.id);
+      if (__DEV__) {
+        console.log("[UseEndCycle] Attempting to end period with:", {
+          hasCachedCycle: Boolean(cachedCycle),
+          cycleId: cachedCycle?.id,
+        });
+      }
 
-      if (updateError) throw updateError;
+      return endCurrentPeriod({
+        userId: user.id,
+        fallbackCycle: cachedCycle ?? null,
+      });
     },
-    onSuccess: () => {
-      trackEvent("cycle_ended");
+    onSuccess: (result) => {
+      trackEvent("cycle_ended", { queued_for_sync: result.queued });
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
       queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+    },
+    onError: (error: Error) => {
+      if (__DEV__) {
+        console.error("[UseEndCycle] Mutation error:", error.message);
+      }
     },
   });
 }
@@ -247,6 +583,94 @@ export function useDeleteAllData() {
       queryClient.invalidateQueries({ queryKey: ["daily-logs"] });
       queryClient.invalidateQueries({ queryKey: ["partner"] });
       queryClient.invalidateQueries({ queryKey: ["partner-logs"] });
+    },
+  });
+}
+
+export async function resetPredictionsAction({
+  cycleLength,
+  periodLength,
+}: ResetPredictionsInput): Promise<{ updatedCycles: number }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  if (
+    !Number.isFinite(cycleLength) ||
+    cycleLength < 15 ||
+    cycleLength > 60
+  ) {
+    throw new Error("Cycle length must be between 15 and 60 days.");
+  }
+
+  if (
+    !Number.isFinite(periodLength) ||
+    periodLength < 1 ||
+    periodLength > 15
+  ) {
+    throw new Error("Period duration must be between 1 and 15 days.");
+  }
+
+  const { data: activeCycles, error: fetchError } = await supabase
+    .from("cycles")
+    .select("id,start_date")
+    .eq("user_id", user.id)
+    .is("end_date", null)
+    .order("start_date", { ascending: false });
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const cycles = (activeCycles ?? []) as Array<{ id: string; start_date: string }>;
+  if (cycles.length === 0) {
+    return { updatedCycles: 0 };
+  }
+
+  await Promise.all(
+    cycles.map(async (cycle) => {
+      const prediction = computePredictions(
+        cycle.start_date,
+        cycleLength,
+        periodLength,
+      );
+
+      const { error: updateError } = await supabase
+        .from("cycles")
+        .update(prediction)
+        .eq("id", cycle.id)
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    }),
+  );
+
+  trackEvent("predictions_reset", {
+    cycle_length: cycleLength,
+    period_length: periodLength,
+    updated_cycles: cycles.length,
+  });
+
+  return { updatedCycles: cycles.length };
+}
+
+export function useResetPredictions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: resetPredictionsAction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
+      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-log"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }

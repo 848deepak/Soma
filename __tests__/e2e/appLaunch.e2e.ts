@@ -11,7 +11,7 @@
 
 describe('App Launch E2E', () => {
   beforeAll(async () => {
-    await device.launchApp();
+    await device.launchApp({});
   });
 
   beforeEach(async () => {
@@ -90,7 +90,8 @@ describe('App Launch E2E', () => {
   describe('Error Handling', () => {
     it('should handle network errors gracefully on launch', async () => {
       // Simulate network issues
-      await device.setNetworkConnection(false);
+      await (device as unknown as { setNetworkConnection?: (enabled: boolean) => Promise<void> })
+        .setNetworkConnection?.(false);
       await device.reloadReactNative();
 
       // App should still launch and show fallback content
@@ -99,7 +100,8 @@ describe('App Launch E2E', () => {
         .withTimeout(15000);
 
       // Restore network
-      await device.setNetworkConnection(true);
+      await (device as unknown as { setNetworkConnection?: (enabled: boolean) => Promise<void> })
+        .setNetworkConnection?.(true);
     });
 
     it('should show appropriate loading timeout fallbacks', async () => {
@@ -120,7 +122,8 @@ describe('App Launch E2E', () => {
       await element(by.text('Calendar')).tap();
 
       // Background and restore app
-      await device.sendAppToBackground(2);
+      await (device as unknown as { sendAppToBackground?: (seconds: number) => Promise<void> })
+        .sendAppToBackground?.(2);
 
       // Should return to the same screen
       await expect(element(by.text('Calendar'))).toBeVisible();
@@ -128,7 +131,7 @@ describe('App Launch E2E', () => {
 
     it('should handle app restart correctly', async () => {
       await device.terminateApp();
-      await device.launchApp();
+      await device.launchApp({});
 
       // Should go through normal launch flow
       await waitFor(element(by.text('SOMA')))

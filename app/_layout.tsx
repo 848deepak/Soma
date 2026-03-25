@@ -12,22 +12,30 @@ import {
 } from "@expo-google-fonts/playfair-display";
 import * as SplashScreen from "expo-splash-screen";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
 import { useNetworkSync } from "@/hooks/useNetworkSync";
+import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
 import { supabase } from "@/lib/supabase";
 import { AuthProvider, useAuthContext } from "@/src/context/AuthProvider";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { initSentry } from "@/src/services/errorTracking";
 import { initAnalytics } from "@/src/services/analytics";
 import { setupGlobalErrorHandlers } from "@/src/services/globalErrorHandlers";
-import { initializeNotificationHandler } from "@/src/services/notificationService/handler";
+import {
+  initializeNotificationHandler,
+  startNotificationListeners,
+} from "@/src/services/notificationService/handler";
 import { SomaErrorBoundary } from "@/src/components/ui/SomaErrorBoundary";
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
+import {
+  requestAndSyncPushToken,
+  revokePushToken,
+} from "@/src/services/notificationService/pushTokenService";
 
 // ─── Observability bootstrap ────────────────────────────────────────────────
 // Both services are opt-in: they only activate when the corresponding
@@ -73,14 +81,59 @@ const queryClient = new QueryClient({
  *  Returning email:   (already has session)  onboarding check → Tabs
  *  Returning anon:    Tabs directly (skip login prompt)
  */
-function AuthBootstrap({ children }: { children: React.ReactNode }) {
+function AuthBootstrap({
+  children,
+  onBootstrapComplete,
+}: {
+  children: React.ReactNode;
+  onBootstrapComplete?: () => void;
+}) {
   const router = useRouter();
   const segments = useSegments();
   const { user, isLoading, isAnonymous } = useAuthContext();
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
+  const previousUserIdRef = useRef<string | null>(null);
 
   // Flush offline queue whenever connectivity is restored
   useNetworkSync();
+  usePeriodAutoEnd();
+
+  useEffect(() => {
+    // Re-run bootstrap when auth identity changes (login/logout/account switch).
+    setHasBootstrapped(false);
+  }, [user?.id, isAnonymous]);
+
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    const previousUserId = previousUserIdRef.current;
+
+    if (currentUserId && currentUserId !== previousUserId) {
+      void requestAndSyncPushToken(currentUserId);
+    }
+
+    if (!currentUserId && previousUserId) {
+      void revokePushToken(previousUserId);
+    }
+
+    previousUserIdRef.current = currentUserId;
+  }, [user?.id]);
+
+  useEffect(() => {
+    let unsubscribe: () => void = () => {
+      return;
+    };
+    void startNotificationListeners((data) => {
+      if (typeof data.route === 'string' && data.route.length > 0) {
+        router.push(data.route as never);
+      }
+    }).then((cleanup) => {
+      unsubscribe = cleanup;
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [router]);
 
   useEffect(() => {
     if (isLoading || hasBootstrapped) return;
@@ -89,33 +142,17 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
 
     async function bootstrap() {
       try {
-        // Set maximum bootstrap timeout to prevent infinite loading
-        const bootstrapTimeout = setTimeout(() => {
-          if (isMounted) {
-            console.warn("[Auth] Bootstrap timeout reached, forcing navigation to tabs");
-            router.replace("/(tabs)" as never);
-            setHasBootstrapped(true);
-          }
-        }, 15000);
-
         const hasLaunched = await AsyncStorage.getItem(HAS_LAUNCHED_KEY);
         const inAuth = segments[0] === "auth";
         const inOnboarding =
           segments[0] === "welcome" || segments[0] === "setup";
 
-        // Clear timeout if we're proceeding normally
-        clearTimeout(bootstrapTimeout);
-
-        // Already on auth or onboarding screens — don't interfere
-        if (inAuth || inOnboarding) {
-          if (isMounted) setHasBootstrapped(true);
-          return;
-        }
-
         if (!user) {
           // No session at all — first-time user → show auth
           if (isMounted) {
-            router.replace("/auth/login" as never);
+            if (!inAuth) {
+              router.replace("/auth/login" as never);
+            }
             setHasBootstrapped(true);
           }
           return;
@@ -125,7 +162,9 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
           // First launch with anonymous session → prompt to sign in/up
           // (Anonymous session created as fallback by the "Continue without account" path)
           if (isMounted) {
-            router.replace("/auth/login" as never);
+            if (!inAuth) {
+              router.replace("/auth/login" as never);
+            }
             setHasBootstrapped(true);
           }
           return;
@@ -151,38 +190,36 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
           ]);
 
           if (isMounted) {
-            if (profile && !profile.is_onboarded) {
-              router.replace("/welcome" as never);
-            } else if (!hasLaunched) {
-              // First time opening app with valid session, mark as launched and go to main app
-              await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
-              router.replace("/(tabs)" as never);
+            if (!profile || !profile.is_onboarded) {
+              if (!inOnboarding) {
+                router.replace("/welcome" as never);
+              }
+            } else {
+              // First valid launch with a complete profile.
+              if (!hasLaunched) {
+                await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
+              }
+              if (inAuth || inOnboarding || segments[0] !== "(tabs)") {
+                router.replace("/(tabs)" as never);
+              }
             }
             setHasBootstrapped(true);
           }
         } catch (profileError) {
           console.warn("[Auth] Profile query failed:", profileError);
-          // Fallback: proceed to main app even if profile check fails
+          // Fail safe to onboarding to avoid bypassing setup on transient profile errors.
           if (isMounted) {
-            try {
-              if (!hasLaunched) {
-                await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
-              }
-              router.replace("/(tabs)" as never);
-              setHasBootstrapped(true);
-            } catch (storageError) {
-              console.warn("[Auth] Storage fallback failed:", storageError);
-              // Ultimate fallback - go to tabs
-              router.replace("/(tabs)" as never);
-              setHasBootstrapped(true);
+            if (!inOnboarding) {
+              router.replace("/welcome" as never);
             }
+            setHasBootstrapped(true);
           }
         }
       } catch (error) {
         console.warn("[Auth] Bootstrap critical error:", error);
-        // Always ensure we don't leave the user hanging
+        // Last resort: route to login when route resolution fails.
         if (isMounted) {
-          router.replace("/(tabs)" as never);
+          router.replace("/auth/login" as never);
           setHasBootstrapped(true);
         }
       }
@@ -193,9 +230,15 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-    // We intentionally only run this on first auth resolution
+    // We intentionally run this during bootstrap transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
+  }, [isLoading, hasBootstrapped, user?.id, isAnonymous, segments[0]]);
+
+  useEffect(() => {
+    if (hasBootstrapped) {
+      onBootstrapComplete?.();
+    }
+  }, [hasBootstrapped, onBootstrapComplete]);
 
   return <>{children}</>;
 }
@@ -203,6 +246,7 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appReady, setAppReady] = useState(false);
+  const [authBootstrapped, setAuthBootstrapped] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     "PlayfairDisplay-Regular": PlayfairDisplay_400Regular,
@@ -220,17 +264,21 @@ export default function RootLayout() {
     }
   }, [appReady]);
 
-  // Enhanced app readiness check - wait for fonts AND auth
+  // Enhanced app readiness check - wait for fonts AND auth bootstrap.
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      // Give auth a moment to resolve, then mark app as ready
-      const timer = setTimeout(() => {
-        setAppReady(true);
-      }, 1000); // Allow 1 second for auth to initialize
-
-      return () => clearTimeout(timer);
+    if ((fontsLoaded || fontError) && authBootstrapped) {
+      setAppReady(true);
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, authBootstrapped]);
+
+  // Fail-safe so startup never hangs if auth/network is slow.
+  useEffect(() => {
+    if (appReady) return;
+    const timer = setTimeout(() => {
+      setAuthBootstrapped(true);
+    }, 9000);
+    return () => clearTimeout(timer);
+  }, [appReady]);
 
   // Show custom splash screen while app isn't ready
   if (!appReady) {
@@ -238,7 +286,10 @@ export default function RootLayout() {
       <SomaLoadingSplash
         subtitle="Initializing your cycle companion..."
         timeout={8000}
-        onTimeout={() => setAppReady(true)}
+        onTimeout={() => {
+          setAuthBootstrapped(true);
+          setAppReady(true);
+        }}
       />
     );
   }
@@ -249,7 +300,7 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <AuthBootstrap>
+              <AuthBootstrap onBootstrapComplete={() => setAuthBootstrapped(true)}>
                 <ThemeProvider
                   value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
                 >
@@ -265,6 +316,30 @@ export default function RootLayout() {
                   <Stack.Screen
                     name="auth/signup"
                     options={{ headerShown: false, animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/privacy"
+                    options={{ title: "Privacy Policy", animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/terms"
+                    options={{ title: "Terms of Use", animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/medical-disclaimer"
+                    options={{ title: "Medical Disclaimer", animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/data-consent"
+                    options={{ title: "Data Consent Center", animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/data-practices"
+                    options={{ title: "Data Practices", animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="legal/data-rights"
+                    options={{ title: "Data Rights Requests", animation: "slide_from_right" }}
                   />
                   <Stack.Screen
                     name="welcome"

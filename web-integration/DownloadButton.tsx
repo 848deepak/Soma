@@ -16,6 +16,9 @@ export default function DownloadButton() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const metadataUrl =
+    "https://raw.githubusercontent.com/848deepak/Soma/main/build-artifacts/latest-build.json";
+
   useEffect(() => {
     fetchLatestBuild();
   }, []);
@@ -24,9 +27,7 @@ export default function DownloadButton() {
     try {
       setLoading(true);
       // Fetch from GitHub raw content
-      const response = await fetch(
-        "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/build-artifacts/latest-build.json",
-      );
+      const response = await fetch(metadataUrl);
 
       if (!response.ok) throw new Error("Failed to fetch build data");
 

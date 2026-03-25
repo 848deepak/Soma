@@ -1,3 +1,4 @@
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import type { Metadata } from "next";
@@ -41,6 +42,7 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col font-sans antialiased">
         <Navbar />
         <main className="flex-1">{children}</main>
+        <CookieConsentBanner />
         <Footer />
       </body>
     </html>

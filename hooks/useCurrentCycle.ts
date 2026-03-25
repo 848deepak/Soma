@@ -82,21 +82,36 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
   return useQuery<DerivedCycleData | null>({
     queryKey: CURRENT_CYCLE_KEY,
     queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
       const { data, error } = await supabase
         .from("cycles")
         .select("*")
+        .eq("user_id", user.id)
         .is("end_date", null)
         .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error) {
-        console.warn("[CurrentCycle] Query error:", error);
+        if (__DEV__) {
+          console.warn("[CurrentCycle] Query error:", error);
+        }
         return null;
       }
       if (!data) return null;
 
       const cycle = data as unknown as CycleRow;
+
+      // SAFETY: Validate required fields
+      if (!cycle.id || !cycle.start_date) {
+        console.warn("[CurrentCycle] Invalid cycle data:", cycle);
+        return null;
+      }
+
       const cycleDay = computeCycleDay(cycle.start_date);
       const phase = computePhase(cycleDay, cycleLength, periodLen);
 
@@ -108,8 +123,9 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
         progress: computeProgress(cycleDay, cycleLength),
       };
     },
-    // Cycle data doesn't change during a session – refresh every 10 min
-    staleTime: 10 * 60 * 1000,
+    // CRITICAL FIX: Reduce staleTime to 2 minutes (from 10)
+    // This ensures fresher data for end period operations
+    staleTime: 2 * 60 * 1000,
     // Simplified retry logic
     retry: (failureCount, error) => {
       if (error.message.includes("network") && failureCount < 1) {
@@ -145,23 +161,40 @@ export function buildMiniCalendar(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const periodDates = new Set<number>();
+  const periodDates = new Set<string>();
+
+  const toIso = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   if (cycle) {
-    const start = new Date(cycle.start_date);
-    // Current period window
-    for (let i = 0; i < periodLen; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      periodDates.add(d.getDate());
+    const start = new Date(`${cycle.start_date}T00:00:00`);
+    const end = cycle.end_date
+      ? new Date(`${cycle.end_date}T00:00:00`)
+      : (() => {
+          const inferred = new Date(start);
+          inferred.setDate(inferred.getDate() + Math.max(0, periodLen - 1));
+          return inferred;
+        })();
+
+    if (end >= start) {
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        periodDates.add(toIso(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
     }
+
     // Predicted next period window
     if (cycle.predicted_next_cycle) {
-      const next = new Date(cycle.predicted_next_cycle);
+      const next = new Date(`${cycle.predicted_next_cycle}T00:00:00`);
       for (let i = 0; i < periodLen; i++) {
         const d = new Date(next);
         d.setDate(next.getDate() + i);
-        periodDates.add(d.getDate());
+        periodDates.add(toIso(d));
       }
     }
   }
@@ -169,11 +202,12 @@ export function buildMiniCalendar(
   return [-3, -2, -1, 0, 1, 2, 3].map((offset) => {
     const d = new Date(today);
     d.setDate(today.getDate() + offset);
+    const iso = toIso(d);
     return {
       day: DAY_NAMES[d.getDay()],
       date: d.getDate(),
       isCurrent: offset === 0,
-      hasPeriod: periodDates.has(d.getDate()),
+      hasPeriod: periodDates.has(iso),
     };
   });
 }

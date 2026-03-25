@@ -56,6 +56,9 @@ const mockRemoveChannel = jest.fn().mockResolvedValue(undefined);
 export const supabase = {
   from: mockFrom,
   rpc: mockRpc,
+  functions: {
+    invoke: jest.fn().mockResolvedValue({ data: null, error: null }),
+  },
   channel: jest.fn().mockReturnValue(mockChannel),
   removeChannel: mockRemoveChannel,
   auth: {

@@ -191,6 +191,145 @@ export interface PartnerInsert {
 export type PartnerUpdate = Partial<PartnerInsert>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TABLE: push_tokens
+// ─────────────────────────────────────────────────────────────────────────────
+export interface PushTokenRow {
+  id: string;
+  user_id: string;
+  token: string;
+  token_type: string;
+  device_type: 'ios' | 'android' | 'web';
+  timezone: string;
+  app_version: string | null;
+  last_seen_at: string;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PushTokenInsert {
+  user_id: string;
+  token: string;
+  token_type?: string;
+  device_type?: 'ios' | 'android' | 'web';
+  timezone?: string;
+  app_version?: string | null;
+  last_seen_at?: string;
+  revoked_at?: string | null;
+}
+
+export type PushTokenUpdate = Partial<PushTokenInsert>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: notification_preferences
+// ─────────────────────────────────────────────────────────────────────────────
+export interface NotificationPreferenceRow {
+  user_id: string;
+  daily_reminders: boolean;
+  period_alerts: boolean;
+  ovulation_alerts: boolean;
+  behavioral_alerts: boolean;
+  max_per_day: number;
+  quiet_hours_start: number;
+  quiet_hours_end: number;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationPreferenceInsert {
+  user_id: string;
+  daily_reminders?: boolean;
+  period_alerts?: boolean;
+  ovulation_alerts?: boolean;
+  behavioral_alerts?: boolean;
+  max_per_day?: number;
+  quiet_hours_start?: number;
+  quiet_hours_end?: number;
+  timezone?: string;
+}
+
+export type NotificationPreferenceUpdate = Partial<NotificationPreferenceInsert>;
+
+export type ScheduledNotificationStatus =
+  | 'pending'
+  | 'processing'
+  | 'sent'
+  | 'failed'
+  | 'suppressed';
+
+export type ScheduledNotificationType =
+  | 'daily_log'
+  | 'period_alert'
+  | 'ovulation_alert'
+  | 'behavioral_inactive'
+  | 'behavioral_cycle_phase';
+
+export interface ScheduledNotificationRow {
+  id: string;
+  user_id: string;
+  type: ScheduledNotificationType;
+  title: string;
+  body: string;
+  route: string | null;
+  payload: Record<string, unknown>;
+  timezone: string;
+  scheduled_for_utc: string;
+  status: ScheduledNotificationStatus;
+  retry_count: number;
+  max_retries: number;
+  dedupe_key: string | null;
+  sent_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduledNotificationInsert {
+  user_id: string;
+  type: ScheduledNotificationType;
+  title: string;
+  body: string;
+  route?: string | null;
+  payload?: Record<string, unknown>;
+  timezone?: string;
+  scheduled_for_utc: string;
+  status?: ScheduledNotificationStatus;
+  retry_count?: number;
+  max_retries?: number;
+  dedupe_key?: string | null;
+  sent_at?: string | null;
+  last_error?: string | null;
+}
+
+export type ScheduledNotificationUpdate = Partial<ScheduledNotificationInsert>;
+
+export type NotificationEventType =
+  | 'scheduled'
+  | 'sent'
+  | 'opened'
+  | 'failed'
+  | 'suppressed';
+
+export interface NotificationEventRow {
+  id: string;
+  notification_id: string | null;
+  user_id: string | null;
+  event_type: NotificationEventType;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface NotificationEventInsert {
+  notification_id?: string | null;
+  user_id?: string | null;
+  event_type: NotificationEventType;
+  metadata?: Record<string, unknown>;
+}
+
+export type NotificationEventUpdate = Partial<NotificationEventInsert>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // VIEW: partner_visible_logs
 // Shape returned by partner_visible_logs – used in PartnerView.tsx (Phase 4).
 // Notes, hydration, and sleep are permanently absent from this type.
@@ -249,6 +388,30 @@ export interface Database {
         Row: PartnerRow;
         Insert: PartnerInsert;
         Update: PartnerUpdate;
+        Relationships: [];
+      };
+      push_tokens: {
+        Row: PushTokenRow;
+        Insert: PushTokenInsert;
+        Update: PushTokenUpdate;
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: NotificationPreferenceRow;
+        Insert: NotificationPreferenceInsert;
+        Update: NotificationPreferenceUpdate;
+        Relationships: [];
+      };
+      scheduled_notifications: {
+        Row: ScheduledNotificationRow;
+        Insert: ScheduledNotificationInsert;
+        Update: ScheduledNotificationUpdate;
+        Relationships: [];
+      };
+      notification_events: {
+        Row: NotificationEventRow;
+        Insert: NotificationEventInsert;
+        Update: NotificationEventUpdate;
         Relationships: [];
       };
     };

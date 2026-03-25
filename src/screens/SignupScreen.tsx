@@ -14,15 +14,20 @@ import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
+import {
+  requestAnalyticsConsent,
+  revokeAnalyticsConsent,
+} from "@/src/services/analytics";
+import {
+  recordRequiredAuthConsent,
+  setAnalyticsConsent,
+} from "@/src/services/consentService";
+import {
+  sanitizeInput,
+  validateEmail,
+  validatePassword,
+} from "@/src/utils/validation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function validatePassword(password: string): boolean {
-  return password.length >= 6;
-}
 
 export function SignupScreen() {
   const router = useRouter();
@@ -31,6 +36,8 @@ export function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(true);
+  const [analyticsOptIn, setAnalyticsOptIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -51,11 +58,26 @@ export function SignupScreen() {
       Alert.alert("Password mismatch", "Passwords do not match.");
       return;
     }
+    if (!acceptedLegal) {
+      Alert.alert(
+        "Consent required",
+        "Please agree to the Privacy Policy and Terms to continue.",
+      );
+      return;
+    }
 
     setIsLoading(true);
     try {
+      const normalizedEmail = sanitizeInput(email).toLowerCase();
       await ensureAnonymousSession();
-      await signUpWithEmail(email.trim(), password);
+      await signUpWithEmail(normalizedEmail, password);
+      await recordRequiredAuthConsent();
+      await setAnalyticsConsent(analyticsOptIn);
+      if (analyticsOptIn) {
+        await requestAnalyticsConsent();
+      } else {
+        await revokeAnalyticsConsent();
+      }
       await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
       setSuccessMessage(
         "Account created! Check your inbox to verify your email.",
@@ -216,6 +238,96 @@ export function SignupScreen() {
             style={{ fontSize: 16, color: isDark ? "#F2F2F2" : "#2D2327" }}
             testID="confirm-password-input"
           />
+        </View>
+
+        <View style={{ marginBottom: 18 }}>
+          <PressableScale
+            onPress={() => setAcceptedLegal((prev) => !prev)}
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+              marginBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                marginTop: 2,
+                borderRadius: 5,
+                borderWidth: 1.5,
+                borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: acceptedLegal
+                  ? isDark
+                    ? "#A78BFA"
+                    : "#DDA7A5"
+                  : "transparent",
+              }}
+            >
+              {acceptedLegal ? (
+                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
+              ) : null}
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Typography variant="helper" style={{ lineHeight: 18 }}>
+                By continuing, you agree to our
+              </Typography>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                <PressableScale onPress={() => router.push("/legal/privacy" as never)}>
+                  <Typography
+                    variant="helper"
+                    className="text-somaBlush dark:text-darkPrimary"
+                  >
+                    Privacy Policy
+                  </Typography>
+                </PressableScale>
+                <Typography variant="helper">and</Typography>
+                <PressableScale onPress={() => router.push("/legal/terms" as never)}>
+                  <Typography
+                    variant="helper"
+                    className="text-somaBlush dark:text-darkPrimary"
+                  >
+                    Terms of Use
+                  </Typography>
+                </PressableScale>
+                <Typography variant="helper">.</Typography>
+              </View>
+            </View>
+          </PressableScale>
+
+          <PressableScale
+            onPress={() => setAnalyticsOptIn((prev) => !prev)}
+            style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                marginTop: 2,
+                borderRadius: 5,
+                borderWidth: 1.5,
+                borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: analyticsOptIn
+                  ? isDark
+                    ? "#A78BFA"
+                    : "#DDA7A5"
+                  : "transparent",
+              }}
+            >
+              {analyticsOptIn ? (
+                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
+              ) : null}
+            </View>
+            <Typography variant="helper" style={{ flex: 1, lineHeight: 18 }}>
+              I agree to optional analytics to improve Soma reliability.
+            </Typography>
+          </PressableScale>
         </View>
 
         {/* ── Create Account CTA ──────────────────────────── */}

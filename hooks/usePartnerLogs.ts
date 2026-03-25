@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
+import { logDataAccess } from '@/src/services/auditService';
 import type { PartnerVisibleLog } from '@/types/database';
 
 export const PARTNER_LOGS_KEY = ['partner-logs'] as const;
@@ -57,7 +58,13 @@ export function usePartnerLogs(enabled: boolean = true) {
         .limit(7);
 
       if (error) throw error;
-      return (data ?? []) as unknown as PartnerVisibleLog[];
+      const rows = (data ?? []) as unknown as PartnerVisibleLog[];
+      void logDataAccess('partner_data', 'view', {
+        source: 'usePartnerLogs',
+        resultCount: rows.length,
+        limit: 7,
+      });
+      return rows;
     },
   });
 }

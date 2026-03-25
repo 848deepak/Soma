@@ -5,4 +5,8 @@ export const getNetworkStateAsync = jest.fn().mockResolvedValue({
   type: 'WIFI',
 });
 
-export default { getNetworkStateAsync };
+export const addNetworkStateListener = jest.fn().mockImplementation(() => ({
+  remove: jest.fn(),
+}));
+
+export default { getNetworkStateAsync, addNetworkStateListener };

@@ -8,16 +8,21 @@ import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, View, useColorScheme } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { logPeriodRangeAction } from "@/hooks/useCycleActions";
+import { logPeriodRangeAction, useEndCurrentCycle } from "@/hooks/useCycleActions";
 import { useCycleHistory } from "@/hooks/useCycleHistory";
+import { useDailyLogs } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
-import { predictFertileWindow } from "@/services/CycleIntelligence";
+import {
+  derivePeriodVisualizationDays,
+  predictFertileWindow,
+} from "@/services/CycleIntelligence";
 import { CycleCalendarCard } from "@/src/components/cards/CycleCalendarCard";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
+import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { MonthCalendarMeta } from "@/src/features/cycle/uiMockData";
 import {
     buildMonthGrid,
@@ -49,28 +54,6 @@ function isoToLocalDate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function addDaysToIso(iso: string, days: number): string {
-  const d = isoToLocalDate(iso);
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function computePeriodDaysForMonth(
-  startDateIso: string,
-  periodLen: number,
-  month: number,
-  year: number,
-): number[] {
-  const days: number[] = [];
-  for (let i = 0; i < periodLen; i++) {
-    const d = isoToLocalDate(addDaysToIso(startDateIso, i));
-    if (d.getFullYear() === year && d.getMonth() === month) {
-      days.push(d.getDate());
-    }
-  }
-  return days;
-}
-
 function isoRangeToCalendarDays(
   startIso: string,
   endIso: string,
@@ -100,6 +83,9 @@ function getDayNote(day: number, meta: MonthCalendarMeta): string {
   if (meta.periodDays.includes(day)) {
     return "Period day. Rest and gentle self-care recommended.";
   }
+  if (meta.predictedPeriodDays.includes(day)) {
+    return "Predicted period day based on your cycle history.";
+  }
   return "Regular cycle day. Listen to your body.";
 }
 
@@ -115,6 +101,7 @@ export function CalendarScreen() {
   );
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
+  const endCurrentCycle = useEndCurrentCycle();
 
   const { data: profile } = useProfile();
   const {
@@ -125,6 +112,7 @@ export function CalendarScreen() {
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
+  const { data: dailyLogs = [] } = useDailyLogs(730);
   const { data: completedCycles = [] } = useCycleHistory(6);
 
   const periodLen = profile?.period_duration_average ?? 5;
@@ -144,30 +132,51 @@ export function CalendarScreen() {
   // ─── Derived calendar meta ─────────────────────────────────────────────────
   const calendarMeta: MonthCalendarMeta = useMemo(() => {
     let periodDays: number[] = [];
+    let predictedPeriodDays: number[] = [];
     let fertileWindow: number[] = [];
     let ovulationDay = -1;
+
+    const loggedPeriodDays = dailyLogs
+      .filter((log) => (log.flow_level ?? 0) > 0)
+      .map((log) => isoToLocalDate(log.date))
+      .filter(
+        (date) =>
+          date.getFullYear() === viewYear && date.getMonth() === viewMonth,
+      )
+      .map((date) => date.getDate());
+
+    const cycleRangeDays = [
+      ...completedCycles,
+      ...(cycleData?.cycle ? [cycleData.cycle] : []),
+    ].flatMap((cycle) => {
+      const rangeEnd = cycle.end_date ?? cycle.start_date;
+      return isoRangeToCalendarDays(
+        cycle.start_date,
+        rangeEnd,
+        viewMonth,
+        viewYear,
+      );
+    });
+
+    const actualPeriodDays = [...new Set([...loggedPeriodDays, ...cycleRangeDays])].sort(
+      (a, b) => a - b,
+    );
+
+    periodDays = actualPeriodDays;
 
     if (cycleData?.cycle) {
       const { cycle } = cycleData;
 
-      // Current cycle period days
-      periodDays = computePeriodDaysForMonth(
-        cycle.start_date,
-        periodLen,
-        viewMonth,
-        viewYear,
-      );
+      const periodVisualization = derivePeriodVisualizationDays({
+        month: viewMonth,
+        year: viewYear,
+        periodLength: periodLen,
+        loggedPeriodDays: actualPeriodDays,
+        predictedPeriodStartDate: cycle.predicted_next_cycle,
+      });
 
-      // Predicted next period (from DB column)
-      if (cycle.predicted_next_cycle) {
-        const nextPeriod = computePeriodDaysForMonth(
-          cycle.predicted_next_cycle,
-          periodLen,
-          viewMonth,
-          viewYear,
-        );
-        periodDays = [...new Set([...periodDays, ...nextPeriod])];
-      }
+      periodDays = periodVisualization.periodDays;
+      predictedPeriodDays = periodVisualization.predictedPeriodDays;
 
       // Fertile window from CycleIntelligence
       const fertile = predictFertileWindow(completedCycles, cycle.start_date);
@@ -213,10 +222,19 @@ export function CalendarScreen() {
       year: viewYear,
       currentDay,
       periodDays,
+      predictedPeriodDays,
       fertileWindow,
       ovulationDay,
     };
-  }, [cycleData, completedCycles, viewMonth, viewYear, periodLen, currentDay]);
+  }, [
+    cycleData,
+    completedCycles,
+    dailyLogs,
+    viewMonth,
+    viewYear,
+    periodLen,
+    currentDay,
+  ]);
 
   // ─── Calendar grid ──────────────────────────────────────────────────────────
   const weeks = useMemo(() => {
@@ -227,6 +245,7 @@ export function CalendarScreen() {
 
   // ─── Month navigation helpers ──────────────────────────────────────────────
   const goToPrevMonth = useCallback(() => {
+    void HapticsService.gestureTick();
     setSelectedDay(null);
     if (viewMonth === 0) {
       setViewMonth(11);
@@ -237,6 +256,7 @@ export function CalendarScreen() {
   }, [viewMonth]);
 
   const goToNextMonth = useCallback(() => {
+    void HapticsService.gestureTick();
     setSelectedDay(null);
     if (viewMonth === 11) {
       setViewMonth(0);
@@ -252,20 +272,27 @@ export function CalendarScreen() {
     [selectedDay, calendarMeta],
   );
   const hasCycle = Boolean(cycleData?.cycle);
+  const hasActiveCycle = Boolean(cycleData?.cycle);
   const isDark = useColorScheme() === "dark";
 
   const handleSubmitPeriodModal = useCallback(
     async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
       try {
+        await HapticsService.impactMedium();
         setIsLoggingPeriod(true);
         await logPeriodRangeAction({
           startDate,
           endDate: endDate || undefined,
+          fallbackActiveCycle: cycleData?.cycle
+            ? { id: cycleData.cycle.id, start_date: cycleData.cycle.start_date }
+            : null,
         });
         await refetchCurrentCycle();
         setShowPeriodModal(false);
+        await HapticsService.success();
         Alert.alert("Saved", "Period dates logged successfully.");
       } catch (error: unknown) {
+        await HapticsService.error();
         const message =
           error instanceof Error
             ? error.message
@@ -275,8 +302,89 @@ export function CalendarScreen() {
         setIsLoggingPeriod(false);
       }
     },
-    [refetchCurrentCycle],
+    [cycleData?.cycle, refetchCurrentCycle],
   );
+
+  const handleEndPeriod = useCallback(() => {
+    if (endCurrentCycle.isPending) {
+      return;
+    }
+
+    Alert.alert(
+      "End Current Period",
+      "Mark today as the end of your current period?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "End",
+          onPress: async () => {
+            if (endCurrentCycle.isPending) {
+              return;
+            }
+
+            try {
+              await HapticsService.impactMedium();
+              await endCurrentCycle.mutateAsync();
+              await refetchCurrentCycle();
+              await HapticsService.success();
+              Alert.alert("Saved", "Current period ended today.");
+            } catch (error: unknown) {
+              await HapticsService.error();
+              const message = error instanceof Error ? error.message : String(error);
+              
+              // Debug logging
+              console.error("[CalendarScreen] End period error:", {
+                message,
+                fullError: error,
+                errorType: typeof error,
+              });
+
+              // IMPROVED: Better error messages
+              if (
+                message.includes("No active period") ||
+                message.includes("already ended")
+              ) {
+                Alert.alert(
+                  "No Active Period",
+                  "There's no active period to end. Start a new period first.",
+                  [{ text: "OK" }],
+                );
+              } else if (
+                message.includes("network") ||
+                message.includes("offline") ||
+                message.includes("Failed")
+              ) {
+                Alert.alert(
+                  "Connection Issue",
+                  message.includes("sync") || message.includes("offline")
+                    ? "You're offline. The period will be ended when you're online again."
+                    : `Connection error: ${message}\n\nPlease check your internet and try again.`,
+                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
+                );
+              } else if (
+                message.includes("Invalid") ||
+                message.includes("format")
+              ) {
+                Alert.alert(
+                  "Data Error",
+                  "Your period data appears corrupted. Please contact support.",
+                  [{ text: "OK" }],
+                );
+              } else {
+                const fallbackMessage =
+                  message || "Could not end the current period.";
+                Alert.alert(
+                  "Action Failed",
+                  fallbackMessage,
+                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
+                );
+              }
+            }
+          },
+        },
+      ],
+    );
+  }, [endCurrentCycle, refetchCurrentCycle]);
 
   return (
     <Screen>
@@ -299,7 +407,7 @@ export function CalendarScreen() {
             : "rgba(255,255,255,0.8)",
           paddingHorizontal: 16,
           paddingVertical: 12,
-          shadowColor: "#DDA7A5",
+          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.1,
           shadowRadius: 16,
@@ -383,7 +491,7 @@ export function CalendarScreen() {
               ? "rgba(30,33,40,0.8)"
               : "rgba(255,218,185,0.2)",
             padding: 20,
-            shadowColor: "#DDA7A5",
+            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.12,
             shadowRadius: 24,
@@ -440,34 +548,69 @@ export function CalendarScreen() {
         </View>
       ) : null}
 
-      <PressableScale
-        onPress={() => setShowPeriodModal(true)}
+      <View
         style={{
           marginBottom: 24,
           marginTop: 4,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.2)"
-            : "rgba(221,167,165,0.45)",
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.14)"
-            : "rgba(255,255,255,0.7)",
-          paddingVertical: 14,
+          flexDirection: "row",
+          gap: 10,
         }}
       >
-        <Typography
+        <PressableScale
+          onPress={() => setShowPeriodModal(true)}
+          hapticOnPress="selection"
           style={{
-            fontSize: 15,
-            fontWeight: "600",
-            color: isDark ? "#F2F2F2" : "#2D2327",
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: isDark
+              ? "rgba(255,255,255,0.2)"
+              : "rgba(221,167,165,0.45)",
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.14)"
+              : "rgba(255,255,255,0.7)",
+            paddingVertical: 14,
           }}
         >
-          Log Period
-        </Typography>
-      </PressableScale>
+          <Typography
+            style={{
+              fontSize: 15,
+              fontWeight: "600",
+              color: isDark ? "#F2F2F2" : "#2D2327",
+            }}
+          >
+            Log Period
+          </Typography>
+        </PressableScale>
+
+        {hasActiveCycle ? (
+          <PressableScale
+            onPress={handleEndPeriod}
+            hapticOnPress="impactMedium"
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 999,
+              backgroundColor: "#DDA7A5",
+              paddingVertical: 14,
+              opacity: endCurrentCycle.isPending ? 0.7 : 1,
+            }}
+          >
+            <Typography
+              style={{
+                fontSize: 15,
+                fontWeight: "600",
+                color: "#FFFFFF",
+              }}
+            >
+              {endCurrentCycle.isPending ? "Ending…" : "End Period"}
+            </Typography>
+          </PressableScale>
+        ) : null}
+      </View>
 
       <PeriodLogModal
         visible={showPeriodModal}
