@@ -6,6 +6,10 @@ type RequestPayload = {
   childDateOfBirth?: string;
 };
 
+const TOKEN_BYTES = 32;
+const MAX_REQUESTS_PER_HOUR = 5;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -13,13 +17,10 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-function generateConsentToken(length = 48): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let output = '';
-  for (let i = 0; i < length; i += 1) {
-    output += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return output;
+function generateConsentTokenHex(bytes = TOKEN_BYTES): string {
+  const buffer = new Uint8Array(bytes);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer, (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 function expiryIso(daysFromNow: number): string {
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
     const parentEmail = payload.parentEmail?.trim().toLowerCase() ?? '';
     const childDateOfBirth = payload.childDateOfBirth?.trim() || null;
 
-    if (!parentEmail || !parentEmail.includes('@')) {
+    if (!parentEmail || !EMAIL_PATTERN.test(parentEmail)) {
       return jsonResponse({ error: 'Valid parentEmail is required' }, 400);
     }
 
@@ -109,6 +110,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: recentCount } = await admin
+      .from('parental_consents')
+      .select('id', { count: 'exact', head: true })
+      .eq('child_id', user.id)
+      .gte('requested_at', oneHourAgoIso);
+
+    if ((recentCount ?? 0) >= MAX_REQUESTS_PER_HOUR) {
+      return jsonResponse(
+        { error: 'Too many consent requests. Please wait before requesting again.' },
+        429,
+      );
+    }
+
     const { data: existingPending } = await admin
       .from('parental_consents')
       .select('id,expires_at')
@@ -128,7 +143,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const verificationToken = generateConsentToken();
+    const verificationToken = generateConsentTokenHex();
     const expiresAt = expiryIso(7);
 
     const { data: inserted, error: insertError } = await admin

@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const TOKEN_HEX_PATTERN = /^[a-f0-9]{64}$/;
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -72,7 +74,7 @@ Deno.serve(async (req) => {
 
     if (req.method === 'GET') {
       const token = url.searchParams.get('token')?.trim() ?? '';
-      if (!token || token.length < 20) {
+      if (!TOKEN_HEX_PATTERN.test(token)) {
         return htmlResponse('<h2>Invalid verification link</h2><p>Please request a new parental consent email.</p>', 400);
       }
 
@@ -95,7 +97,7 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const token = typeof payload?.token === 'string' ? payload.token.trim() : '';
 
-    if (!token || token.length < 20) {
+    if (!TOKEN_HEX_PATTERN.test(token)) {
       return jsonResponse({ error: 'Invalid token' }, 400);
     }
 

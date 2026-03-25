@@ -81,7 +81,13 @@ const queryClient = new QueryClient({
  *  Returning email:   (already has session)  onboarding check → Tabs
  *  Returning anon:    Tabs directly (skip login prompt)
  */
-function AuthBootstrap({ children }: { children: React.ReactNode }) {
+function AuthBootstrap({
+  children,
+  onBootstrapComplete,
+}: {
+  children: React.ReactNode;
+  onBootstrapComplete?: () => void;
+}) {
   const router = useRouter();
   const segments = useSegments();
   const { user, isLoading, isAnonymous } = useAuthContext();
@@ -228,12 +234,19 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, hasBootstrapped, user?.id, isAnonymous, segments[0]]);
 
+  useEffect(() => {
+    if (hasBootstrapped) {
+      onBootstrapComplete?.();
+    }
+  }, [hasBootstrapped, onBootstrapComplete]);
+
   return <>{children}</>;
 }
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [appReady, setAppReady] = useState(false);
+  const [authBootstrapped, setAuthBootstrapped] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     "PlayfairDisplay-Regular": PlayfairDisplay_400Regular,
@@ -251,17 +264,21 @@ export default function RootLayout() {
     }
   }, [appReady]);
 
-  // Enhanced app readiness check - wait for fonts AND auth
+  // Enhanced app readiness check - wait for fonts AND auth bootstrap.
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      // Give auth a moment to resolve, then mark app as ready
-      const timer = setTimeout(() => {
-        setAppReady(true);
-      }, 1000); // Allow 1 second for auth to initialize
-
-      return () => clearTimeout(timer);
+    if ((fontsLoaded || fontError) && authBootstrapped) {
+      setAppReady(true);
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, authBootstrapped]);
+
+  // Fail-safe so startup never hangs if auth/network is slow.
+  useEffect(() => {
+    if (appReady) return;
+    const timer = setTimeout(() => {
+      setAuthBootstrapped(true);
+    }, 9000);
+    return () => clearTimeout(timer);
+  }, [appReady]);
 
   // Show custom splash screen while app isn't ready
   if (!appReady) {
@@ -269,7 +286,10 @@ export default function RootLayout() {
       <SomaLoadingSplash
         subtitle="Initializing your cycle companion..."
         timeout={8000}
-        onTimeout={() => setAppReady(true)}
+        onTimeout={() => {
+          setAuthBootstrapped(true);
+          setAppReady(true);
+        }}
       />
     );
   }
@@ -280,7 +300,7 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <AuthBootstrap>
+              <AuthBootstrap onBootstrapComplete={() => setAuthBootstrapped(true)}>
                 <ThemeProvider
                   value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
                 >
