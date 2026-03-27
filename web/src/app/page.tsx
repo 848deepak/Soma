@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DynamicGreeting from "@/components/DynamicGreeting";
 
 const featureCards = [
   {
@@ -194,11 +195,10 @@ export default function HomePage() {
                 <div className="absolute bottom-1/3 left-0 w-56 h-56 rounded-full blur-[95px] opacity-25 bg-[radial-gradient(circle,#DDA7A5_0%,transparent_70%)]" />
 
                 <div className="relative z-10 flex items-start justify-between mb-7">
-                  <h3 className="font-serif text-charcoal text-[2.45rem] leading-[1.04] font-semibold tracking-tight">
-                    Good Morning,
-                    <br />
-                    Parisha
-                  </h3>
+                  <DynamicGreeting
+                    name="Parisha"
+                    className="font-serif text-charcoal text-[2.45rem] leading-[1.04] font-semibold tracking-tight"
+                  />
                   <div className="w-12 h-12 rounded-full border border-white/60 flex items-center justify-center text-mauve bg-gradient-to-br from-peach/40 to-rose/20 shadow-[0_4px_16px_rgba(221,167,165,0.2)]">
                     <svg
                       className="w-5 h-5"

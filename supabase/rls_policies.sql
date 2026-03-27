@@ -121,12 +121,12 @@ create policy "partners: partner user read"
   using (auth.uid() = partner_user_id);
 
 -- Insertion is done via the link_partner() SECURITY DEFINER function.
--- We still allow direct insert so the function can write on behalf of the
--- authenticated user (the SECURITY DEFINER context sets auth.uid correctly).
+-- Direct inserts from authenticated clients are intentionally blocked.
+-- New rows are created exclusively via link_partner().
 create policy "partners: insert via link"
   on public.partners
   for insert
-  with check (auth.uid() = partner_user_id);
+  with check (false);
 
 -- Only the primary user (the one whose data is being shared) can update
 -- permissions or revoke the connection.
@@ -215,6 +215,7 @@ create policy "notification_events: owner read"
 -- We grant SELECT on the view to authenticated role.
 -- =============================================================================
 grant select on public.partner_visible_logs to authenticated;
+grant select on public.shared_data to authenticated;
 
 -- =============================================================================
 -- Revoke all default public access on underlying tables

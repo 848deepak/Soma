@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 const TOKEN_HEX_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -70,6 +71,13 @@ async function verifyByToken(token: string): Promise<
 
 Deno.serve(async (req) => {
   try {
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'verify-parental-consent',
+      limit: 5,
+      windowMs: 60_000,
+    });
+    if (rateLimited) return rateLimited;
+
     const url = new URL(req.url);
 
     if (req.method === 'GET') {

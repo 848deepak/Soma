@@ -2,6 +2,7 @@ export type PhiResourceType =
   | "cycle_data"
   | "daily_logs"
   | "partner_data"
+  | "care_circle"
   | "consent_data"
   | "gdpr_data_rights";
 
@@ -11,7 +12,13 @@ export type PhiActionType =
   | "request"
   | "cancel"
   | "open_result_link"
-  | "delete";
+  | "delete"
+  | "create_connection"
+  | "get_connections"
+  | "get_shared_data"
+  | "update_permissions"
+  | "revoke_connection"
+  | "accept_connection";
 
 const SENSITIVE_FIELDS = new Set([
   "start_date",

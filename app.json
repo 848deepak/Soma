@@ -10,10 +10,14 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FDF7F5"
+      "backgroundColor": "#FDF7F5",
+      "dark": {
+        "backgroundColor": "#0F1115"
+      }
     },
     "ios": {
       "supportsTablet": true,
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.soma.health",
       "buildNumber": "1",
       "config": {
@@ -35,6 +39,10 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "notification": {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#DDA7A5"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.soma.health",
@@ -58,7 +66,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#DDA7A5",
           "defaultChannel": "default",
           "sounds": []

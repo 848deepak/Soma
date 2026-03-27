@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 type ProcessPayload = {
   requestId?: string;
@@ -36,6 +37,13 @@ function isTerminalStatus(status: string): boolean {
 
 Deno.serve(async (req) => {
   try {
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'process-data-rights-request',
+      limit: 10,
+      windowMs: 1000,
+    });
+    if (rateLimited) return rateLimited;
+
     if (!hasAllowedOrigin(req)) {
       return jsonResponse({ error: 'Origin not allowed' }, 403);
     }

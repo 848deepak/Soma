@@ -66,7 +66,7 @@ describe('App Launch E2E', () => {
 
     it('should auto-login and navigate to home for returning users', async () => {
       // Should bypass login and go directly to home
-      await waitFor(element(by.text('Good Morning')))
+      await waitFor(element(by.text('Day')))
         .toBeVisible()
         .withTimeout(10000);
 

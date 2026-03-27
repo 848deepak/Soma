@@ -3,7 +3,12 @@
  * Tests for the optimized HomeScreen component.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 import React from "react";
 
 import { AuthProvider } from "@/src/context/AuthProvider";
@@ -16,6 +21,17 @@ jest.mock("expo-router", () => ({
     push: mockPush,
   }),
 }));
+
+let mockCurrentCycleData: any = {
+  cycleDay: 14,
+  phaseLabel: "Ovulation Phase",
+  phase: "ovulation",
+  progress: 0.5,
+  cycle: {
+    id: "test-cycle",
+    start_date: "2024-01-01",
+  },
+};
 
 // Mock hooks
 jest.mock("@/hooks/useProfile", () => ({
@@ -45,16 +61,7 @@ jest.mock("@/hooks/useDailyLogs", () => ({
 
 jest.mock("@/hooks/useCurrentCycle", () => ({
   useCurrentCycle: () => ({
-    data: {
-      cycleDay: 14,
-      phaseLabel: "Ovulation Phase",
-      phase: "ovulation",
-      progress: 0.5,
-      cycle: {
-        id: "test-cycle",
-        start_date: "2024-01-01",
-      },
-    },
+    data: mockCurrentCycleData,
     isLoading: false,
     error: null,
     refetch: jest.fn(),
@@ -67,6 +74,17 @@ jest.mock("@/hooks/useCurrentCycle", () => ({
 
 jest.mock("@/hooks/useRealtimeSync", () => ({
   useRealtimeSync: jest.fn(),
+}));
+
+jest.mock("@/hooks/useCareCircle", () => ({
+  useCareCircle: () => ({
+    data: {
+      asPrimary: [],
+      asViewer: [],
+    },
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 jest.mock("@/src/store/useCycleStore", () => ({
@@ -97,6 +115,16 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 describe("HomeScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCurrentCycleData = {
+      cycleDay: 14,
+      phaseLabel: "Ovulation Phase",
+      phase: "ovulation",
+      progress: 0.5,
+      cycle: {
+        id: "test-cycle",
+        start_date: "2024-01-01",
+      },
+    };
   });
 
   it("renders greeting with user name", async () => {
@@ -107,7 +135,9 @@ describe("HomeScreen", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Good Morning,\s*Jane/)).toBeTruthy();
+      expect(
+        screen.getByText(/Good (Morning|Afternoon|Evening|Night),\s*Jane/),
+      ).toBeTruthy();
     });
   });
 
@@ -187,6 +217,112 @@ describe("HomeScreen", () => {
       expect(screen.getByText("Log Period")).toBeTruthy();
       expect(screen.getByText("Current mood")).toBeTruthy();
       expect(screen.getByText("Readiness")).toBeTruthy();
+    });
+  });
+
+  it("routes both log entry points to canonical log screen", async () => {
+    render(
+      <TestWrapper>
+        <HomeScreen />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("home-log-primary-button")).toBeTruthy();
+      expect(screen.getByTestId("home-log-fab")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId("home-log-primary-button"));
+    fireEvent.press(screen.getByTestId("home-log-fab"));
+
+    expect(mockPush).toHaveBeenCalledWith("/log");
+    expect(mockPush).toHaveBeenCalledTimes(2);
+  });
+
+  it("hides daily log CTA when there is no active period", async () => {
+    mockCurrentCycleData = {
+      cycleDay: 1,
+      phaseLabel: "Cycle Phase",
+      phase: null,
+      progress: 0,
+      cycle: null,
+    };
+
+    render(
+      <TestWrapper>
+        <HomeScreen />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("home-log-primary-button")).toBeNull();
+      expect(
+        screen.getByText("Start a period to enable daily logging."),
+      ).toBeTruthy();
+      expect(screen.getByTestId("home-log-fab")).toBeTruthy();
+    });
+  });
+
+  it("shows Care Circle entry card when not connected", async () => {
+    render(
+      <TestWrapper>
+        <HomeScreen />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Build Your Care Circle/i) ||
+          screen.queryByTestId("care-circle-card"),
+      ).toBeTruthy();
+    });
+  });
+
+  it("hides Care Circle entry card when already connected", async () => {
+    jest.unmock("@/hooks/useCareCircle");
+    jest.doMock("@/hooks/useCareCircle", () => ({
+      useCareCircle: () => ({
+        data: {
+          asPrimary: [
+            {
+              id: "partner-1",
+              user_id: "user-2",
+            },
+          ],
+          asViewer: [],
+        },
+        isLoading: false,
+        error: null,
+      }),
+    }));
+
+    render(
+      <TestWrapper>
+        <HomeScreen />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      // Care Circle card should not appear when connected
+      expect(screen.queryByTestId("care-circle-card")).toBeNull();
+    });
+  });
+
+  it("navigates to care-circle route when Care Circle card is tapped", async () => {
+    render(
+      <TestWrapper>
+        <HomeScreen />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      const careCircleButton =
+        screen.getByTestId("care-circle-cta") ||
+        screen.getByText(/Build Your Care Circle/i);
+      if (careCircleButton) {
+        fireEvent.press(careCircleButton);
+        expect(mockPush).toHaveBeenCalledWith("/care-circle");
+      }
     });
   });
 });

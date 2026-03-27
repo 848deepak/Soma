@@ -6,7 +6,14 @@
  */
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, TextInput, useColorScheme, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput,
+  useColorScheme,
+  View,
+} from "react-native";
 
 import {
     ensureAnonymousSession,
@@ -147,8 +154,13 @@ export function LoginScreen() {
   };
 
   return (
-    <Screen scrollable={false}>
-      <View style={{ flex: 1, justifyContent: "center" }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={24}
+    >
+      <Screen>
+        <View style={{ justifyContent: "center", minHeight: 620, paddingTop: 18 }}>
         {/* ── Brand orb ────────────────────────────────────── */}
         <BrandOrb isDark={isDark} />
 
@@ -370,7 +382,8 @@ export function LoginScreen() {
             Continue without an account
           </Typography>
         </PressableScale>
-      </View>
-    </Screen>
+        </View>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }

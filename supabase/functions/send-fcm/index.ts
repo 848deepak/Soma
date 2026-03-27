@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
+import { requireInternalCaller, jsonError } from '../_shared/internal-auth.ts';
 
 type SendRequest = {
   notificationId: string;
@@ -40,14 +42,21 @@ async function sendToFcmToken(params: {
 
 Deno.serve(async (req) => {
   try {
+    const unauthorized = requireInternalCaller(req);
+    if (unauthorized) return unauthorized;
+
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'send-fcm',
+      limit: 100,
+      windowMs: 60_000,
+    });
+    if (rateLimited) return rateLimited;
+
     const projectId = Deno.env.get('FCM_PROJECT_ID');
     const accessToken = Deno.env.get('FCM_ACCESS_TOKEN');
 
     if (!projectId || !accessToken) {
-      return new Response(JSON.stringify({ error: 'Missing FCM_PROJECT_ID or FCM_ACCESS_TOKEN' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return jsonError('Notification provider misconfigured', 500);
     }
 
     const body = (await req.json()) as SendRequest;
@@ -64,7 +73,7 @@ Deno.serve(async (req) => {
       .is('revoked_at', null);
 
     if (tokenError) {
-      throw tokenError;
+      return jsonError('Failed to fetch notification targets', 500);
     }
 
     if (!tokens || tokens.length === 0) {
@@ -133,9 +142,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    );
+    console.error('[send-fcm] unexpected failure');
+    return jsonError('Internal server error', 500);
   }
 });

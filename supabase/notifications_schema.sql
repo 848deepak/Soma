@@ -33,6 +33,45 @@ create table if not exists public.notification_preferences (
   updated_at timestamptz not null default now()
 );
 
+create or replace function public.ensure_notification_preferences_row()
+returns trigger
+language plpgsql
+as $$
+begin
+  insert into public.notification_preferences (
+    user_id,
+    daily_reminders,
+    period_alerts,
+    ovulation_alerts,
+    behavioral_alerts,
+    max_per_day,
+    quiet_hours_start,
+    quiet_hours_end,
+    timezone
+  )
+  values (
+    new.id,
+    false,
+    true,
+    true,
+    true,
+    3,
+    22,
+    8,
+    'UTC'
+  )
+  on conflict (user_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_profiles_ensure_notification_preferences on public.profiles;
+
+create trigger trg_profiles_ensure_notification_preferences
+  after insert on public.profiles
+  for each row execute function public.ensure_notification_preferences_row();
+
 create table if not exists public.scheduled_notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -70,6 +109,8 @@ create table if not exists public.notification_events (
 create index if not exists idx_notification_events_user_created
   on public.notification_events(user_id, created_at desc);
 
+-- Legacy profile-level JSON is retained for backward compatibility only.
+-- Canonical source of truth: public.notification_preferences.
 alter table public.profiles
   add column if not exists notification_preferences jsonb not null default '{"daily_reminders": true, "period_alerts": true, "ovulation_alerts": true, "behavioral_alerts": true}'::jsonb;
 

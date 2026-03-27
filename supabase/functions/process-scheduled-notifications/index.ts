@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
+import { requireInternalCaller } from '../_shared/internal-auth.ts';
 
 import { buildNotificationTemplate } from '../_shared/notificationTemplates.ts';
 import { evaluateBehavioralRule } from './rules.ts';
@@ -41,7 +43,17 @@ async function enforceDailyCap(
   return (count ?? 0) < maxPerDay;
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  const unauthorized = requireInternalCaller(req);
+  if (unauthorized) return unauthorized;
+
+  const rateLimited = enforceRateLimit(req, {
+    scope: 'process-scheduled-notifications',
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -59,7 +71,7 @@ Deno.serve(async () => {
     .limit(MAX_BATCH);
 
   if (dueError) {
-    return new Response(JSON.stringify({ error: dueError.message }), {
+    return new Response(JSON.stringify({ ok: false, error: 'Failed to load scheduled notifications' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -157,7 +169,10 @@ Deno.serve(async () => {
 
     await admin.from('scheduled_notifications').update({ status: 'processing', updated_at: nowIso() }).eq('id', row.id);
 
-    const invokeResult = await admin.functions.invoke('send-fcm', {
+    const invokeResult = await admin.functions.invoke('send-fcm-v2', {
+      headers: {
+        'x-internal-token': Deno.env.get('INTERNAL_FUNCTION_TOKEN') ?? '',
+      },
       body: {
         notificationId: row.id,
         userId: row.user_id,

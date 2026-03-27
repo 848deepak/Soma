@@ -12,6 +12,7 @@ import { logPeriodRangeAction, useEndCurrentCycle } from "@/hooks/useCycleAction
 import { useCycleHistory } from "@/hooks/useCycleHistory";
 import { useDailyLogs } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
+import { useCareCircle } from "@/hooks/useCareCircle";
 import {
   derivePeriodVisualizationDays,
   predictFertileWindow,
@@ -22,6 +23,7 @@ import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
+import { SupportDashboard } from "@/src/components/SupportDashboard";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { MonthCalendarMeta } from "@/src/features/cycle/uiMockData";
 import {
@@ -101,9 +103,11 @@ export function CalendarScreen() {
   );
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
+  const [viewMode, setViewMode] = useState<'own' | 'shared'>('own');
   const endCurrentCycle = useEndCurrentCycle();
 
   const { data: profile } = useProfile();
+  const { data: careCircleState } = useCareCircle();
   const {
     data: cycleData,
     isLoading: cycleLoading,
@@ -116,6 +120,10 @@ export function CalendarScreen() {
   const { data: completedCycles = [] } = useCycleHistory(6);
 
   const periodLen = profile?.period_duration_average ?? 5;
+
+  // Determine if viewer has an active connection
+  const viewerConnection = careCircleState?.asViewer?.[0] ?? null;
+  const isViewer = Boolean(viewerConnection);
 
   // Memoize current month check to prevent recalculation
   const isCurrentMonth = useMemo(
@@ -390,7 +398,64 @@ export function CalendarScreen() {
     <Screen>
       <HeaderBar title={"Your Cycle\nCalendar"} />
 
-      {/* ── Month navigation ─────────────────────────────────────── */}
+      {/* ── Me/Partner toggle (if viewer) ──────────────────────────── */}
+      {isViewer && (
+        <View testID="calendar-view-toggle" style={{ flexDirection: "row", gap: 8, marginBottom: 16, marginTop: 16, paddingHorizontal: 8 }}>
+          <PressableScale
+            testID="view-mode-own"
+            onPress={() => setViewMode('own')}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 12,
+              backgroundColor: viewMode === 'own' ? '#DDA7A5' : isDark ? 'rgba(167,139,250,0.14)' : 'rgba(221,167,165,0.2)',
+            }}
+          >
+            <Typography
+              style={{
+                textAlign: 'center',
+                fontWeight: '600',
+                fontSize: 14,
+                color: viewMode === 'own' ? '#FFFFFF' : isDark ? '#F2F2F2' : '#2D2327',
+              }}
+            >
+              My Cycle
+            </Typography>
+          </PressableScale>
+          <PressableScale
+            testID="view-mode-partner"
+            onPress={() => setViewMode('shared')}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 12,
+              backgroundColor: viewMode === 'shared' ? '#DDA7A5' : isDark ? 'rgba(167,139,250,0.14)' : 'rgba(221,167,165,0.2)',
+            }}
+          >
+            <Typography
+              style={{
+                textAlign: 'center',
+                fontWeight: '600',
+                fontSize: 14,
+                color: viewMode === 'shared' ? '#FFFFFF' : isDark ? '#F2F2F2' : '#2D2327',
+              }}
+            >
+              Shared
+            </Typography>
+          </PressableScale>
+        </View>
+      )}
+
+      {/* ── Shared view: Support Dashboard (viewer role) ─────────── */}
+      {viewMode === 'shared' && isViewer && viewerConnection ? (
+        <SupportDashboard
+          partnerId={viewerConnection.user_id}
+          partnerName={`Partner's`}
+        />
+      ) : viewMode === 'shared' ? null : (
+        <>
+          {/* ── My Cycle view ────────────────────────────────────── */}
+          {/* ── Month navigation ─────────────────────────────────────── */}
       <View
         style={{
           marginTop: 20,
@@ -618,6 +683,8 @@ export function CalendarScreen() {
         onSubmit={handleSubmitPeriodModal}
         isSubmitting={isLoggingPeriod}
       />
+        </>
+      )}
     </Screen>
   );
 }

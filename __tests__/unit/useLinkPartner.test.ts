@@ -59,6 +59,62 @@ describe('useLinkPartner actions', () => {
         'Unexpected response while linking partner. Please try again.',
       );
     });
+
+    it('accepts optional role parameter and passes to RPC', async () => {
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: {
+          id: 'partner-1',
+          invite_code: 'AB-12-CD',
+          permissions: { role: 'trusted' },
+        },
+        error: null,
+      });
+
+      const result = await linkPartnerAction('ab12cd', 'trusted');
+
+      expect(supabase.rpc).toHaveBeenCalledWith('link_partner', {
+        code: 'AB-12-CD',
+        role: 'trusted',
+      });
+      expect(result.id).toBe('partner-1');
+    });
+
+    it('defaults to viewer role when not specified', async () => {
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: {
+          id: 'partner-1',
+          invite_code: 'AB-12-CD',
+          permissions: { role: 'viewer' },
+        },
+        error: null,
+      });
+
+      const result = await linkPartnerAction('ab12cd');
+
+      expect(supabase.rpc).toHaveBeenCalledWith('link_partner', {
+        code: 'AB-12-CD',
+      });
+      expect(result.id).toBe('partner-1');
+    });
+
+    it('supports mutual role for bidirectional sharing', async () => {
+      (supabase.rpc as jest.Mock).mockResolvedValue({
+        data: {
+          id: 'partner-1',
+          invite_code: 'AB-12-CD',
+          permissions: { role: 'mutual' },
+        },
+        error: null,
+      });
+
+      const result = await linkPartnerAction('ab12cd', 'mutual');
+
+      expect(supabase.rpc).toHaveBeenCalledWith('link_partner', {
+        code: 'AB-12-CD',
+        role: 'mutual',
+      });
+      expect(result.id).toBe('partner-1');
+    });
   });
 
   describe('ensurePartnerInviteCodeAction', () => {

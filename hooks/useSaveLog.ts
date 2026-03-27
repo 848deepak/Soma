@@ -20,6 +20,47 @@ import { trackEvent } from "@/src/services/analytics";
 import { encryptionService } from "@/src/services/encryptionService";
 import type { DailyLogRow, LogPayload } from "@/types/database";
 
+function hasOwn<T extends object>(obj: T, key: keyof LogPayload): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+export function mergeDailyLogForUpsert(
+  existing: DailyLogRow | null,
+  payload: LogPayload,
+  base: { user_id: string; date: string; cycle_id: string | null; cycle_day: number | null },
+) {
+  const merged = {
+    user_id: base.user_id,
+    date: base.date,
+    cycle_id: base.cycle_id ?? existing?.cycle_id ?? null,
+    cycle_day: base.cycle_day ?? existing?.cycle_day ?? null,
+    flow_level: hasOwn(payload, "flow_level")
+      ? (payload.flow_level ?? null)
+      : (existing?.flow_level ?? null),
+    mood: hasOwn(payload, "mood") ? (payload.mood ?? null) : (existing?.mood ?? null),
+    energy_level: hasOwn(payload, "energy_level")
+      ? (payload.energy_level ?? null)
+      : (existing?.energy_level ?? null),
+    symptoms: hasOwn(payload, "symptoms")
+      ? (payload.symptoms ?? [])
+      : (existing?.symptoms ?? []),
+    notes: hasOwn(payload, "notes")
+      ? (payload.notes ?? null)
+      : (existing?.notes ?? null),
+    hydration_glasses: hasOwn(payload, "hydration_glasses")
+      ? (payload.hydration_glasses ?? null)
+      : (existing?.hydration_glasses ?? null),
+    sleep_hours: hasOwn(payload, "sleep_hours")
+      ? (payload.sleep_hours ?? null)
+      : (existing?.sleep_hours ?? null),
+    partner_alert: hasOwn(payload, "partner_alert")
+      ? Boolean(payload.partner_alert)
+      : (existing?.partner_alert ?? false),
+  };
+
+  return merged;
+}
+
 function isLikelyNetworkError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
@@ -41,6 +82,8 @@ export function useSaveLog() {
     LogPayload,
     { previousLog: DailyLogRow | null | undefined }
   >({
+    // Prevent concurrent same-device writes from racing on stale reads.
+    scope: { id: "daily-log-save" },
     // ─── Actual Supabase write ─────────────────────────────────────────────
     mutationFn: async (payload) => {
       const {
@@ -69,27 +112,54 @@ export function useSaveLog() {
         throw activeCycleError;
       }
 
-      const resolvedCycle =
-        activeCycle ??
-        (cachedCycleData?.cycle
-          ? {
-              id: cachedCycleData.cycle.id,
-              start_date: cachedCycleData.cycle.start_date,
-            }
-          : null);
+      const resolvedCycle = activeCycle
+        ? {
+            id: activeCycle.id,
+            start_date: activeCycle.start_date,
+          }
+        : activeCycleError && isLikelyNetworkError(activeCycleError)
+          ? (cachedCycleData?.cycle
+              ? {
+                  id: cachedCycleData.cycle.id,
+                  start_date: cachedCycleData.cycle.start_date,
+                }
+              : null)
+          : null;
 
       const cycleId = resolvedCycle?.id ?? null;
       const cycleDay = resolvedCycle?.start_date
         ? computeCycleDay(resolvedCycle.start_date)
         : null;
 
-      const upsertPayload = {
-        user_id: user.id,
-        date: today,
-        cycle_id: cycleId,
-        cycle_day: cycleDay,
-        ...payload,
-      };
+      if (!cycleId) {
+        throw new Error(
+          "No active period. Start your period to begin logging.",
+        );
+      }
+
+      const { data: existingLog, error: existingLogError } = await supabase
+        .from("daily_logs")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .maybeSingle();
+
+      if (existingLogError && !isLikelyNetworkError(existingLogError)) {
+        throw existingLogError;
+      }
+
+      const mergedPayload = mergeDailyLogForUpsert(
+        (existingLog as DailyLogRow | null) ?? null,
+        payload,
+        {
+          user_id: user.id,
+          date: today,
+          cycle_id: cycleId,
+          cycle_day: cycleDay,
+        },
+      );
+
+      const upsertPayload = mergedPayload;
 
       const { data, error } = await supabase
         .from("daily_logs")
@@ -101,7 +171,7 @@ export function useSaveLog() {
         if (!isLikelyNetworkError(error)) throw error;
 
         const encryptedPayload = await encryptionService.encrypt(
-          JSON.stringify(upsertPayload),
+          JSON.stringify(mergedPayload),
         );
 
         await enqueueSync(
@@ -116,16 +186,16 @@ export function useSaveLog() {
           id: `queued-${today}`,
           user_id: user.id,
           date: today,
-          cycle_day: cycleDay,
-          cycle_id: cycleId,
-          flow_level: payload.flow_level ?? null,
-          mood: payload.mood ?? null,
-          energy_level: payload.energy_level ?? null,
-          symptoms: payload.symptoms ?? [],
-          notes: payload.notes ?? null,
-          hydration_glasses: payload.hydration_glasses ?? null,
-          sleep_hours: payload.sleep_hours ?? null,
-          partner_alert: payload.partner_alert ?? false,
+          cycle_day: mergedPayload.cycle_day,
+          cycle_id: mergedPayload.cycle_id,
+          flow_level: mergedPayload.flow_level,
+          mood: mergedPayload.mood,
+          energy_level: mergedPayload.energy_level,
+          symptoms: mergedPayload.symptoms,
+          notes: mergedPayload.notes,
+          hydration_glasses: mergedPayload.hydration_glasses,
+          sleep_hours: mergedPayload.sleep_hours,
+          partner_alert: mergedPayload.partner_alert,
           created_at: queuedAt,
           updated_at: queuedAt,
         } as DailyLogRow;

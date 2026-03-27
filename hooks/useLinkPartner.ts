@@ -38,14 +38,19 @@ export function isInviteCodeFormat(input: string | null | undefined): boolean {
   return INVITE_CODE_REGEX.test(input.toUpperCase().trim());
 }
 
-export async function linkPartnerAction(rawCode: string): Promise<PartnerRow> {
+export async function linkPartnerAction(
+  rawCode: string,
+  role?: 'viewer' | 'trusted' | 'mutual',
+): Promise<PartnerRow> {
   const normalizedCode = normalizeInviteCode(rawCode);
 
   if (__DEV__) {
-    console.debug('[PartnerSync] Attempting link with invite code:', normalizedCode);
+    console.debug('[PartnerSync] Attempting link with invite code:', normalizedCode, { role });
   }
 
-  const { data, error } = await supabase.rpc('link_partner', { code: normalizedCode });
+  // Backward compatible: call with or without role parameter
+  const rpcParams = role ? { code: normalizedCode, role } : { code: normalizedCode };
+  const { data, error } = await supabase.rpc('link_partner', rpcParams);
   if (error) throw error;
   if (!isValidPartnerRow(data)) {
     throw new Error('Unexpected response while linking partner. Please try again.');
@@ -97,8 +102,19 @@ export async function ensurePartnerInviteCodeAction(
 export function useLinkPartner() {
   const queryClient = useQueryClient();
 
-  return useMutation<PartnerRow, Error, string>({
-    mutationFn: linkPartnerAction,
+  return useMutation<
+    PartnerRow,
+    Error,
+    string | { code: string; role?: 'viewer' | 'trusted' | 'mutual' }
+  >({
+    mutationFn: async (params) => {
+      // Support both old (string code) and new (object) call styles for backward compatibility
+      if (typeof params === 'string') {
+        return linkPartnerAction(params);
+      } else {
+        return linkPartnerAction(params.code, params.role);
+      }
+    },
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PARTNER_KEY });

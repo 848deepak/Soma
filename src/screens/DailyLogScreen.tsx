@@ -113,6 +113,15 @@ export function DailyLogScreen() {
   }
 
   function handleSave() {
+    if (!hasActivePeriod) {
+      void HapticsService.error();
+      Alert.alert(
+        "Start Period First",
+        "No active period found. Start your period before saving a daily log.",
+      );
+      return;
+    }
+
     void HapticsService.success();
     saveLog.mutate(
       {
@@ -535,12 +544,13 @@ export function DailyLogScreen() {
         >
           <PressableScale
             onPress={handleSave}
+            disabled={saveLog.isPending || !hasActivePeriod}
             style={{
               alignItems: "center",
               borderRadius: 999,
               backgroundColor: accentPrimary,
               paddingVertical: 20,
-              opacity: saveLog.isPending ? 0.6 : 1,
+              opacity: saveLog.isPending || !hasActivePeriod ? 0.6 : 1,
               shadowColor: accentPrimaryDark,
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.4,
@@ -554,6 +564,15 @@ export function DailyLogScreen() {
               {saveLog.isPending ? "Saving…" : "Save Log"}
             </Typography>
           </PressableScale>
+
+          {!hasActivePeriod ? (
+            <Typography
+              variant="helper"
+              style={{ marginTop: 8, textAlign: "center", color: "#9B7E8C" }}
+            >
+              Start your period to enable logging.
+            </Typography>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

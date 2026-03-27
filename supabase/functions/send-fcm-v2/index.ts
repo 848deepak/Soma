@@ -15,11 +15,13 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendFCMNotification, isValidFCMToken, parseFCMError, type FCMMessage } from '../_shared/fcm-client.ts';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
+import { requireInternalCaller } from '../_shared/internal-auth.ts';
 
 interface SendFCMRequest {
   notificationId?: string;
   userId: string;
-  deviceToken: string;
+  deviceToken?: string;
   title: string;
   body: string;
   data?: Record<string, string>;
@@ -40,6 +42,16 @@ interface SendFCMResponseEnvelope {
 
 Deno.serve(async (req) => {
   try {
+    const unauthorized = requireInternalCaller(req);
+    if (unauthorized) return unauthorized;
+
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'send-fcm-v2',
+      limit: 100,
+      windowMs: 60_000,
+    });
+    if (rateLimited) return rateLimited;
+
     // Only POST requests allowed
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
@@ -62,23 +74,11 @@ Deno.serve(async (req) => {
     // Validate required fields
     const { userId, deviceToken, title, body: msgBody, data, route, notificationId } = body;
 
-    if (!userId || !deviceToken || !title || !msgBody) {
+    if (!userId || !title || !msgBody) {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: 'Missing required fields: userId, deviceToken, title, body',
-          statusCode: 400,
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
-
-    // Validate token format
-    if (!isValidFCMToken(deviceToken)) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'Invalid device token format',
+          error: 'Missing required fields: userId, title, body',
           statusCode: 400,
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
@@ -101,39 +101,86 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send notification via FCM
-    const fcmResponse = await sendFCMNotification(
-      { projectId, serviceAccountJson },
-      {
-        token: deviceToken,
-        title,
-        body: msgBody,
-        data,
-        route,
-      } as FCMMessage,
-    );
-
-    // If failed, parse error details
-    let errorDetails = undefined;
-    if (!fcmResponse.success && fcmResponse.error) {
-      errorDetails = parseFCMError(fcmResponse.error);
-    }
-
-    // Log attempt (async, don't block response)
+    // Log attempts/results
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    let tokensToSend: string[] = [];
+    if (deviceToken) {
+      if (!isValidFCMToken(deviceToken)) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: 'Invalid device token format',
+            statusCode: 400,
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      tokensToSend = [deviceToken];
+    } else {
+      const { data: tokenRows, error: tokenError } = await admin
+        .from('push_tokens')
+        .select('token')
+        .eq('user_id', userId)
+        .is('revoked_at', null);
+      if (tokenError) {
+        return new Response(JSON.stringify({ ok: false, error: 'Failed to load device tokens', statusCode: 500 }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      tokensToSend = (tokenRows ?? []).map((row) => row.token).filter((token) => isValidFCMToken(token));
+    }
+
+    if (tokensToSend.length === 0) {
+      return new Response(JSON.stringify({ ok: true, sent: 0, failed: 0, suppressed: true, statusCode: 200 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    let sent = 0;
+    let failed = 0;
+    let lastMessageId: string | undefined;
+    let lastError: string | undefined;
+    let lastErrorDetails: SendFCMResponseEnvelope['errorDetails'] | undefined;
+
+    for (const token of tokensToSend) {
+      const fcmResponse = await sendFCMNotification(
+        { projectId, serviceAccountJson },
+        {
+          token,
+          title,
+          body: msgBody,
+          data,
+          route,
+        } as FCMMessage,
+      );
+
+      if (fcmResponse.success) {
+        sent += 1;
+        lastMessageId = fcmResponse.messageId;
+      } else {
+        failed += 1;
+        lastError = fcmResponse.error ?? 'Failed to deliver';
+        lastErrorDetails = fcmResponse.error ? parseFCMError(fcmResponse.error) : undefined;
+      }
+    }
+
     const logEntry = {
       notification_id: notificationId || null,
       user_id: userId,
-      event_type: fcmResponse.success ? 'sent' : 'failed',
+      event_type: sent > 0 ? 'sent' : 'failed',
       metadata: {
-        device_token_length: deviceToken.length,
-        fcm_message_id: fcmResponse.messageId,
-        error: fcmResponse.error,
-        error_type: errorDetails?.type,
+        target_count: tokensToSend.length,
+        sent,
+        failed,
+        fcm_message_id: lastMessageId,
+        error: lastError,
+        error_type: lastErrorDetails?.type,
       },
     };
 
@@ -142,16 +189,18 @@ Deno.serve(async (req) => {
     });
 
     // Return response
-    const responseEnvelope: SendFCMResponseEnvelope = {
-      ok: fcmResponse.success,
-      messageId: fcmResponse.messageId,
-      error: fcmResponse.error,
-      errorDetails,
-      statusCode: fcmResponse.statusCode || (fcmResponse.success ? 200 : 500),
+    const responseEnvelope: SendFCMResponseEnvelope & { sent: number; failed: number } = {
+      ok: sent > 0,
+      messageId: lastMessageId,
+      error: lastError,
+      errorDetails: lastErrorDetails,
+      statusCode: sent > 0 ? 200 : 500,
+      sent,
+      failed,
     };
 
     return new Response(JSON.stringify(responseEnvelope), {
-      status: fcmResponse.statusCode || (fcmResponse.success ? 200 : 500),
+      status: sent > 0 ? 200 : 500,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
