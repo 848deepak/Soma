@@ -56,6 +56,7 @@ export function mergeDailyLogForUpsert(
     partner_alert: hasOwn(payload, "partner_alert")
       ? Boolean(payload.partner_alert)
       : (existing?.partner_alert ?? false),
+    updated_at: new Date().toISOString(),
   };
 
   return merged;

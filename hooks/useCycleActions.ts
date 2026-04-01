@@ -93,6 +93,7 @@ export async function logPeriodRangeAction({
           start_date: resolvedActiveCycle.start_date,
           end_date: endDate,
           cycle_length: cycleLength,
+          updated_at: new Date().toISOString(),
         }),
       );
 
@@ -106,10 +107,12 @@ export async function logPeriodRangeAction({
       current_phase: "menstrual";
       end_date?: string;
       cycle_length?: number;
+        updated_at?: string;
     } = {
       user_id: user.id,
       start_date: startDate,
       current_phase: "menstrual",
+        updated_at: new Date().toISOString(),
     };
 
     if (endDate) {
@@ -403,6 +406,7 @@ export async function endCurrentPeriod({
           start_date: resolvedCycle.start_date,
           end_date: resolvedEndDate,
           cycle_length: cycleLength,
+          updated_at: new Date().toISOString(),
         }),
       );
 

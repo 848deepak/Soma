@@ -57,6 +57,11 @@ export type SyncQueueItem = {
   updatedAt: string;
 };
 
+function isEncryptedPayloadFormat(payload: string): boolean {
+  // Expected format from encryptionService: <base64-iv>.<base64-ciphertext>
+  return /^[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]+$/.test(payload);
+}
+
 // ─── DB singleton ─────────────────────────────────────────────────────────────
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -229,6 +234,10 @@ export async function enqueueSync(
   operation: 'upsert' | 'delete',
   encryptedPayload: string,
 ): Promise<void> {
+  if (!isEncryptedPayloadFormat(encryptedPayload)) {
+    throw new Error('Sync payload must be encrypted before queueing.');
+  }
+
   const db = await initDatabase();
   const id = createId();
   const now = new Date().toISOString();

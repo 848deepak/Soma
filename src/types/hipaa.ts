@@ -8,6 +8,7 @@ export type PhiResourceType =
 
 export type PhiActionType =
   | "view"
+  | "update_consent"
   | "export"
   | "request"
   | "cancel"

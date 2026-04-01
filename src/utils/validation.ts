@@ -9,7 +9,12 @@ export function validateEmail(email: string): boolean {
 }
 
 export function validatePassword(password: string): boolean {
-  return typeof password === "string" && password.length >= 6;
+  if (typeof password !== "string") return false;
+  if (password.length < 10) return false;
+
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  return hasLetter && hasNumber;
 }
 
 export function validateStringLength(
