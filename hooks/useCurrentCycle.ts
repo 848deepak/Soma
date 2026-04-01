@@ -17,12 +17,12 @@ export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
 /** Returns the 1-based day number within the cycle (Day 1 = start_date). */
 export function computeCycleDay(startDateIso: string): number {
-  const start = new Date(startDateIso);
-  start.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [year, month, day] = startDateIso.split("-").map(Number);
+  const start = Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1);
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const diff = Math.floor(
-    (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    (today - start) / (1000 * 60 * 60 * 24),
   );
   return Math.max(1, diff + 1);
 }

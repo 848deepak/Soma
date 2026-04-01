@@ -1,8 +1,16 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 Deno.serve(async (req) => {
   try {
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'sync-push-token',
+      limit: 10,
+      windowMs: 1000,
+    });
+    if (rateLimited) return rateLimited;
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing Authorization header' }), { status: 401 });

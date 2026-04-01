@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, TextInput, useColorScheme, View } from "react-native";
 
-import { ensureAnonymousSession, signUpWithEmail } from "@/lib/auth";
+import { signUpWithEmail } from "@/lib/auth";
 import { BrandOrb } from "@/src/components/ui/BrandOrb";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
@@ -22,6 +22,7 @@ import {
   recordRequiredAuthConsent,
   setAnalyticsConsent,
 } from "@/src/services/consentService";
+import { ensureNotificationPreferencesRow } from "@/src/services/notificationPreferencesService";
 import {
   sanitizeInput,
   validateEmail,
@@ -69,10 +70,14 @@ export function SignupScreen() {
     setIsLoading(true);
     try {
       const normalizedEmail = sanitizeInput(email).toLowerCase();
-      await ensureAnonymousSession();
-      await signUpWithEmail(normalizedEmail, password);
+      const signedUpUser = await signUpWithEmail(normalizedEmail, password);
       await recordRequiredAuthConsent();
       await setAnalyticsConsent(analyticsOptIn);
+      try {
+        await ensureNotificationPreferencesRow(signedUpUser.id, false);
+      } catch {
+        // If email verification mode blocks RLS writes, settings hook seeds later.
+      }
       if (analyticsOptIn) {
         await requestAnalyticsConsent();
       } else {
@@ -80,7 +85,7 @@ export function SignupScreen() {
       }
       await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
       setSuccessMessage(
-        "Account created! Check your inbox to verify your email.",
+        "Verification email sent. Please verify your email, then sign in.",
       );
     } catch (error: unknown) {
       const message =
@@ -143,7 +148,7 @@ export function SignupScreen() {
             {successMessage}
           </Typography>
           <PressableScale
-            onPress={() => router.replace("/welcome" as never)}
+            onPress={() => router.push("/auth/login" as never)}
             className="items-center rounded-full bg-somaBlush px-10 py-[18px] dark:bg-darkPrimary"
             style={{
               shadowColor: "#DDA7A5",
@@ -154,7 +159,7 @@ export function SignupScreen() {
             }}
           >
             <Typography className="text-base font-semibold text-white">
-              Continue to App
+              Go to Sign In
             </Typography>
           </PressableScale>
         </View>

@@ -2,7 +2,7 @@
  * __tests__/unit/cycleLogic.test.ts
  *
  * Unit tests for pure helper functions in hooks/useCurrentCycle.ts
- * and src/features/cycle/uiMockData.ts
+ * and src/features/cycle/uiCycleData.ts
  *
  * All functions here are deterministic and side-effect-free – no mocks needed.
  */
@@ -13,7 +13,7 @@ import {
   getPhaseLabel,
   buildMiniCalendar,
 } from '@/hooks/useCurrentCycle';
-import { buildMonthGrid } from '@/src/features/cycle/uiMockData';
+import { buildMonthGrid } from '@/src/features/cycle/uiCycleData';
 import type { CycleRow } from '@/types/database';
 
 // ─── computeCycleDay ─────────────────────────────────────────────────────────

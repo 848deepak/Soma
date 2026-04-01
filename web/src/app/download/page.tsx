@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getLatestApkUrl } from "../../utils/getLatestApkUrl";
+import { getLatestDownloadLinks, type DownloadLinks } from "../../utils/getLatestApkUrl";
 
 const steps = [
   {
@@ -47,10 +47,13 @@ const steps = [
 import Link from "next/link";
 
 function DownloadPage() {
-  const [apkUrl, setApkUrl] = useState<string | null>(null);
+  const [downloadLinks, setDownloadLinks] = useState<DownloadLinks>({
+    androidUrl: null,
+    iosIpaUrl: null,
+  });
 
   useEffect(() => {
-    getLatestApkUrl().then(setApkUrl);
+    getLatestDownloadLinks().then(setDownloadLinks);
   }, []);
 
   return (
@@ -87,9 +90,9 @@ function DownloadPage() {
               Download the APK directly onto any Android device (Android 10+).
               No Google Play account required.
             </p>
-            {apkUrl ? (
+            {downloadLinks.androidUrl ? (
               <a
-                href={apkUrl}
+                href={downloadLinks.androidUrl}
                 download
                 className="rose-shadow-soft block w-full rounded-full bg-rose px-6 py-3 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-mauve"
               >
@@ -116,21 +119,29 @@ function DownloadPage() {
               iOS
             </h2>
             <p className="mb-6 text-sm leading-relaxed text-charcoal/62 md:mb-8">
-              Soma for iPhone and iPad is coming to the Apple App Store. Join
-              the waitlist to be notified on launch day.
+              Download the signed IPA directly from our website release channel.
             </p>
-            <button
-              disabled
-              className="w-full bg-charcoal/10 text-charcoal/40 px-6 py-3 rounded-full text-sm font-medium cursor-not-allowed"
-            >
-              App Store — Coming Soon
-            </button>
+            {downloadLinks.iosIpaUrl ? (
+              <a
+                href={downloadLinks.iosIpaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rose-shadow-soft block w-full rounded-full bg-rose px-6 py-3 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-mauve"
+              >
+                Download IPA
+              </a>
+            ) : (
+              <button
+                disabled
+                className="w-full bg-charcoal/10 text-charcoal/40 px-6 py-3 rounded-full text-sm font-medium cursor-not-allowed"
+              >
+                Loading IPA link...
+              </button>
+            )}
             <p className="mt-3 text-xs text-charcoal/40">
-              Leave your email on our{" "}
-              <Link href="/support" className="text-rose hover:underline">
-                support page
-              </Link>{" "}
-              to join the waitlist.
+              {downloadLinks.iosIpaUrl
+                ? "Install using Apple Configurator 2, MDM, or your internal iOS install workflow."
+                : "Add iosIpaUrl in download metadata to enable this button."}
             </p>
           </div>
         </div>

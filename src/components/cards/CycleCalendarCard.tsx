@@ -3,7 +3,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Typography } from '@/src/components/ui/Typography';
-import { MonthCalendarMeta } from '@/src/features/cycle/uiMockData';
+import { MonthCalendarMeta } from '@/src/features/cycle/uiCycleData';
 
 type CycleCalendarCardProps = {
   weekdays: string[];

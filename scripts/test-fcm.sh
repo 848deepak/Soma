@@ -23,7 +23,7 @@ if [[ -f .env.local ]]; then
   export $(grep -v '^#' .env.local | xargs)
 fi
 
-SUPABASE_URL="${EXPO_PUBLIC_SUPABASE_URL:-https://wqgprkhkbqcbokxstxrq.supabase.co}"
+SUPABASE_URL="${EXPO_PUBLIC_SUPABASE_URL}"
 ANON_KEY="${EXPO_PUBLIC_SUPABASE_ANON_KEY}"
 
 DEVICE_TOKEN="${1:-}"
@@ -42,6 +42,12 @@ fi
 if [[ -z "$ANON_KEY" ]]; then
   echo -e "${RED}❌ Error: EXPO_PUBLIC_SUPABASE_ANON_KEY not set${NC}"
   echo "Ensure .env.local exists with EXPO_PUBLIC_SUPABASE_ANON_KEY"
+  exit 1
+fi
+
+if [[ -z "$SUPABASE_URL" ]]; then
+  echo -e "${RED}❌ Error: EXPO_PUBLIC_SUPABASE_URL not set${NC}"
+  echo "Ensure .env.local exists with EXPO_PUBLIC_SUPABASE_URL"
   exit 1
 fi
 

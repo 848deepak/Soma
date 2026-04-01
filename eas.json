@@ -32,6 +32,7 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "production",
         "SENTRY_PROJECT": "soma-mobile",
         "SENTRY_ORG": "soma-org"
       },
@@ -43,18 +44,20 @@
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease"
       }
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "YOUR_APPLE_ID",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
-      },
+    },
+    "production-apk": {
+      "extends": "production",
       "android": {
-        "serviceAccountKeyPath": "./google-play-service-account.json",
-        "track": "production"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
+    "production-ipa": {
+      "extends": "production",
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
       }
     }
   }

@@ -9,6 +9,31 @@
  */
 import { supabase } from '@/lib/supabase';
 
+const PROFILE_CHECK_RETRIES = 3;
+const PROFILE_CHECK_DELAY_MS = 150;
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const code = 'code' in error ? String((error as { code?: string }).code ?? '') : '';
+  const message =
+    'message' in error ? String((error as { message?: string }).message ?? '') : '';
+  const normalized = message.toLowerCase();
+
+  return code === '23505' || normalized.includes('duplicate key');
+}
+
+function isProfilesPermissionDenied(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const code = 'code' in error ? String((error as { code?: string }).code ?? '') : '';
+  const message =
+    'message' in error ? String((error as { message?: string }).message ?? '') : '';
+  const normalized = message.toLowerCase();
+
+  return code === '42501' || normalized.includes('permission denied for table profiles');
+}
+
 function calculateAgeFromIsoDate(isoDate: string): number | null {
   const parts = isoDate.split('-').map(Number);
   if (parts.length !== 3) return null;
@@ -94,9 +119,94 @@ function normalizeAuthError(error: unknown): Error {
     if (lower.includes('email not confirmed')) {
       return new Error('Please verify your email before signing in.');
     }
+
+    if (lower.includes('already registered') || lower.includes('already in use')) {
+      return new Error('This email is already in use. Try signing in instead.');
+    }
   }
 
   return error instanceof Error ? error : new Error('Authentication failed. Please try again.');
+}
+
+function shouldFallbackToExplicitSignUp(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('anonymous') ||
+    message.includes('upgrade') ||
+    message.includes('updating email') ||
+    message.includes('not allowed')
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function ensureProfileRow(userId: string): Promise<void> {
+  for (let attempt = 1; attempt <= PROFILE_CHECK_RETRIES; attempt += 1) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error && isProfilesPermissionDenied(error)) {
+      // In email-confirmation mode, sign-up can succeed without an active
+      // authenticated session, so profile verification may be blocked by RLS.
+      // Do not fail sign-up UX for this case.
+      return;
+    }
+
+    if (error) {
+      throw new Error(error.message || 'Could not verify profile creation.');
+    }
+
+    if (data?.id) {
+      return;
+    }
+
+    if (attempt < PROFILE_CHECK_RETRIES) {
+      await delay(PROFILE_CHECK_DELAY_MS);
+    }
+  }
+
+  // Defensive repair path: create a minimal profile row if trigger did not create one.
+  const { error: insertError } = await supabase.from('profiles').insert({
+    id: userId,
+    first_name: '',
+    is_onboarded: false,
+  });
+
+  if (insertError && isProfilesPermissionDenied(insertError)) {
+    return;
+  }
+
+  if (!insertError) {
+    return;
+  }
+
+  // The auth trigger may create the row between our last check and insert.
+  // Treat unique-constraint collisions as success after one final verification.
+  if (isUniqueViolation(insertError)) {
+    const { data: finalProfile, error: finalProfileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (finalProfileError) {
+      throw new Error(finalProfileError.message || 'Could not verify profile creation.');
+    }
+
+    if (finalProfile?.id) {
+      return;
+    }
+  }
+
+  if (insertError) {
+    throw new Error(insertError.message || 'Account created, but profile setup failed.');
+  }
 }
 
 /**
@@ -139,8 +249,34 @@ export async function signUpWithEmail(email: string, password: string) {
       email: normalizedEmail,
       password,
     });
-    if (error) throw normalizeAuthError(error);
-    return data.user;
+
+    if (!error && data.user) {
+      await ensureProfileRow(data.user.id);
+      return data.user;
+    }
+
+    if (!shouldFallbackToExplicitSignUp(error)) {
+      throw normalizeAuthError(error);
+    }
+
+    // Some environments disable anonymous account upgrade.
+    // Fallback: sign out anonymous user and do explicit sign-up.
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      throw normalizeAuthError(signOutError);
+    }
+
+    const { data: fallbackData, error: fallbackError } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+    });
+    if (fallbackError) throw normalizeAuthError(fallbackError);
+    if (!fallbackData.user) {
+      throw new Error('Sign up completed without a user record. Please try again.');
+    }
+
+    await ensureProfileRow(fallbackData.user.id);
+    return fallbackData.user;
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -148,6 +284,10 @@ export async function signUpWithEmail(email: string, password: string) {
     password,
   });
   if (error) throw normalizeAuthError(error);
+  if (!data.user) {
+    throw new Error('Sign up completed without a user record. Please try again.');
+  }
+  await ensureProfileRow(data.user.id);
   return data.user;
 }
 

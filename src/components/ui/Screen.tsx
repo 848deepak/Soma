@@ -66,6 +66,8 @@ export function Screen({ children, scrollable = true, showAurora = true }: Scree
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {children}
         </ScrollView>

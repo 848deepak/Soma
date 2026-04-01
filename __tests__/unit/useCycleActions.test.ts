@@ -43,6 +43,7 @@ function mockCycleUpdate(result: UpdateResult) {
 
 describe("endCurrentPeriod", () => {
   beforeEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
   });
 
@@ -113,6 +114,44 @@ describe("endCurrentPeriod", () => {
       "upsert",
       "encrypted-payload",
     );
+  });
+
+  it("retries active-cycle fetch on transient network failure", async () => {
+    const maybeSingle = jest
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error("Network request failed"),
+      })
+      .mockResolvedValueOnce({
+        data: { id: "cycle-1", start_date: "2026-03-01" },
+        error: null,
+      });
+
+    const select = jest.fn().mockReturnValue({
+      eq: jest.fn().mockReturnValue({
+        is: jest.fn().mockReturnValue({
+          order: jest.fn().mockReturnValue({
+            limit: jest.fn().mockReturnValue({ maybeSingle }),
+          }),
+        }),
+      }),
+    });
+
+    const updateChain = mockCycleUpdate({ error: null });
+
+    (supabase.from as jest.Mock).mockImplementation(() => ({
+      select,
+      update: updateChain.update,
+    }));
+
+    const result = await endCurrentPeriod({
+      userId: "user-1",
+      endDate: "2026-03-05",
+    });
+
+    expect(result.queued).toBe(false);
+    expect(maybeSingle).toHaveBeenCalledTimes(2);
   });
 });
 

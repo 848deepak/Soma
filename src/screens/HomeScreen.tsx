@@ -1,12 +1,19 @@
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, View, useColorScheme } from "react-native";
+import { Alert, ScrollView, View, useColorScheme } from "react-native";
 
 import { buildMiniCalendar, useCurrentCycle } from "@/hooks/useCurrentCycle";
 import { logPeriodRangeAction } from "@/hooks/useCycleActions";
+import { useCycleHistory } from "@/hooks/useCycleHistory";
 import { useTodayLog } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { useCareCircle } from "@/hooks/useCareCircle";
+import {
+  estimateOvulation,
+  predictFertileWindow,
+} from "@/services/CycleIntelligence";
+import { logDataAccess } from "@/src/services/auditService";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
@@ -34,6 +41,35 @@ const featureFlags = {
   waterTracking: false,
   sleepTracking: false,
 } as const;
+
+function getGreetingByHour(now: Date): string {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 12) return "Good Morning";
+  if (hour >= 12 && hour < 17) return "Good Afternoon";
+  if (hour >= 17 && hour < 22) return "Good Evening";
+  return "Good Night";
+}
+
+function buildInsightText(input: {
+  phase: string | null | undefined;
+  mood: string | null | undefined;
+  energy: string | null | undefined;
+}): string {
+  const phaseInsight = input.phase
+    ? (PHASE_INSIGHT[input.phase] ?? PHASE_INSIGHT.follicular)
+    : "Welcome to SOMA. Let's start tracking your cycle.";
+
+  const moodHint =
+    input.mood && input.mood !== "--"
+      ? ` Mood check-in: ${input.mood}.`
+      : "";
+  const energyHint =
+    input.energy && input.energy !== "--"
+      ? ` Energy: ${input.energy.toLowerCase()}.`
+      : "";
+
+  return `${phaseInsight}${moodHint}${energyHint}`.trim();
+}
 
 // ── Gradient Orb — hero element matching Figma ─────────────────────────────
 const CycleOrb = React.memo(function CycleOrb({
@@ -197,6 +233,12 @@ export function HomeScreen() {
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
+  const { data: cycleHistory = [] } = useCycleHistory(6);
+
+  // ─── Care Circle state ───────────────────────────────────────────────────
+  const { data: careCircleState } = useCareCircle();
+  const hasPrimaryConnections = (careCircleState?.asPrimary?.length ?? 0) > 0;
+  const hasViewerConnections = (careCircleState?.asViewer?.length ?? 0) > 0;
 
   // Initialize app state once
   useEffect(() => {
@@ -246,10 +288,6 @@ export function HomeScreen() {
 
   // Memoize navigation handlers
   const handleLogFlow = useCallback(() => {
-    router.push("/quick-checkin" as never);
-  }, [router]);
-
-  const handleLogSymptoms = useCallback(() => {
     router.push("/log" as never);
   }, [router]);
 
@@ -284,6 +322,33 @@ export function HomeScreen() {
     [refetchCurrentCycle],
   );
 
+  const fertileWindowPrediction =
+    cycleData?.cycle?.start_date
+      ? predictFertileWindow(cycleHistory, cycleData.cycle.start_date)
+      : null;
+  const ovulationEstimate =
+    cycleData?.cycle?.start_date
+      ? estimateOvulation(cycleHistory, cycleData.cycle.start_date)
+      : null;
+
+  useEffect(() => {
+    if (!ovulationEstimate) return;
+
+    // Record prediction confidence usage for production diagnostics.
+    void logDataAccess("cycle_data", "view", {
+      source: "home_prediction_confidence",
+      confidence: ovulationEstimate.confidence,
+      confidenceScore: ovulationEstimate.confidenceScore,
+      cyclesUsed: ovulationEstimate.cyclesUsed,
+      variabilityDays: ovulationEstimate.variabilityDays,
+    });
+  }, [
+    ovulationEstimate?.confidence,
+    ovulationEstimate?.confidenceScore,
+    ovulationEstimate?.cyclesUsed,
+    ovulationEstimate?.variabilityDays,
+  ]);
+
   // Show loading splash only if all queries are loading AND timeout hasn't been reached AND no errors
   if ((isProfileLoading || isTodayLoading || isCycleLoading) && !forceShow && !profileError && !todayError && !cycleError) {
     return (
@@ -297,11 +362,10 @@ export function HomeScreen() {
 
   // ─── Derived display values with fallbacks ───────────────────────────────────────────────
   const greetingName = profile?.first_name || "there";
+  const greetingPrefix = getGreetingByHour(new Date());
   const cycleDay = cycleData?.cycleDay ?? 1;
   const phaseLabel = cycleData?.phaseLabel ?? "Cycle Phase";
-  const insightText = cycleData?.phase
-    ? (PHASE_INSIGHT[cycleData.phase] ?? PHASE_INSIGHT.follicular!)
-    : "Welcome to SOMA. Let's start tracking your cycle.";
+  const hasActivePeriod = Boolean(cycleData?.cycle?.id);
 
   const hydrationValue = `${todayLog?.hydration_glasses ?? 0}/8`;
   const sleepValue = todayLog?.sleep_hours
@@ -311,6 +375,11 @@ export function HomeScreen() {
   const energyValue = todayLog?.energy_level
     ? `${todayLog.energy_level} Energy`
     : "--";
+  const insightText = buildInsightText({
+    phase: cycleData?.phase,
+    mood: todayLog?.mood,
+    energy: todayLog?.energy_level,
+  });
 
   const homeWidgets = [
     {
@@ -360,11 +429,23 @@ export function HomeScreen() {
   ].filter((item) => item.isEnabled);
 
   const actionSectionBottomSpacing = Math.max(20, insets.bottom + 14);
-  const fabBottomSpacing = Math.max(10, insets.bottom + 4);
+  const fabBottomSpacing = Math.max(88, insets.bottom + 82);
+
+  // Show skeleton loaders only for cycle/today data after initial loading is complete
+  const shouldShowSkeleton = (isCycleLoading || isTodayLoading) && forceShow;
 
   return (
-    <Screen>
-      {/* Top bar */}
+    <Screen scrollable={false}>
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+        >
+        {shouldShowSkeleton ? (
+          <SkeletonLoader />
+        ) : (
+          <>
       <View
         style={{
           marginTop: 0,
@@ -383,7 +464,7 @@ export function HomeScreen() {
             color: isDark ? "#F2F2F2" : "#2D2327",
           }}
         >
-          {`Good Morning,\n${greetingName}`}
+          {`${greetingPrefix},\n${greetingName}`}
         </Typography>
 
         <PressableScale
@@ -416,6 +497,35 @@ export function HomeScreen() {
           />
         </PressableScale>
       </View>
+
+      {fertileWindowPrediction || ovulationEstimate ? (
+        <View
+          style={{
+            marginBottom: 24,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.6)",
+            backgroundColor: isDark
+              ? "rgba(30,33,40,0.8)"
+              : "rgba(255,255,255,0.72)",
+            padding: 16,
+          }}
+        >
+          <Typography style={{ fontSize: 14, fontWeight: "600", marginBottom: 4 }}>
+            Upcoming Predictions
+          </Typography>
+          {fertileWindowPrediction ? (
+            <Typography variant="helper" style={{ marginBottom: 2 }}>
+              Fertile window: {fertileWindowPrediction.windowStart} to {fertileWindowPrediction.windowEnd}
+            </Typography>
+          ) : null}
+          {ovulationEstimate ? (
+            <Typography variant="helper">
+              Ovulation estimate: {ovulationEstimate.estimatedDate} ({ovulationEstimate.confidence} confidence, {ovulationEstimate.confidenceScore}%)
+            </Typography>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Hero orb */}
       <View style={{ marginTop: 32, marginBottom: 40, alignItems: "center" }}>
@@ -512,6 +622,93 @@ export function HomeScreen() {
           }}
         />
       </View>
+
+      {/* ── Care Circle entry card (if not connected) ──────────────────── */}
+      {!hasPrimaryConnections && !hasViewerConnections ? (
+        <View
+          style={{
+            marginBottom: 32,
+            borderRadius: 24,
+            borderWidth: 1,
+            borderColor: isDark
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(255,255,255,0.7)",
+            backgroundColor: isDark
+              ? "rgba(30,33,40,0.85)"
+              : "rgba(255, 218, 185, 0.22)",
+            padding: 20,
+          }}
+        >
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isDark
+                  ? "rgba(167,139,250,0.2)"
+                  : "rgba(255, 218, 185, 0.35)",
+                borderWidth: 1,
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgba(255,255,255,0.5)",
+              }}
+            >
+              <SymbolView
+                name={{
+                  ios: "person.2.fill",
+                  android: "people",
+                  web: "people",
+                }}
+                tintColor="#9B7E8C"
+                size={20}
+              />
+            </View>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <Typography
+                style={{
+                  fontSize: 15,
+                  fontWeight: "600",
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  marginBottom: 4,
+                }}
+              >
+                Build Your Care Circle
+              </Typography>
+              <Typography
+                variant="helper"
+                style={{
+                  color: isDark
+                    ? "rgba(242,242,242,0.7)"
+                    : "rgba(157, 126, 140, 0.9)",
+                  marginBottom: 8,
+                }}
+              >
+                Add trusted supporters to your health journey
+              </Typography>
+              <PressableScale
+                testID="care-circle-cta"
+                onPress={() => router.push("/care-circle" as never)}
+                style={{
+                  alignSelf: "flex-start",
+                }}
+              >
+                <Typography
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#DDA7A5",
+                  }}
+                >
+                  Get Started →
+                </Typography>
+              </PressableScale>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {/* ── Mini calendar strip ───────────────────────────────────── */}
       <View
@@ -718,42 +915,55 @@ export function HomeScreen() {
           </Typography>
         </PressableScale>
 
-        <PressableScale
-          onPress={handleLogSymptoms}
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 999,
-            backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-            paddingVertical: 20,
-            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 40,
-            elevation: 10,
-          }}
-        >
-          <Typography
+        {hasActivePeriod ? (
+          <PressableScale
+            onPress={handleLogFlow}
+            testID="home-log-primary-button"
             style={{
-              fontSize: 16,
-              fontWeight: "600",
-              color: "#FFFFFF",
-              textAlign: "center",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 999,
+              backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+              paddingVertical: 20,
+              shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.4,
+              shadowRadius: 40,
+              elevation: 10,
             }}
           >
-            Log Today's Flow & Mood
+            <Typography
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: "#FFFFFF",
+                textAlign: "center",
+              }}
+            >
+              Log Today's Flow & Mood
+            </Typography>
+          </PressableScale>
+        ) : (
+          <Typography
+            variant="helper"
+            style={{ textAlign: "center", color: "#9B7E8C", paddingVertical: 8 }}
+          >
+            Start a period to enable daily logging.
           </Typography>
-        </PressableScale>
+        )}
       </View>
 
-      {/* Floating FAB to mirror reference composition */}
+          </>
+        )}
+
+        </ScrollView>
       <PressableScale
         onPress={handleLogFlow}
+        testID="home-log-fab"
         style={{
-          alignSelf: "flex-end",
-          marginTop: 14,
-          marginRight: 4,
-          marginBottom: fabBottomSpacing,
+          position: "absolute",
+          right: 12,
+          bottom: fabBottomSpacing,
           width: 64,
           height: 64,
           borderRadius: 32,
@@ -780,6 +990,7 @@ export function HomeScreen() {
         onSubmit={handleSubmitPeriodModal}
         isSubmitting={isLoggingPeriod}
       />
+      </View>
     </Screen>
   );
 }

@@ -36,6 +36,47 @@ function logError(message, error) {
   process.stderr.write(`${message}${details}\n`);
 }
 
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toLocalDateIso(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function parseCalendarText(input) {
+  const text = String(input || "").trim();
+  const lower = text.toLowerCase();
+  const now = new Date();
+  const date = lower.includes("tomorrow")
+    ? toLocalDateIso(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
+    : toLocalDateIso(now);
+
+  const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  let startTime = "09:00";
+  if (timeMatch) {
+    let hour = Number(timeMatch[1]) % 12;
+    if (timeMatch[3].toLowerCase() === "pm") hour += 12;
+    startTime = `${pad2(hour)}:${pad2(Number(timeMatch[2] || "0"))}`;
+  }
+
+  const endHour = (Number(startTime.slice(0, 2)) + 1) % 24;
+  const endTime = `${pad2(endHour)}:${startTime.slice(3, 5)}`;
+
+  return {
+    title: text.replace(/\b(today|tomorrow|at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/gi, "").trim() || "Untitled event",
+    date,
+    startTime,
+    endTime,
+    location: null,
+    participants: [],
+    tags: [],
+    recurrence: null,
+    confidence: 0.75,
+    needsReview: true,
+  };
+}
+
 // ===========================
 // GET /api/latest-build
 // Returns latest build metadata
@@ -127,6 +168,88 @@ app.get("/api/health", (req, res) => {
   res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
+  });
+});
+
+// ===========================
+// SMART CALENDAR API EXAMPLES
+// ===========================
+
+app.post("/api/calendar/parse", (req, res) => {
+  const text = req.body?.text;
+  if (!text || typeof text !== "string") {
+    return res.status(400).json({
+      success: false,
+      error: "text is required",
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: parseCalendarText(text),
+    parser: "inbuilt-rule-engine",
+  });
+});
+
+app.get("/api/calendar/events", (req, res) => {
+  return res.json({
+    success: true,
+    data: {
+      start: req.query.start ?? null,
+      end: req.query.end ?? null,
+      types: req.query.types ?? "all",
+      events: [],
+    },
+  });
+});
+
+app.post("/api/calendar/events", (req, res) => {
+  const { title, startTime, endTime, type = "manual" } = req.body ?? {};
+  if (!title || !startTime || !endTime) {
+    return res.status(400).json({
+      success: false,
+      error: "title, startTime, and endTime are required",
+    });
+  }
+
+  return res.status(201).json({
+    success: true,
+    data: {
+      id: `evt_${Date.now()}`,
+      title,
+      startTime,
+      endTime,
+      type,
+      tags: req.body?.tags ?? [],
+      recurrence: req.body?.recurrence ?? null,
+      metadata: req.body?.metadata ?? {},
+    },
+  });
+});
+
+app.get("/api/calendar/today", (req, res) => {
+  return res.json({
+    success: true,
+    data: {
+      today: toLocalDateIso(new Date()),
+      events: [],
+      tomorrowPreview: [],
+      highlights: [],
+    },
+  });
+});
+
+app.get("/api/calendar/suggestions", (req, res) => {
+  return res.json({
+    success: true,
+    data: [
+      {
+        id: "habit-workout-7am",
+        title: "You usually workout at 7 AM, schedule it?",
+        source: "habit",
+        confidence: 0.82,
+      },
+    ],
   });
 });
 

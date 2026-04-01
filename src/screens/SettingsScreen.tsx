@@ -7,12 +7,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Appearance,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   Share,
-  Switch,
-  TextInput,
-  View,
   useColorScheme,
 } from "react-native";
 
@@ -23,13 +21,25 @@ import {
   useResetPredictions,
   useStartNewCycle,
 } from "@/hooks/useCycleActions";
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import {
+  useNotificationPreferences,
+  useProfile,
+  useUpdateNotificationPreferences,
+  useUpdateProfile,
+} from "@/hooks/useProfile";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { useAuthContext } from "@/src/context/AuthProvider";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
-import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
-import { Typography } from "@/src/components/ui/Typography";
+import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
+import { AccountActionsSection } from "@/src/components/settings/AccountActionsSection";
+import { CycleActionsSection } from "@/src/components/settings/CycleActionsSection";
+import { NotificationsSection } from "@/src/components/settings/NotificationsSection";
+import { PreferencesSection } from "@/src/components/settings/PreferencesSection";
+import { PrivacySection } from "@/src/components/settings/PrivacySection";
+import { SettingsProfileHeader } from "@/src/components/settings/SettingsProfileHeader";
+import { ThemeSection } from "@/src/components/settings/ThemeSection";
 import {
   getAnalyticsConsentStatus,
   requestAnalyticsConsent,
@@ -49,139 +59,22 @@ import {
 import { logDataAccess } from "@/src/services/auditService";
 import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
 
-function SectionLabel({ label, isDark }: { label: string; isDark: boolean }) {
-  return (
-    <Typography
-      style={{
-        marginBottom: 12,
-        fontSize: 11,
-        fontWeight: "600",
-        letterSpacing: 2,
-        textTransform: "uppercase",
-        color: isDark ? "rgba(242,242,242,0.5)" : "#9B7E8C",
-      }}
-    >
-      {label}
-    </Typography>
-  );
-}
-
-function SettingsRow({
-  title,
-  tone = "normal",
-  isDark,
-  onPress,
-}: {
-  title: string;
-  tone?: "normal" | "danger";
-  isDark: boolean;
-  onPress?: () => void;
-}) {
-  return (
-    <PressableScale
-      onPress={onPress}
-      style={{
-        marginBottom: 8,
-        borderRadius: 16,
-        backgroundColor: isDark
-          ? "rgba(255,255,255,0.06)"
-          : "rgba(255,218,185,0.2)",
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Typography
-          style={{
-            fontSize: 15,
-            color:
-              tone === "danger" ? "#EF4444" : isDark ? "#F2F2F2" : "#2D2327",
-          }}
-        >
-          {title}
-        </Typography>
-        <Typography
-          style={{
-            fontSize: 18,
-            color: tone === "danger" ? "#EF4444" : "#9B7E8C",
-          }}
-        >
-          ›
-        </Typography>
-      </View>
-    </PressableScale>
-  );
-}
-
-function InputField({
-  label,
-  value,
-  onChangeText,
-  isDark,
-  placeholder,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  isDark: boolean;
-  placeholder?: string;
-  keyboardType?: "default" | "numeric";
-}) {
-  return (
-    <View style={{ marginBottom: 10 }}>
-      <Typography variant="helper" style={{ marginBottom: 6 }}>
-        {label}
-      </Typography>
-      <View
-        style={{
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.1)"
-            : "rgba(221,167,165,0.3)",
-          backgroundColor: isDark
-            ? "rgba(255,255,255,0.04)"
-            : "rgba(255,255,255,0.75)",
-          paddingHorizontal: 14,
-          paddingVertical: 11,
-        }}
-      >
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          keyboardType={keyboardType}
-          placeholderTextColor="#9B7E8C"
-          style={{
-            fontSize: 15,
-            color: isDark ? "#F2F2F2" : "#2D2327",
-          }}
-        />
-      </View>
-    </View>
-  );
-}
-
 export function SettingsScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === "dark";
+  const { isAnonymous } = useAuthContext();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const notificationPreferences = useNotificationPreferences();
+  const updateNotificationPreferences = useUpdateNotificationPreferences();
   const startNewCycle = useStartNewCycle();
   const endCurrentCycle = useEndCurrentCycle();
   const resetPredictions = useResetPredictions();
   const deleteAllData = useDeleteAllData();
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [username, setUsername] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -226,6 +119,10 @@ export function SettingsScreen() {
   }
 
   const displayName = profile?.first_name || profile?.username || "You";
+  const isUsernameLocked = Boolean(profile?.username?.trim());
+  const notificationsEnabled =
+    notificationPreferences.data?.daily_reminders ?? false;
+  const isNotificationSaving = updateNotificationPreferences.isPending;
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString(undefined, {
         month: "long",
@@ -237,12 +134,89 @@ export function SettingsScreen() {
     if (!profile) return false;
     return (
       firstName.trim() !== (profile.first_name ?? "") ||
-      username.trim() !== (profile.username ?? "") ||
+      (!isUsernameLocked &&
+        username.trim().toLowerCase() !==
+          (profile.username ?? "").trim().toLowerCase()) ||
       dateOfBirth.trim() !== (profile.date_of_birth ?? "") ||
       Number(cycleLength) !== profile.cycle_length_average ||
       Number(periodDuration) !== profile.period_duration_average
     );
-  }, [profile, firstName, username, dateOfBirth, cycleLength, periodDuration]);
+  }, [
+    profile,
+    firstName,
+    username,
+    dateOfBirth,
+    cycleLength,
+    periodDuration,
+    isUsernameLocked,
+  ]);
+
+  const validationErrors = useMemo(() => {
+    if (!profile) {
+      return {
+        firstName: null,
+        username: null,
+        dateOfBirth: null,
+        cycleLength: null,
+        periodDuration: null,
+      };
+    }
+
+    const normalizedFirstName = firstName.trim();
+    const normalizedUsername = username
+      .trim()
+      .replace(/\s+/g, "")
+      .toLowerCase();
+    const normalizedDob = dateOfBirth.trim();
+    const cycleLengthValue = Number(cycleLength);
+    const periodDurationValue = Number(periodDuration);
+
+    return {
+      firstName: normalizedFirstName
+        ? null
+        : "Please enter your first name.",
+      username:
+        isUsernameLocked || normalizedUsername
+          ? null
+          : "Please choose a username.",
+      dateOfBirth:
+        normalizedDob && !validateIsoDate(normalizedDob)
+          ? "Use YYYY-MM-DD format for date of birth."
+          : normalizedDob && !validateMinimumAge(normalizedDob, 13)
+            ? "You must be at least 13 years old to use Soma without parental consent."
+            : null,
+      cycleLength:
+        Number.isFinite(cycleLengthValue) &&
+        cycleLengthValue >= 15 &&
+        cycleLengthValue <= 60
+          ? null
+          : "Cycle length must be between 15 and 60 days.",
+      periodDuration:
+        Number.isFinite(periodDurationValue) &&
+        periodDurationValue >= 1 &&
+        periodDurationValue <= 15
+          ? null
+          : "Period duration must be between 1 and 15 days.",
+    };
+  }, [
+    profile,
+    firstName,
+    username,
+    dateOfBirth,
+    cycleLength,
+    periodDuration,
+    isUsernameLocked,
+  ]);
+
+  const firstValidationError = useMemo(
+    () =>
+      Object.values(validationErrors).find(
+        (value): value is string => Boolean(value),
+      ) ?? null,
+    [validationErrors],
+  );
+
+  const isFormValid = firstValidationError === null;
 
   const sectionCardStyle = {
     marginTop: 16,
@@ -260,23 +234,50 @@ export function SettingsScreen() {
 
   async function handleNotificationToggle(value: boolean) {
     void HapticsService.selection();
-    setNotificationsEnabled(value);
-    if (value) {
-      const result = await requestPermissions();
-      if (result.granted) {
+    try {
+      if (value) {
+        const result = await requestPermissions();
+        if (!result.granted) {
+          try {
+            await updateNotificationPreferences.mutateAsync({
+              daily_reminders: false,
+            });
+          } catch {
+            // Keep UX safe even if persistence fails.
+          }
+          void HapticsService.error();
+          Alert.alert(
+            "Permission Required",
+            "Please enable notifications in your device settings.",
+          );
+          return;
+        }
+
         await scheduleDailyLogReminder(20, 0);
         void HapticsService.success();
       } else {
-        setNotificationsEnabled(false);
-        void HapticsService.error();
-        Alert.alert(
-          "Permission Required",
-          "Please enable notifications in your device settings.",
-        );
+        await cancelAllNotifications();
+        void HapticsService.selection();
       }
-    } else {
-      await cancelAllNotifications();
-      void HapticsService.selection();
+
+      await updateNotificationPreferences.mutateAsync({
+        daily_reminders: value,
+      });
+    } catch (error: unknown) {
+      // If enabling reminders fails after scheduling, cancel to keep state consistent.
+      if (value) {
+        try {
+          await cancelAllNotifications();
+        } catch {
+          // Best-effort rollback only.
+        }
+      }
+      void HapticsService.error();
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not update notification preference.";
+      Alert.alert("Preference Update Failed", message);
     }
   }
 
@@ -311,6 +312,9 @@ export function SettingsScreen() {
       .trim()
       .replace(/\s+/g, "")
       .toLowerCase();
+    const resolvedUsername = isUsernameLocked
+      ? (profile?.username ?? "")
+      : normalizedUsername;
     const normalizedDob = dateOfBirth.trim();
     const cycleLengthValue = Number(cycleLength);
     const periodDurationValue = Number(periodDuration);
@@ -320,7 +324,7 @@ export function SettingsScreen() {
       Alert.alert("Missing name", "Please enter your first name.");
       return;
     }
-    if (!normalizedUsername) {
+    if (!resolvedUsername) {
       void HapticsService.error();
       Alert.alert("Missing username", "Please choose a username.");
       return;
@@ -365,14 +369,20 @@ export function SettingsScreen() {
 
     try {
       await HapticsService.impactMedium();
-      await updateProfile.mutateAsync({
+      const basePayload = {
         first_name: normalizedFirstName,
-        username: normalizedUsername,
         date_of_birth: normalizedDob || null,
         cycle_length_average: cycleLengthValue,
         period_duration_average: periodDurationValue,
-      });
+      };
+
+      await updateProfile.mutateAsync(
+        isUsernameLocked
+          ? basePayload
+          : { ...basePayload, username: resolvedUsername },
+      );
       await HapticsService.success();
+      setIsEditMode(false);
       Alert.alert("Saved", "Your settings were updated.");
     } catch (error: unknown) {
       await HapticsService.error();
@@ -382,6 +392,21 @@ export function SettingsScreen() {
           : "Could not update your settings.";
       Alert.alert("Save Failed", message);
     }
+  }
+
+  function handleEditProfile() {
+    setIsEditMode(true);
+  }
+
+  function handleCancelEdit() {
+    if (profile) {
+      setFirstName(profile.first_name ?? "");
+      setUsername(profile.username ?? "");
+      setDateOfBirth(profile.date_of_birth ?? "");
+      setCycleLength(String(profile.cycle_length_average ?? 28));
+      setPeriodDuration(String(profile.period_duration_average ?? 5));
+    }
+    setIsEditMode(false);
   }
 
   async function handleLogout() {
@@ -408,6 +433,10 @@ export function SettingsScreen() {
         },
       },
     ]);
+  }
+
+  function handleSignIn() {
+    router.push("/auth/login" as never);
   }
 
   function handleStartPeriodToday() {
@@ -687,369 +716,116 @@ export function SettingsScreen() {
   }
 
   return (
-    <Screen>
-      {/* ── Profile header ────────────────────────────────────────── */}
-      <View style={{ marginTop: 16, alignItems: "center", paddingBottom: 8 }}>
-        {/* Gradient avatar circle */}
-        <View
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: 48,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 12,
-            backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 24,
-            elevation: 12,
-          }}
-        >
-          {/* Inner peach circle for gradient approximation */}
-          <View
-            style={{
-              position: "absolute",
-              width: 96,
-              height: 96,
-              borderRadius: 48,
-              backgroundColor: isDark
-                ? "rgba(167,139,250,0.6)"
-                : "rgba(255,218,185,0.5)",
-            }}
-          />
-          {!isLoading && displayName[0] ? (
-            <Typography
-              style={{
-                fontFamily: "PlayfairDisplay-SemiBold",
-                fontSize: 36,
-                color: "#FFFFFF",
-                lineHeight: 40,
-              }}
-            >
-              {displayName[0].toUpperCase()}
-            </Typography>
-          ) : null}
-        </View>
-
-        {/* Name in Playfair Display */}
-        <Typography variant="serifMd">
-          {isLoading ? "···" : displayName}
-        </Typography>
-
-        {memberSince ? (
-          <Typography variant="muted" style={{ marginTop: 4 }}>
-            Member since {memberSince}
-          </Typography>
-        ) : null}
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={96}
+    >
+      <Screen>
+      <SettingsProfileHeader
+        isDark={isDark}
+        isLoading={isLoading}
+        displayName={displayName}
+        memberSince={memberSince}
+      />
 
       <HeaderBar title="Settings" />
 
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Profile" isDark={isDark} />
-        <InputField
-          label="First name"
-          value={firstName}
-          onChangeText={setFirstName}
-          isDark={isDark}
-          placeholder="Your name"
-        />
-        <InputField
-          label="Username"
-          value={username}
-          onChangeText={setUsername}
-          isDark={isDark}
-          placeholder="yourname"
-        />
-        <InputField
-          label="Date of birth (YYYY-MM-DD)"
-          value={dateOfBirth}
-          onChangeText={setDateOfBirth}
-          isDark={isDark}
-          placeholder="1995-08-21"
-        />
-      </View>
-
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Cycle Defaults" isDark={isDark} />
-        <InputField
-          label="Cycle length (days)"
-          value={cycleLength}
-          onChangeText={setCycleLength}
-          isDark={isDark}
-          keyboardType="numeric"
-        />
-        <InputField
-          label="Period duration (days)"
-          value={periodDuration}
-          onChangeText={setPeriodDuration}
-          isDark={isDark}
-          keyboardType="numeric"
-        />
-
-        <PressableScale
-          onPress={handleSaveProfile}
-          style={{
-            marginTop: 6,
-            alignItems: "center",
-            borderRadius: 999,
-            backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-            paddingVertical: 14,
-            opacity: updateProfile.isPending || !hasChanges ? 0.6 : 1,
-          }}
-          disabled={updateProfile.isPending || !hasChanges}
-        >
-          <Typography
-            style={{ fontSize: 15, fontWeight: "600", color: "#FFFFFF" }}
-          >
-            {updateProfile.isPending ? "Saving…" : "Save Changes"}
-          </Typography>
-        </PressableScale>
-      </View>
-
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Cycle Actions" isDark={isDark} />
-
-        <SettingsRow
-          title={
-            resetPredictions.isPending
-              ? "Resetting Predictions…"
-              : "Reset Predictions"
-          }
-          isDark={isDark}
-          onPress={handleResetPredictions}
-        />
-
-        <SettingsRow
-          title={startNewCycle.isPending ? "Starting…" : "Start Period Today"}
-          isDark={isDark}
-          onPress={handleStartPeriodToday}
-        />
-
-        {/* FIX: Only show "End Period" button when there's an active cycle */}
-        {currentCycleData?.cycle ? (
-          <SettingsRow
-            title={endCurrentCycle.isPending ? "Ending…" : "End Current Period"}
-            isDark={isDark}
-            onPress={handleEndPeriodToday}
-          />
-        ) : null}
-
-        <Typography variant="helper" style={{ marginTop: 6 }}>
-          {currentCycleData?.cycle
-            ? `Active cycle started ${currentCycleData.cycle.start_date}`
-            : "No active cycle right now."}
-        </Typography>
-
-        <Typography variant="helper" style={{ marginTop: 6 }}>
-          Reset Predictions updates forecast dates only. It never deletes logs.
-        </Typography>
-      </View>
-
-      {/* ── App Preferences ───────────────────────────────────────── */}
-      <View style={sectionCardStyle}>
-        <SectionLabel label="App Preferences" isDark={isDark} />
-
-        {/* Daily Reminders toggle row */}
-        <View
-          style={{
-            marginBottom: 8,
-            borderRadius: 16,
-            backgroundColor: isDark
-              ? "rgba(255,255,255,0.06)"
-              : "rgba(255,218,185,0.2)",
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Typography
-            style={{
-              fontSize: 15,
-              color: isDark ? "#F2F2F2" : "#2D2327",
-            }}
-          >
-            Daily Reminders
-          </Typography>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={handleNotificationToggle}
-            trackColor={{ false: "#D7CFCA", true: "#DDA7A5" }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
-        <SettingsRow
-          title="Partner Sync"
-          isDark={isDark}
-          onPress={() => router.push("/partner" as never)}
-        />
-
-        <View
-          style={{
-            marginTop: 8,
-            borderRadius: 16,
-            backgroundColor: isDark
-              ? "rgba(255,255,255,0.06)"
-              : "rgba(255,218,185,0.2)",
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Typography
-            style={{
-              fontSize: 15,
-              color: isDark ? "#F2F2F2" : "#2D2327",
-            }}
-          >
-            Analytics Consent
-          </Typography>
-          <Switch
-            value={analyticsEnabled}
-            onValueChange={handleAnalyticsToggle}
-            trackColor={{ false: "#D7CFCA", true: "#DDA7A5" }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-      </View>
-
-      {/* ── Legal ─────────────────────────────────────────────────── */}
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Legal" isDark={isDark} />
-        <SettingsRow
-          title="Data Consent Center"
-          isDark={isDark}
-          onPress={() => router.push("/legal/data-consent" as never)}
-        />
-        <SettingsRow
-          title="Data Practices"
-          isDark={isDark}
-          onPress={() => router.push("/legal/data-practices" as never)}
-        />
-        <SettingsRow
-          title="Data Rights Requests"
-          isDark={isDark}
-          onPress={() => router.push("/legal/data-rights" as never)}
-        />
-        <SettingsRow
-          title="Privacy Policy"
-          isDark={isDark}
-          onPress={() => router.push("/legal/privacy" as never)}
-        />
-        <SettingsRow
-          title="Terms of Use"
-          isDark={isDark}
-          onPress={() => router.push("/legal/terms" as never)}
-        />
-        <SettingsRow
-          title="Medical Disclaimer"
-          isDark={isDark}
-          onPress={() => router.push("/legal/medical-disclaimer" as never)}
-        />
-      </View>
-
-      {/* ── Theme ─────────────────────────────────────────────────── */}
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Theme" isDark={isDark} />
-        <View
-          style={{ flexDirection: "row", justifyContent: "center", gap: 24 }}
-        >
-          {[
-            { id: "Cream" as const, color: "#FFFDFB", border: "#DDA7A5" },
-            { id: "Midnight" as const, color: "#0F1115", border: "#A78BFA" },
-          ].map((theme) => (
-            <PressableScale
-              key={theme.id}
-              onPress={() => handleThemeSelect(theme.id)}
-              style={{ alignItems: "center" }}
-            >
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: theme.color,
-                  borderWidth: activeTheme === theme.id ? 3 : 2,
-                  borderColor:
-                    activeTheme === theme.id
-                      ? theme.border
-                      : theme.border + "66",
-                  shadowColor:
-                    activeTheme === theme.id ? theme.border : "transparent",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: activeTheme === theme.id ? 0.4 : 0,
-                  shadowRadius: 8,
-                  elevation: activeTheme === theme.id ? 4 : 0,
-                }}
-              />
-              <Typography variant="helper" style={{ marginTop: 8 }}>
-                {theme.id}
-              </Typography>
-            </PressableScale>
-          ))}
-        </View>
-      </View>
-
-      {/* ── Account ───────────────────────────────────────────────── */}
-      <View style={sectionCardStyle}>
-        <SectionLabel label="Account" isDark={isDark} />
-        <SettingsRow
-          title="Export Data"
-          isDark={isDark}
-          onPress={handleExportData}
-        />
-        <SettingsRow
-          title="Report an Issue"
-          isDark={isDark}
-          onPress={handleSendFeedback}
-        />
-        <SettingsRow
-          title="Delete Account"
-          tone="danger"
-          isDark={isDark}
-          onPress={handleDeleteAllData}
-        />
-
-        <Typography variant="helper" style={{ marginTop: 6 }}>
-          {deleteAllData.isPending
-            ? "Deleting your data…"
-            : "Danger zone: Delete all data is permanent and cannot be undone."}
-        </Typography>
-      </View>
-
-      {/* ── Sign Out ──────────────────────────────────────────────── */}
-      <PressableScale
-        onPress={handleLogout}
-        style={{
-          marginTop: 16,
-          marginBottom: 32,
-          alignItems: "center",
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.1)"
-            : "rgba(221,167,165,0.3)",
-          paddingVertical: 16,
-          opacity: isLoggingOut ? 0.5 : 1,
+      <AccountProfileSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        isEditMode={isEditMode}
+        handleEditProfile={handleEditProfile}
+        firstName={firstName}
+        setFirstName={setFirstName}
+        username={username}
+        setUsername={setUsername}
+        dateOfBirth={dateOfBirth}
+        setDateOfBirth={setDateOfBirth}
+        isUsernameLocked={isUsernameLocked}
+        validationErrors={{
+          firstName: validationErrors.firstName,
+          username: validationErrors.username,
+          dateOfBirth: validationErrors.dateOfBirth,
         }}
-      >
-        <Typography
-          style={{
-            fontSize: 15,
-            fontWeight: "500",
-            color: "#9B7E8C",
-          }}
-        >
-          {isLoggingOut ? "Signing out…" : "Sign Out"}
-        </Typography>
-      </PressableScale>
-    </Screen>
+      />
+
+      <PreferencesSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        cycleLength={cycleLength}
+        setCycleLength={setCycleLength}
+        periodDuration={periodDuration}
+        setPeriodDuration={setPeriodDuration}
+        isEditMode={isEditMode}
+        validationErrors={{
+          cycleLength: validationErrors.cycleLength,
+          periodDuration: validationErrors.periodDuration,
+        }}
+        handleCancelEdit={handleCancelEdit}
+        handleSaveProfile={handleSaveProfile}
+        isSaveDisabled={updateProfile.isPending || !hasChanges || !isFormValid}
+        isSavePending={updateProfile.isPending}
+        isFormValid={isFormValid}
+        firstValidationError={firstValidationError}
+      />
+
+      <CycleActionsSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        isResetPending={resetPredictions.isPending}
+        isStartPending={startNewCycle.isPending}
+        isEndPending={endCurrentCycle.isPending}
+        activeCycleStartDate={currentCycleData?.cycle?.start_date}
+        handleResetPredictions={handleResetPredictions}
+        handleStartPeriodToday={handleStartPeriodToday}
+        handleEndPeriodToday={handleEndPeriodToday}
+      />
+
+      <NotificationsSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        notificationsEnabled={notificationsEnabled}
+        handleNotificationToggle={handleNotificationToggle}
+        isNotificationSaving={isNotificationSaving}
+        analyticsEnabled={analyticsEnabled}
+        handleAnalyticsToggle={handleAnalyticsToggle}
+        openPartnerSync={() => router.push("/partner" as never)}
+      />
+
+      <PrivacySection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        openDataConsent={() => router.push("/legal/data-consent" as never)}
+        openDataPractices={() => router.push("/legal/data-practices" as never)}
+        openDataRights={() => router.push("/legal/data-rights" as never)}
+        openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
+        openTerms={() => router.push("/legal/terms" as never)}
+        openMedicalDisclaimer={() =>
+          router.push("/legal/medical-disclaimer" as never)
+        }
+      />
+
+      <ThemeSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        activeTheme={activeTheme}
+        handleThemeSelect={handleThemeSelect}
+      />
+
+      <AccountActionsSection
+        isDark={isDark}
+        cardStyle={sectionCardStyle}
+        isDeletePending={deleteAllData.isPending}
+        isLoggingOut={isLoggingOut}
+        isAnonymous={isAnonymous}
+        handleExportData={handleExportData}
+        handleSendFeedback={handleSendFeedback}
+        handleDeleteAllData={handleDeleteAllData}
+        handleLogout={handleLogout}
+        handleSignIn={handleSignIn}
+      />
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }

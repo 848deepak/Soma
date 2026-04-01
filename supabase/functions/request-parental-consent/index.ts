@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceRateLimit } from '../_shared/rate-limit.ts';
 
 type RequestPayload = {
   parentEmail?: string;
@@ -73,6 +74,13 @@ async function sendVerificationEmail(
 
 Deno.serve(async (req) => {
   try {
+    const rateLimited = enforceRateLimit(req, {
+      scope: 'request-parental-consent',
+      limit: 5,
+      windowMs: 60_000,
+    });
+    if (rateLimited) return rateLimited;
+
     if (req.method !== 'POST') {
       return jsonResponse({ error: 'Method not allowed' }, 405);
     }

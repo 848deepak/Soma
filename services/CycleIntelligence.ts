@@ -339,6 +339,23 @@ export interface OvulationEstimate {
   dayNumber: number;
   /** How reliable the estimate is. */
   confidence: OvulationConfidence;
+  /** Numeric reliability score (0-100). */
+  confidenceScore: number;
+  /** Number of completed cycles used in the confidence calculation. */
+  cyclesUsed: number;
+  /** Variability (std dev) of recent cycle lengths in days. */
+  variabilityDays: number;
+}
+
+function scoreOvulationConfidence(cycleCount: number, variabilityDays: number): number {
+  // Coverage contributes up to 48 points (6 cycles max).
+  const coverageScore = Math.min(cycleCount, 6) * 8;
+
+  // Variability contributes up to 52 points and drops quickly after ±2-3 day SD.
+  // This prevents high confidence on erratic cycle histories.
+  const variabilityScore = Math.max(0, 52 - Math.round(Math.min(variabilityDays, 10) * 10));
+
+  return Math.max(0, Math.min(100, coverageScore + variabilityScore));
 }
 
 export function estimateOvulation(
@@ -355,17 +372,27 @@ export function estimateOvulation(
 
   const dayNumber = Math.max(avgLength - 14, 1);
   const estimatedDate = addDays(currentCycleStartDate, dayNumber - 1);
+  const confidenceScore = scoreOvulationConfidence(recent.length, sd);
 
   let confidence: OvulationConfidence;
-  if (recent.length >= 6 && sd <= 2) {
+  if (recent.length < 3) {
+    confidence = 'low';
+  } else if (confidenceScore >= 80) {
     confidence = 'high';
-  } else if (recent.length >= 3 && sd <= 5) {
+  } else if (confidenceScore >= 55) {
     confidence = 'medium';
   } else {
     confidence = 'low';
   }
 
-  return { estimatedDate, dayNumber, confidence };
+  return {
+    estimatedDate,
+    dayNumber,
+    confidence,
+    confidenceScore,
+    cyclesUsed: recent.length,
+    variabilityDays: Number(sd.toFixed(2)),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

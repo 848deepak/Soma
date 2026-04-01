@@ -9,6 +9,7 @@ import {
     render,
     screen
 } from "@testing-library/react-native";
+import { Alert } from "react-native";
 
 jest.mock("@/lib/supabase");
 jest.mock("@/lib/auth");
@@ -45,6 +46,7 @@ jest.mock("@/hooks/useCycleActions", () => ({
 }));
 
 import { useTodayLog } from "@/hooks/useDailyLogs";
+import { useCurrentCycle } from "@/hooks/useCurrentCycle";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { DailyLogScreen } from "@/src/screens/DailyLogScreen";
 import { useRouter } from "expo-router";
@@ -60,15 +62,23 @@ const mockRouter = {
 describe("DailyLogScreen (SymptomLog)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Alert, "alert").mockImplementation(() => {});
     (useTodayLog as jest.Mock).mockReturnValue({
       data: null,
       isLoading: false,
+    });
+    (useCurrentCycle as jest.Mock).mockReturnValue({
+      data: { cycle: null },
     });
     (useSaveLog as jest.Mock).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
     });
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  });
+
+  afterEach(() => {
+    (Alert.alert as jest.Mock).mockRestore?.();
   });
 
   it("renders without crashing", () => {
@@ -146,10 +156,23 @@ describe("DailyLogScreen (SymptomLog)", () => {
     expect(screen.getByDisplayValue("Feeling tired")).toBeTruthy();
   });
 
-  it("calls mutate with correct payload when save is pressed", () => {
+  it("blocks save when there is no active cycle", () => {
+    render(<DailyLogScreen />);
+    expect(screen.getByText("Start your period to enable logging.")).toBeTruthy();
+
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it("calls mutate with correct payload when save is pressed and active cycle exists", () => {
+    (useCurrentCycle as jest.Mock).mockReturnValue({
+      data: { cycle: { id: "cycle-1", start_date: "2026-03-20" } },
+    });
+
     render(<DailyLogScreen />);
     const saveButton = screen.getByText("Save Log");
     fireEvent.press(saveButton);
+
     expect(mockMutate).toHaveBeenCalledWith(
       expect.objectContaining({
         flow_level: expect.any(Number),
@@ -162,6 +185,10 @@ describe("DailyLogScreen (SymptomLog)", () => {
   });
 
   it("calls router.back() on successful save", () => {
+    (useCurrentCycle as jest.Mock).mockReturnValue({
+      data: { cycle: { id: "cycle-1", start_date: "2026-03-20" } },
+    });
+
     (useSaveLog as jest.Mock).mockReturnValue({
       mutate: (payload: unknown, options: { onSuccess: () => void }) => {
         options.onSuccess();

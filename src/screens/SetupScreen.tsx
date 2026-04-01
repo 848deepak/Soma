@@ -1,14 +1,17 @@
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+  View,
 } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useProfile } from "@/hooks/useProfile";
+import { PROFILE_QUERY_KEY, useProfile } from "@/hooks/useProfile";
 import { ensureAnonymousSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { PressableScale } from "@/src/components/ui/PressableScale";
@@ -16,6 +19,7 @@ import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { trackEvent } from "@/src/services/analytics";
 import { captureException } from "@/src/services/errorTracking";
+import { ensureNotificationPreferencesRow } from "@/src/services/notificationPreferencesService";
 import { requestParentalConsent } from "@/src/services/parentalConsentService";
 import {
   sanitizeInput,
@@ -26,13 +30,16 @@ import {
 
 export function SetupScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: profile } = useProfile();
-  const [selectedDate, setSelectedDate] = useState(14);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().getDate());
+  const [step, setStep] = useState<1 | 2>(1);
   const [firstName, setFirstName] = useState("");
   const [username, setUsername] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const isUsernameLocked = Boolean(profile?.username?.trim());
 
   useEffect(() => {
     if (!profile) return;
@@ -59,27 +66,36 @@ export function SetupScreen() {
     [daysInMonth],
   );
 
-  async function handleContinue() {
-    if (isLoading) return;
-    if (!sanitizeInput(firstName)) {
+  function validateDetailsStep(): {
+    normalizedFirstName: string;
+    normalizedUsername: string;
+    normalizedDob: string;
+    normalizedParentEmail: string;
+    requiresParentalConsent: boolean;
+  } | null {
+    const normalizedFirstName = sanitizeInput(firstName);
+    if (!normalizedFirstName) {
       Alert.alert("Missing name", "Please enter your first name.");
-      return;
+      return null;
     }
 
-    const normalizedUsername = sanitizeInput(username)
-      .replace(/\s+/g, "")
-      .toLowerCase();
-    const normalizedDob = sanitizeInput(dateOfBirth);
+    const normalizedUsername = isUsernameLocked
+      ? sanitizeInput(profile?.username ?? "")
+      : sanitizeInput(username).replace(/\s+/g, "").toLowerCase();
     if (!normalizedUsername) {
       Alert.alert("Missing username", "Please choose a username.");
-      return;
+      return null;
     }
+
+    const normalizedDob = sanitizeInput(dateOfBirth);
     if (normalizedDob && !validateIsoDate(normalizedDob)) {
       Alert.alert("Invalid date", "Use YYYY-MM-DD for date of birth.");
-      return;
+      return null;
     }
-    const requiresParentalConsent =
-      normalizedDob && !validateMinimumAge(normalizedDob, 13);
+
+    const requiresParentalConsent = Boolean(
+      normalizedDob && !validateMinimumAge(normalizedDob, 13),
+    );
     const normalizedParentEmail = sanitizeInput(parentEmail).toLowerCase();
 
     if (requiresParentalConsent && !validateEmail(normalizedParentEmail)) {
@@ -87,8 +103,39 @@ export function SetupScreen() {
         "Parent email required",
         "Enter a valid parent or guardian email to request consent.",
       );
+      return null;
+    }
+
+    return {
+      normalizedFirstName,
+      normalizedUsername,
+      normalizedDob,
+      normalizedParentEmail,
+      requiresParentalConsent,
+    };
+  }
+
+  async function handleContinue() {
+    if (isLoading) return;
+
+    const validated = validateDetailsStep();
+    if (!validated) {
       return;
     }
+
+    const {
+      normalizedFirstName,
+      normalizedUsername,
+      normalizedDob,
+      normalizedParentEmail,
+      requiresParentalConsent,
+    } = validated;
+
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+
 
     setIsLoading(true);
     try {
@@ -101,13 +148,20 @@ export function SetupScreen() {
           normalizedParentEmail,
           normalizedDob,
         );
-        await supabase
+        const { data: consentProfile, error: consentProfileError } = await supabase
           .from("profiles")
-          .update({
+          .upsert({
+            id: user.id,
             date_of_birth: normalizedDob,
             is_onboarded: false,
-          })
-          .eq("id", user.id);
+          }, { onConflict: "id" })
+          .select("*")
+          .single();
+
+        if (consentProfileError) throw consentProfileError;
+        if (consentProfile) {
+          queryClient.setQueryData(PROFILE_QUERY_KEY, consentProfile);
+        }
 
         if (consentRequest.emailSent) {
           Alert.alert(
@@ -148,16 +202,23 @@ export function SetupScreen() {
         if (cycleError) throw cycleError;
       }
 
-      const { error: profileError } = await supabase
+      const { data: updatedProfile, error: profileError } = await supabase
         .from("profiles")
-        .update({
-          first_name: sanitizeInput(firstName),
+        .upsert({
+          id: user.id,
+          first_name: normalizedFirstName,
           username: normalizedUsername,
           date_of_birth: normalizedDob || null,
           is_onboarded: true,
-        })
-        .eq("id", user.id);
+        }, { onConflict: "id" })
+        .select("*")
+        .single();
       if (profileError) throw profileError;
+      if (updatedProfile) {
+        queryClient.setQueryData(PROFILE_QUERY_KEY, updatedProfile);
+      }
+
+      await ensureNotificationPreferencesRow(user.id, false);
 
       trackEvent("onboarding_complete");
 
@@ -176,24 +237,57 @@ export function SetupScreen() {
   }
 
   return (
-    <Screen>
-      {/* ── Progress dots ───────────────────────────── */}
-      <View className="mt-2 flex-row items-center justify-center gap-2">
-        <View className="h-2 w-2 rounded-full bg-somaBlush" />
-        <View className="h-2 w-2 rounded-full bg-somaBlush/30" />
-        <View className="h-2 w-2 rounded-full bg-somaBlush/30" />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={24}
+    >
+      <Screen scrollable={false}>
+        <View style={{ flex: 1 }}>
+        {/* ── Progress dots ───────────────────────────── */}
+        <View className="mt-2 flex-row items-center justify-center gap-2">
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            backgroundColor: step === 1 ? "#DDA7A5" : "rgba(221,167,165,0.3)",
+          }}
+        />
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            backgroundColor: step === 2 ? "#DDA7A5" : "rgba(221,167,165,0.3)",
+          }}
+        />
       </View>
 
       {/* ── Heading ─────────────────────────────────── */}
       <View className="mt-8 mb-6">
-        <Typography variant="serifMd">
-          {"When did your\nlast period start?"}
-        </Typography>
+        {step === 1 ? (
+          <Typography variant="serifMd">{"Welcome to Soma"}</Typography>
+        ) : (
+          <Typography variant="serifMd">
+            {"When did your\nlast period start?"}
+          </Typography>
+        )}
         <Typography className="mt-4 text-[15px] text-somaMauve dark:text-darkTextSecondary">
-          This helps us provide accurate predictions.
+          {step === 1
+            ? "Provide your details so we can personalize your experience."
+            : "This helps us provide accurate predictions."}
         </Typography>
       </View>
 
+      {step === 1 ? (
+      <>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 12 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       <View className="mb-5">
         <View
           style={{
@@ -235,11 +329,17 @@ export function SetupScreen() {
           <TextInput
             value={username}
             onChangeText={setUsername}
+            editable={!isUsernameLocked}
             autoCapitalize="none"
             placeholder="yourname"
             placeholderTextColor="#9B7E8C"
             style={{ fontSize: 16, color: "#2D2327" }}
           />
+          {isUsernameLocked ? (
+            <Typography variant="helper" style={{ marginTop: 6 }}>
+              Username is locked after account creation.
+            </Typography>
+          ) : null}
         </View>
 
         <View
@@ -292,9 +392,12 @@ export function SetupScreen() {
         ) : null}
       </View>
 
-      {/* ── Date picker card ─────────────────────────── */}
+      </ScrollView>
+      </>
+      ) : (
       <View
         style={{
+          flex: 1,
           borderRadius: 28,
           borderWidth: 1,
           borderColor: "rgba(255,255,255,0.6)",
@@ -307,6 +410,7 @@ export function SetupScreen() {
           elevation: 6,
         }}
       >
+        {/* ── Date picker card ─────────────────────────── */}
         <Typography
           variant="helper"
           className="mb-4 text-center uppercase tracking-widest"
@@ -315,8 +419,8 @@ export function SetupScreen() {
         </Typography>
 
         <ScrollView
-          style={{ height: 288 }}
-          contentContainerStyle={{ alignItems: "center", paddingVertical: 56 }}
+          style={{ height: 220 }}
+          contentContainerStyle={{ alignItems: "center", paddingVertical: 44 }}
           showsVerticalScrollIndicator={false}
         >
           {dates.map((date) => {
@@ -345,28 +449,31 @@ export function SetupScreen() {
           })}
         </ScrollView>
       </View>
+      )}
 
-      {/* ── Continue CTA ────────────────────────────── */}
-      <PressableScale
-        onPress={handleContinue}
-        className="mt-8 items-center rounded-full bg-somaBlush py-[18px] dark:bg-darkPrimary"
-        style={{
-          opacity: isLoading ? 0.6 : 1,
-          shadowColor: "#DDA7A5",
-          shadowOffset: { width: 0, height: 12 },
-          shadowOpacity: 0.4,
-          shadowRadius: 40,
-          elevation: 12,
-        }}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Typography className="text-base font-semibold text-white">
-            Continue
-          </Typography>
-        )}
-      </PressableScale>
-    </Screen>
+        {/* ── Continue CTA ────────────────────────────── */}
+        <PressableScale
+          onPress={handleContinue}
+          className="mt-8 items-center rounded-full bg-somaBlush py-[18px] dark:bg-darkPrimary"
+          style={{
+            opacity: isLoading ? 0.6 : 1,
+            shadowColor: "#DDA7A5",
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.4,
+            shadowRadius: 40,
+            elevation: 12,
+          }}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Typography className="text-base font-semibold text-white">
+              {step === 1 ? "Continue" : "Done"}
+            </Typography>
+          )}
+        </PressableScale>
+        </View>
+      </Screen>
+    </KeyboardAvoidingView>
   );
 }

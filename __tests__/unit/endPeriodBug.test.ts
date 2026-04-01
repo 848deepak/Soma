@@ -50,6 +50,8 @@ describe("End Period Bug Fixes", () => {
         start_date: "2026/03/15", // Wrong format
         end_date: null,
         cycle_length: null,
+        predicted_ovulation: null,
+        predicted_next_cycle: null,
         current_phase: "menstrual" as const,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -193,6 +195,8 @@ describe("End Period Bug Fixes", () => {
         start_date: "2026-03-15",
         end_date: null,
         cycle_length: null,
+        predicted_ovulation: null,
+        predicted_next_cycle: null,
         current_phase: "menstrual" as const,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

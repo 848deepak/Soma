@@ -77,6 +77,28 @@ create trigger trg_profiles_updated_at
   before update on public.profiles
   for each row execute function set_updated_at();
 
+-- Username can be set once during onboarding and is immutable afterwards.
+create or replace function prevent_username_change_after_set()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.username is not null
+     and btrim(old.username) <> ''
+     and new.username is distinct from old.username then
+    raise exception using
+      errcode = '23514',
+      message = 'Username is immutable after initial creation.';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_profiles_username_immutable
+  before update on public.profiles
+  for each row execute function prevent_username_change_after_set();
+
 -- index for quick lookup by partner invite code (PartnerSyncScreen, partner linking)
 create unique index if not exists idx_profiles_partner_link_code
   on public.profiles(partner_link_code);
@@ -169,6 +191,39 @@ comment on table public.daily_logs is
 create trigger trg_daily_logs_updated_at
   before update on public.daily_logs
   for each row execute function set_updated_at();
+
+-- Prevent cross-user cycle linking by ensuring cycle_id belongs to the same user.
+create or replace function public.validate_daily_log_cycle_owner()
+returns trigger
+language plpgsql
+as $$
+declare
+  cycle_owner uuid;
+begin
+  if new.cycle_id is null then
+    return new;
+  end if;
+
+  select c.user_id into cycle_owner
+  from public.cycles c
+  where c.id = new.cycle_id;
+
+  if cycle_owner is null then
+    raise exception 'Invalid cycle_id for daily log' using errcode = '23503';
+  end if;
+
+  if cycle_owner <> new.user_id then
+    raise exception 'daily_logs.cycle_id must reference a cycle owned by the same user' using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_daily_logs_validate_cycle_owner on public.daily_logs;
+create trigger trg_daily_logs_validate_cycle_owner
+  before insert or update on public.daily_logs
+  for each row execute function public.validate_daily_log_cycle_owner();
 
 -- primary access pattern: latest N days for a user
 create index if not exists idx_daily_logs_user_date

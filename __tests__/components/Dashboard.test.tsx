@@ -46,6 +46,14 @@ jest.mock("@/hooks/useDailyLogs", () => ({
   useTodayLog: jest.fn(),
 }));
 
+jest.mock("@/hooks/useCycleHistory", () => ({
+  useCycleHistory: jest.fn(() => ({ data: [] })),
+}));
+
+jest.mock("@/hooks/useCareCircle", () => ({
+  useCareCircle: jest.fn(() => ({ data: { asPrimary: [], asViewer: [] } })),
+}));
+
 jest.mock("@/src/store/useCycleStore", () => ({
   useCycleStore: jest.fn(
     (selector: (state: Record<string, unknown>) => unknown) =>
@@ -134,7 +142,7 @@ describe("HomeScreen (Dashboard)", () => {
 
   it("displays the greeting with user first name", () => {
     render(<HomeScreen />);
-    expect(screen.getByText(/Good Morning/)).toBeTruthy();
+    expect(screen.getByText(/Good (Morning|Afternoon|Evening|Night)/)).toBeTruthy();
     expect(screen.getByText(/Luna/)).toBeTruthy();
   });
 
@@ -288,7 +296,7 @@ describe("HomeScreen (Dashboard)", () => {
   it('falls back to greeting "there" when no profile loaded', () => {
     (useProfile as jest.Mock).mockReturnValue({ data: null, isLoading: false });
     render(<HomeScreen />);
-    expect(screen.getByText(/Good Morning/)).toBeTruthy();
+    expect(screen.getByText(/Good (Morning|Afternoon|Evening|Night)/)).toBeTruthy();
     expect(screen.getByText(/there/)).toBeTruthy();
   });
 });

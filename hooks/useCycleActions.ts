@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { __DEV__ } from "react-native";
 
 import type { DerivedCycleData } from "@/hooks/useCurrentCycle";
 import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
@@ -9,7 +8,11 @@ import { trackEvent } from "@/src/services/analytics";
 import { encryptionService } from "@/src/services/encryptionService";
 
 function todayIso(): string {
-  return new Date().toISOString().split("T")[0]!;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isIsoDate(value: string): boolean {
@@ -167,6 +170,9 @@ type EndCurrentPeriodInput = {
   fallbackCycle?: ActiveCycleLike | null;
 };
 
+const END_PERIOD_FETCH_RETRIES = 2;
+const END_PERIOD_FETCH_RETRY_DELAY_MS = 120;
+
 export type EndCurrentPeriodResult = {
   cycleId: string;
   startDate: string;
@@ -204,6 +210,59 @@ function isLikelyNetworkError(error: unknown): boolean {
   );
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const value = String((error as { message?: string }).message ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return fallback;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchActiveCycleForEnd(userId: string): Promise<{
+  data: ActiveCycleLike | null;
+  error: unknown;
+}> {
+  let lastData: ActiveCycleLike | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= END_PERIOD_FETCH_RETRIES; attempt += 1) {
+    const { data, error } = await supabase
+      .from("cycles")
+      .select("id,start_date")
+      .eq("user_id", userId)
+      .is("end_date", null)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    lastData = (data as ActiveCycleLike | null) ?? null;
+    lastError = error;
+
+    if (!error) {
+      return { data: lastData, error: null };
+    }
+
+    if (!isLikelyNetworkError(error) || attempt >= END_PERIOD_FETCH_RETRIES) {
+      return { data: lastData, error };
+    }
+
+    await delay(END_PERIOD_FETCH_RETRY_DELAY_MS);
+  }
+
+  return { data: lastData, error: lastError };
+}
+
 function addDaysIso(startIso: string, days: number): string {
   const [year, month, day] = startIso
     .split("-")
@@ -230,29 +289,23 @@ export async function endCurrentPeriod({
   endDate,
   fallbackCycle,
 }: EndCurrentPeriodInput): Promise<EndCurrentPeriodResult> {
-  // CRITICAL FIX: Always fetch fresh cycle data from backend
-  // Don't rely solely on cache which can be stale
-  const { data: activeCycle, error: fetchError } = await supabase
-    .from("cycles")
-    .select("id,start_date")
-    .eq("user_id", userId)
-    .is("end_date", null)
-    .order("start_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Always fetch fresh cycle data from backend with bounded retry for
+  // transient network blips before relying on local fallback.
+  const { data: activeCycle, error: fetchError } =
+    await fetchActiveCycleForEnd(userId);
 
   // IMPROVED: Better error handling with detailed logging
   if (fetchError) {
     if (__DEV__) {
       console.error("[EndCycle] Fetch error:", {
-        message: fetchError.message,
+        message: getErrorMessage(fetchError, "unknown fetch error"),
         code: (fetchError as any).code,
         status: (fetchError as any).status,
       });
     }
     if (!fallbackCycle || !isLikelyNetworkError(fetchError)) {
       throw new Error(
-        `Database error: ${fetchError.message || "Could not fetch active period"}`,
+        `Database error: ${getErrorMessage(fetchError, "Could not fetch active period")}`,
       );
     }
   }
@@ -446,67 +499,17 @@ export function useEndCurrentCycle() {
         throw new Error("Not authenticated");
       }
 
-      // CRITICAL FIX: Always try to refresh the current cycle data
-      // before attempting to end it. This prevents stale cache issues.
+      // Keep cached cycle as a fallback for transient fetch/network issues.
+      // endCurrentPeriod() performs the authoritative fresh backend fetch.
       let cachedCycle: { id: string; start_date: string } | undefined;
-
-      try {
-        // Attempt to fetch fresh data with a timeout
-        const freshData = await Promise.race([
-          queryClient.fetchQuery({
-            queryKey: CURRENT_CYCLE_KEY,
-            queryFn: async () => {
-              const { data, error } = await supabase
-                .from("cycles")
-                .select("*")
-                .eq("user_id", user.id)
-                .is("end_date", null)
-                .order("start_date", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              if (error || !data) return null;
-              const cycle = data as any;
-              return { cycle };
-            },
-            staleTime: 0, // Force fresh fetch
-          }),
-          // Timeout after 3 seconds
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error("Fetch timeout")),
-              3000,
-            ),
-          ),
-        ]);
-
-        if (
-          freshData &&
-          typeof freshData === "object" &&
-          "cycle" in freshData &&
-          freshData.cycle
-        ) {
-          cachedCycle = {
-            id: (freshData.cycle as any).id,
-            start_date: (freshData.cycle as any).start_date,
-          };
-        }
-      } catch (err) {
-        if (__DEV__) {
-          console.warn("[UseEndCycle] Could not fetch fresh cycle data:", err);
-        }
-        // Fall through to use cached data
-      }
-
-      // If fresh fetch fails, try to get from cache
-      if (!cachedCycle) {
-        const cached = queryClient.getQueryData<any>(CURRENT_CYCLE_KEY);
-        if (cached?.cycle) {
-          cachedCycle = {
-            id: cached.cycle.id,
-            start_date: cached.cycle.start_date,
-          };
-        }
+      const cached = queryClient.getQueryData<DerivedCycleData | null>(
+        CURRENT_CYCLE_KEY,
+      );
+      if (cached?.cycle?.id && cached.cycle.start_date) {
+        cachedCycle = {
+          id: cached.cycle.id,
+          start_date: cached.cycle.start_date,
+        };
       }
 
       if (__DEV__) {

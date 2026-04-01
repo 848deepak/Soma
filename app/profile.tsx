@@ -11,16 +11,20 @@ import { Card } from '@/src/components/ui/Card';
 import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Screen } from '@/src/components/ui/Screen';
 import { Typography } from '@/src/components/ui/Typography';
+import { useAuthContext } from '@/src/context/AuthProvider';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const { data: profile, isLoading } = useProfile();
+  const { isAnonymous } = useAuthContext();
 
-  const displayName = profile?.first_name || profile?.username || 'there';
-  const initials = displayName !== 'there'
+  const displayName = profile?.first_name || profile?.username || (isAnonymous ? 'Guest User' : 'there');
+  const initials = (profile?.first_name || profile?.username)
     ? displayName.slice(0, 2).toUpperCase()
-    : '✦';
+    : isAnonymous
+      ? '👤'
+      : '✦';
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString(undefined, {
         month: 'long',

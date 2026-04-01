@@ -60,14 +60,44 @@ export type SymptomOption =
 /** Partner link status values. */
 export type PartnerStatus = 'pending' | 'active' | 'revoked';
 
+/** Care Circle roles for sharing relationships. */
+export type CareCircleRole = 'viewer' | 'trusted' | 'mutual';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Partner permissions object stored as JSONB in profiles and partners tables.
-// Mirrors the toggle state in PartnerSyncScreen.
+// Extended for Care Circle: includes role and share_notes (default false).
+// Backward compatible: missing fields default to pre-Care-Circle behavior.
 // ─────────────────────────────────────────────────────────────────────────────
 export interface PartnerPermissions {
   share_mood: boolean;
   share_fertility: boolean;
   share_symptoms: boolean;
+  share_notes?: boolean;              // NEW: default false; only trusted+ can see notes
+  role?: CareCircleRole;              // NEW: default 'viewer' for backward compat
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VIEW: shared_data
+// Row type for role-aware filtered shared logs from the shared_data view
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SharedDataLog {
+  id: string;                           // uuid – daily_log id
+  user_id: string;                      // uuid – the data owner
+  date: string;                         // "YYYY-MM-DD"
+  cycle_day: number | null;             // 1-based; null if not visible
+  cycle_id: string | null;              // uuid → cycles
+  flow_level: FlowLevel | null;         // raw flow level (always included if visible)
+  mood: MoodOption | null;              // null if share_mood is false
+  energy_level: EnergyLevel | null;     // always included (not restricted)
+  symptoms: SymptomOption[];            // empty array if share_symptoms is false
+  fertility_flow_level: FlowLevel | null; // null if share_fertility is false
+  notes: string | null;                 // null if share_notes is false or role doesn't allow
+  partner_alert: boolean;               // always visible (support indicator)
+  updated_at: string;
+  cycle_phase: CyclePhase | null;       // cycle phase; null if not visible
+  predicted_ovulation: string | null;   // "YYYY-MM-DD"; null if not visible
+  predicted_next_cycle: string | null;  // "YYYY-MM-DD"; null if not visible
+  connection_role: CareCircleRole;      // audit: which role accessed this data
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,6 +112,7 @@ export interface ProfileRow {
   period_duration_average: number;    // 1–15, default 5
   partner_link_code: string;          // unique 6-char code e.g. "A7-92-B1"
   partner_permissions: PartnerPermissions;
+  default_care_circle_role?: CareCircleRole; // NEW: default role for new connections
   is_onboarded: boolean;
   created_at: string;                 // ISO timestamptz
   updated_at: string;
@@ -358,6 +389,67 @@ export interface PartnerVisibleLog {
   predicted_next_cycle: string | null;
 }
 
+export type SmartEventType = 'manual' | 'ai' | 'log';
+
+export type SmartSuggestionSource = 'habit' | 'mood' | 'sleep' | 'productivity';
+
+export interface SmartEventRow {
+  id: string;
+  user_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  type: SmartEventType;
+  location: string | null;
+  tags: string[];
+  participants: string[];
+  recurrence: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SmartEventInsert {
+  user_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  type?: SmartEventType;
+  location?: string | null;
+  tags?: string[];
+  participants?: string[];
+  recurrence?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown>;
+}
+
+export type SmartEventUpdate = Partial<SmartEventInsert>;
+
+export interface SmartEventSuggestionRow {
+  id: string;
+  user_id: string;
+  title: string;
+  rationale: string;
+  suggested_start_time: string;
+  suggested_end_time: string;
+  confidence: number;
+  source: SmartSuggestionSource;
+  tags: string[];
+  created_at: string;
+}
+
+export interface SmartEventSuggestionInsert {
+  user_id: string;
+  title: string;
+  rationale: string;
+  suggested_start_time: string;
+  suggested_end_time: string;
+  confidence: number;
+  source: SmartSuggestionSource;
+  tags?: string[];
+}
+
+export type SmartEventSuggestionUpdate = Partial<SmartEventSuggestionInsert>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Database type for Supabase client generics
 // Usage: createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -414,6 +506,18 @@ export interface Database {
         Update: NotificationEventUpdate;
         Relationships: [];
       };
+      smart_events: {
+        Row: SmartEventRow;
+        Insert: SmartEventInsert;
+        Update: SmartEventUpdate;
+        Relationships: [];
+      };
+      smart_event_suggestions: {
+        Row: SmartEventSuggestionRow;
+        Insert: SmartEventSuggestionInsert;
+        Update: SmartEventSuggestionUpdate;
+        Relationships: [];
+      };
     };
     Views: {
       partner_visible_logs: {
@@ -423,7 +527,7 @@ export interface Database {
     };
     Functions: {
       link_partner: {
-        Args: { code: string };
+        Args: { code: string; role?: CareCircleRole };
         Returns: PartnerRow;
       };
       generate_partner_code: {

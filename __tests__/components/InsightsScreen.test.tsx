@@ -8,10 +8,16 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 
+const mockLogDataAccess = jest.fn();
+
 jest.mock('@/lib/supabase');
 jest.mock('@/lib/auth');
 jest.mock('expo-router');
 jest.mock('expo-haptics');
+
+jest.mock('@/src/services/auditService', () => ({
+  logDataAccess: (...args: any[]) => mockLogDataAccess(...args),
+}));
 
 jest.mock('@/hooks/useCycleHistory', () => ({
   useCycleHistory: jest.fn(),
@@ -65,8 +71,19 @@ function makeLog(date: string, symptoms: SymptomOption[] = []): DailyLogRow {
 describe('InsightsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLogDataAccess.mockResolvedValue(undefined);
     (useCycleHistory as jest.Mock).mockReturnValue({ data: [], isLoading: false });
     (useDailyLogs as jest.Mock).mockReturnValue({ data: [], isLoading: false });
+  });
+
+  it('emits observability event for insights overview', () => {
+    render(<InsightsScreen />);
+
+    expect(mockLogDataAccess).toHaveBeenCalledWith(
+      'cycle_data',
+      'view',
+      expect.objectContaining({ source: 'insights_overview' }),
+    );
   });
 
   it('renders without crashing', () => {

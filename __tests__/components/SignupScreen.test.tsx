@@ -5,7 +5,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { Alert } from "react-native";
 
-import { ensureAnonymousSession, signUpWithEmail } from "@/lib/auth";
+import { signUpWithEmail } from "@/lib/auth";
 import { SignupScreen } from "@/src/screens/SignupScreen";
 
 // expo-router is mocked via __mocks__/expo-router.ts
@@ -13,9 +13,6 @@ import { useRouter } from "expo-router";
 
 const mockSignUp = signUpWithEmail as jest.MockedFunction<
   typeof signUpWithEmail
->;
-const mockEnsureAnon = ensureAnonymousSession as jest.MockedFunction<
-  typeof ensureAnonymousSession
 >;
 const mockUseRouter = useRouter as jest.Mock;
 
@@ -122,16 +119,11 @@ describe("SignupScreen – successful signup", () => {
     fireEvent.changeText(getByTestId("confirm-password-input"), "securePass1");
   }
 
-  it("calls ensureAnonymousSession before signUpWithEmail", async () => {
+  it("calls signUpWithEmail once after submitting a valid form", async () => {
     const { getByTestId } = render(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
-    await waitFor(() => expect(mockEnsureAnon).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mockSignUp).toHaveBeenCalledTimes(1));
-    // ensureAnonymousSession called before signUpWithEmail
-    const ensureOrder = mockEnsureAnon.mock.invocationCallOrder[0];
-    const signUpOrder = mockSignUp.mock.invocationCallOrder[0];
-    expect(ensureOrder).toBeLessThan(signUpOrder);
   });
 
   it("calls signUpWithEmail with trimmed email and password", async () => {
@@ -155,20 +147,20 @@ describe("SignupScreen – successful signup", () => {
     await waitFor(() => expect(getByText("Check your email")).toBeTruthy());
   });
 
-  it("success screen shows Continue to App button", async () => {
+  it("success screen shows Go to Sign In button", async () => {
     const { getByTestId, getByText } = render(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
-    await waitFor(() => expect(getByText("Continue to App")).toBeTruthy());
+    await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
   });
 
-  it("Continue to App navigates to welcome", async () => {
+  it("Go to Sign In navigates to login", async () => {
     const { getByTestId, getByText } = render(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
-    await waitFor(() => expect(getByText("Continue to App")).toBeTruthy());
-    fireEvent.press(getByText("Continue to App"));
-    expect(mockReplace).toHaveBeenCalledWith("/welcome");
+    await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
+    fireEvent.press(getByText("Go to Sign In"));
+    expect(mockPush).toHaveBeenCalledWith("/auth/login");
   });
 });
 

@@ -1,5 +1,5 @@
-import { QuickCheckinScreen } from '@/src/screens/QuickCheckinScreen';
+import { Redirect } from "expo-router";
 
 export default function QuickCheckinRoute() {
-  return <QuickCheckinScreen />;
+  return <Redirect href="/log" />;
 }

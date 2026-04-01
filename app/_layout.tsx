@@ -15,6 +15,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useColorScheme, View } from "react-native";
 import "react-native-reanimated";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
@@ -60,6 +61,11 @@ export const unstable_settings = {
   // tab screen from flashing before auth redirect fires.
   initialRouteName: "index",
 };
+
+SplashScreen.setOptions({
+  duration: 450,
+  fade: true,
+});
 
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
@@ -284,8 +290,8 @@ export default function RootLayout() {
   if (!appReady) {
     return (
       <SomaLoadingSplash
-        subtitle="Initializing your cycle companion..."
-        timeout={8000}
+        subtitle="SOMA"
+        timeout={9000}
         onTimeout={() => {
           setAuthBootstrapped(true);
           setAppReady(true);
@@ -295,15 +301,16 @@ export default function RootLayout() {
   }
 
   return (
-    <SomaErrorBoundary>
-      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <AuthBootstrap onBootstrapComplete={() => setAuthBootstrapped(true)}>
-                <ThemeProvider
-                  value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-                >
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SomaErrorBoundary>
+        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+          <SafeAreaProvider>
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <AuthBootstrap onBootstrapComplete={() => setAuthBootstrapped(true)}>
+                  <ThemeProvider
+                    value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+                  >
                 <Stack>
                   <Stack.Screen
                     name="(tabs)"
@@ -368,13 +375,14 @@ export default function RootLayout() {
                     name="profile"
                     options={{ title: "Profile", headerShown: false }}
                   />
-                </Stack>
-              </ThemeProvider>
-            </AuthBootstrap>
-          </AuthProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
-    </View>
-    </SomaErrorBoundary>
+                  </Stack>
+                  </ThemeProvider>
+                </AuthBootstrap>
+              </AuthProvider>
+            </QueryClientProvider>
+          </SafeAreaProvider>
+        </View>
+      </SomaErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
