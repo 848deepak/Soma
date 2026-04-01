@@ -1,6 +1,7 @@
 import { View, type ViewStyle } from "react-native";
 
 import { SettingsRow, SectionLabel, ToggleRow } from "@/src/components/settings/SettingsPrimitives";
+import { usePendingConnections } from "@/hooks/usePendingConnections";
 
 type NotificationsSectionProps = {
   isDark: boolean;
@@ -23,6 +24,9 @@ export function NotificationsSection({
   handleAnalyticsToggle,
   openPartnerSync,
 }: NotificationsSectionProps) {
+  const { data: pendingData } = usePendingConnections();
+  const pendingCount = pendingData?.incoming?.length ?? 0;
+
   return (
     <View style={cardStyle}>
       <SectionLabel label="Notifications" isDark={isDark} />
@@ -36,7 +40,12 @@ export function NotificationsSection({
         testID="settings-daily-reminders-toggle"
       />
 
-      <SettingsRow title="Partner Sync" isDark={isDark} onPress={openPartnerSync} />
+      <SettingsRow 
+        title="Partner Sync" 
+        isDark={isDark} 
+        onPress={openPartnerSync}
+        badge={pendingCount}
+      />
 
       <ToggleRow
         label="Analytics Consent"

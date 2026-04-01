@@ -152,16 +152,18 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
 export function WelcomeScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === "dark";
-  const { user } = useAuthContext();
+  const { user, isAnonymous } = useAuthContext();
   const { data: profile } = useProfile();
 
-  const displayName = profile?.first_name?.trim() || "there";
+  const displayName = profile?.first_name?.trim() || (isAnonymous ? "Guest User" : "there");
   const username =
     profile?.username?.trim() ||
     (user?.email
       ? user.email.split("@")[0]
-      : `user-${user?.id?.slice(0, 6) ?? "guest"}`);
-  const email = user?.email ?? "Private account";
+      : isAnonymous
+        ? "guest"
+        : `user-${user?.id?.slice(0, 6) ?? "guest"}`);
+  const email = user?.email ?? (isAnonymous ? "Guest Account" : "Private account");
   const profileInfo = profile?.date_of_birth
     ? `DOB: ${profile.date_of_birth}`
     : "Profile can be completed anytime in Settings";

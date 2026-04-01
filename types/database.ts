@@ -389,6 +389,67 @@ export interface PartnerVisibleLog {
   predicted_next_cycle: string | null;
 }
 
+export type SmartEventType = 'manual' | 'ai' | 'log';
+
+export type SmartSuggestionSource = 'habit' | 'mood' | 'sleep' | 'productivity';
+
+export interface SmartEventRow {
+  id: string;
+  user_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  type: SmartEventType;
+  location: string | null;
+  tags: string[];
+  participants: string[];
+  recurrence: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SmartEventInsert {
+  user_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  type?: SmartEventType;
+  location?: string | null;
+  tags?: string[];
+  participants?: string[];
+  recurrence?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown>;
+}
+
+export type SmartEventUpdate = Partial<SmartEventInsert>;
+
+export interface SmartEventSuggestionRow {
+  id: string;
+  user_id: string;
+  title: string;
+  rationale: string;
+  suggested_start_time: string;
+  suggested_end_time: string;
+  confidence: number;
+  source: SmartSuggestionSource;
+  tags: string[];
+  created_at: string;
+}
+
+export interface SmartEventSuggestionInsert {
+  user_id: string;
+  title: string;
+  rationale: string;
+  suggested_start_time: string;
+  suggested_end_time: string;
+  confidence: number;
+  source: SmartSuggestionSource;
+  tags?: string[];
+}
+
+export type SmartEventSuggestionUpdate = Partial<SmartEventSuggestionInsert>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Database type for Supabase client generics
 // Usage: createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -443,6 +504,18 @@ export interface Database {
         Row: NotificationEventRow;
         Insert: NotificationEventInsert;
         Update: NotificationEventUpdate;
+        Relationships: [];
+      };
+      smart_events: {
+        Row: SmartEventRow;
+        Insert: SmartEventInsert;
+        Update: SmartEventUpdate;
+        Relationships: [];
+      };
+      smart_event_suggestions: {
+        Row: SmartEventSuggestionRow;
+        Insert: SmartEventSuggestionInsert;
+        Update: SmartEventSuggestionUpdate;
         Relationships: [];
       };
     };

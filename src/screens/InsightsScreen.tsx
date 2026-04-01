@@ -1,6 +1,6 @@
 import { Text, View, useColorScheme } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { InsightCard } from '@/src/components/cards/InsightCard';
 import { HeaderBar } from '@/src/components/ui/HeaderBar';
@@ -13,6 +13,7 @@ import {
   buildSymptomStats,
   buildTrendInsight,
 } from '@/services/CycleIntelligence';
+import { logDataAccess } from '@/src/services/auditService';
 
 export function InsightsScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -24,6 +25,26 @@ export function InsightsScreen() {
   const insight = useMemo(() => buildTrendInsight(cycles, logs), [cycles, logs]);
 
   const isLoading = cyclesLoading || logsLoading;
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    void logDataAccess('cycle_data', 'view', {
+      source: 'insights_overview',
+      barsCount: bars.length,
+      symptomStatCount: symptomStats.length,
+      insightTitle: insight.title,
+      cyclesCount: cycles.length,
+      logsCount: logs.length,
+    });
+  }, [
+    isLoading,
+    bars.length,
+    symptomStats.length,
+    insight.title,
+    cycles.length,
+    logs.length,
+  ]);
 
   const cardStyle = {
     marginTop: 16,

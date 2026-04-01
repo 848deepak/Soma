@@ -6,13 +6,12 @@ module.exports = {
   transform: {
     '^.+\\.(js|ts)$': 'babel-jest',
   },
-  testEnvironment: 'node',
+  testEnvironment: 'detox/runners/jest/testEnvironment',
   testRegex: '\\.e2e\\.(js|ts)$',
-  testTimeout: 120000,
+  testTimeout: 240000,
   verbose: true,
   maxWorkers: 1, // Run E2E tests serially to avoid conflicts
-  globalSetup: 'detox/runners/jest/globalSetup',
-  globalTeardown: 'detox/runners/jest/globalTeardown',
+  globalSetup: '<rootDir>/globalSetup.js',
+  globalTeardown: '<rootDir>/globalTeardown.js',
   reporters: ['detox/runners/jest/reporter'],
-  setupFilesAfterEnv: ['detox/runners/jest/setup'],
 };

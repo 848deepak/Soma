@@ -1,10 +1,14 @@
 /**
  * src/screens/CalendarScreen.tsx
  *
+ * LEGACY SCREEN (DISABLED IN APP ROUTING)
+ * This file is intentionally kept for rollback/testing only.
+ * Production navigation uses SmartCalendarScreen via app/(tabs)/calendar.tsx.
+ *
  * Full cycle calendar with real Supabase data.
  * Replaces all mock data with live calculations from CycleIntelligence.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, View, useColorScheme } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
@@ -15,6 +19,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useCareCircle } from "@/hooks/useCareCircle";
 import {
   derivePeriodVisualizationDays,
+  estimateOvulation,
   predictFertileWindow,
 } from "@/services/CycleIntelligence";
 import { CycleCalendarCard } from "@/src/components/cards/CycleCalendarCard";
@@ -22,14 +27,16 @@ import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
+import { SkeletonLoader } from "@/src/components/ui/SkeletonLoader";
 import { Typography } from "@/src/components/ui/Typography";
 import { SupportDashboard } from "@/src/components/SupportDashboard";
+import { logDataAccess } from "@/src/services/auditService";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
-import type { MonthCalendarMeta } from "@/src/features/cycle/uiMockData";
+import type { MonthCalendarMeta } from "@/src/features/cycle/uiCycleData";
 import {
     buildMonthGrid,
     calendarWeekdays,
-} from "@/src/features/cycle/uiMockData";
+} from "@/src/features/cycle/uiCycleData";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,6 +54,8 @@ const MONTH_NAMES = [
   "November",
   "December",
 ] as const;
+
+export const LEGACY_CALENDAR_SCREEN_DISABLED = true;
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
@@ -283,6 +292,29 @@ export function CalendarScreen() {
   const hasActiveCycle = Boolean(cycleData?.cycle);
   const isDark = useColorScheme() === "dark";
 
+  const ovulationEstimate = useMemo(() => {
+    if (!cycleData?.cycle?.start_date) return null;
+    return estimateOvulation(completedCycles, cycleData.cycle.start_date);
+  }, [completedCycles, cycleData?.cycle?.start_date]);
+
+  useEffect(() => {
+    if (!ovulationEstimate || viewMode !== "own") return;
+
+    void logDataAccess("cycle_data", "view", {
+      source: "calendar_prediction_confidence",
+      confidence: ovulationEstimate.confidence,
+      confidenceScore: ovulationEstimate.confidenceScore,
+      cyclesUsed: ovulationEstimate.cyclesUsed,
+      variabilityDays: ovulationEstimate.variabilityDays,
+    });
+  }, [
+    ovulationEstimate?.confidence,
+    ovulationEstimate?.confidenceScore,
+    ovulationEstimate?.cyclesUsed,
+    ovulationEstimate?.variabilityDays,
+    viewMode,
+  ]);
+
   const handleSubmitPeriodModal = useCallback(
     async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
       try {
@@ -398,8 +430,11 @@ export function CalendarScreen() {
     <Screen>
       <HeaderBar title={"Your Cycle\nCalendar"} />
 
-      {/* ── Me/Partner toggle (if viewer) ──────────────────────────── */}
-      {isViewer && (
+      {cycleLoading ? (
+        <SkeletonLoader />
+      ) : (
+        <>
+          {isViewer && (
         <View testID="calendar-view-toggle" style={{ flexDirection: "row", gap: 8, marginBottom: 16, marginTop: 16, paddingHorizontal: 8 }}>
           <PressableScale
             testID="view-mode-own"
@@ -540,6 +575,38 @@ export function CalendarScreen() {
         selectedDay={selectedDay}
         onSelectDay={setSelectedDay}
       />
+
+      {viewMode === 'own' && ovulationEstimate ? (
+        <View
+          style={{
+            marginTop: 12,
+            marginBottom: 8,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: isDark
+              ? 'rgba(255,255,255,0.1)'
+              : 'rgba(221,167,165,0.24)',
+            backgroundColor: isDark
+              ? 'rgba(30,33,40,0.75)'
+              : 'rgba(255,255,255,0.7)',
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+          }}
+        >
+          <Typography
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: isDark ? '#F2F2F2' : '#2D2327',
+            }}
+          >
+            Prediction confidence: {ovulationEstimate.confidence} ({ovulationEstimate.confidenceScore}%)
+          </Typography>
+          <Typography variant="helper" style={{ marginTop: 2 }}>
+            Based on {ovulationEstimate.cyclesUsed} cycle{ovulationEstimate.cyclesUsed === 1 ? '' : 's'}; variability {ovulationEstimate.variabilityDays} days.
+          </Typography>
+        </View>
+      ) : null}
 
       {/* ── Selected day detail card ──────────────────────────────── */}
       {selectedDay && dayNote ? (
@@ -683,6 +750,8 @@ export function CalendarScreen() {
         onSubmit={handleSubmitPeriodModal}
         isSubmitting={isLoggingPeriod}
       />
+        </>
+        )}
         </>
       )}
     </Screen>

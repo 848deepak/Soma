@@ -86,6 +86,8 @@
     },
     "extra": {
       "router": {},
+      "EXPO_PUBLIC_SUPABASE_URL": "${EXPO_PUBLIC_SUPABASE_URL}",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "${EXPO_PUBLIC_SUPABASE_ANON_KEY}",
       "eas": {
         "projectId": "2b688a94-93f1-4e7a-baf8-caa0a8497b01"
       }

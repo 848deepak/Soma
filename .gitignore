@@ -58,3 +58,6 @@ web/out/
 
 # large app binaries
 web/public/*.apk
+
+# e2e test artifacts
+artifacts/

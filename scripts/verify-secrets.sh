@@ -4,6 +4,41 @@ set -euo pipefail
 
 ENVIRONMENT="${1:-development}"
 
+load_dotenv_file() {
+  local file_path="$1"
+  if [[ ! -f "$file_path" ]]; then
+    return
+  fi
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" != *=* ]] && continue
+
+    local key="${line%%=*}"
+    local value="${line#*=}"
+
+    key="$(echo "$key" | xargs)"
+    value="$(echo "$value" | sed -e 's/^ *//' -e 's/ *$//')"
+
+    if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    if [[ -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$file_path"
+}
+
+load_dotenv_file ".env.local"
+load_dotenv_file ".env"
+
+if [[ "$ENVIRONMENT" == "production" ]]; then
+  load_dotenv_file ".env.production.local"
+  load_dotenv_file ".env.production"
+fi
+
 required_for_all=(
   "EXPO_PUBLIC_SUPABASE_URL"
   "EXPO_PUBLIC_SUPABASE_ANON_KEY"

@@ -207,6 +207,14 @@ describe('estimateOvulation', () => {
       const result = estimateOvulation(cycles, START);
       expect(result?.confidence).toBe('low');
     });
+
+    it('returns confidence details for telemetry', () => {
+      const result = estimateOvulation(cycles, START);
+      expect(result?.confidenceScore).toBeGreaterThanOrEqual(0);
+      expect(result?.confidenceScore).toBeLessThanOrEqual(100);
+      expect(result?.cyclesUsed).toBe(1);
+      expect(typeof result?.variabilityDays).toBe('number');
+    });
   });
 
   describe('confidence levels', () => {
@@ -231,6 +239,7 @@ describe('estimateOvulation', () => {
       ];
       const result = estimateOvulation(cycles, START);
       expect(result?.confidence).toBe('high');
+      expect(result?.confidenceScore).toBeGreaterThanOrEqual(80);
     });
 
     it('returns low confidence for 6 cycles with high variability (stdDev > 5)', () => {
@@ -244,6 +253,7 @@ describe('estimateOvulation', () => {
       ];
       const result = estimateOvulation(cycles, START);
       expect(result?.confidence).toBe('low');
+      expect(result?.confidenceScore).toBeLessThan(55);
     });
 
     it('returns low confidence for only 2 cycles (below medium threshold of 3)', () => {

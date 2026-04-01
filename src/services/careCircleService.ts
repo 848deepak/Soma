@@ -216,9 +216,47 @@ export async function revokeConnection(connectionId: string): Promise<void> {
 }
 
 /**
- * Accept a pending connection (future multi-pending support).
- * For now, connections are auto-accepted on creation, but this hook
- * allows future UI where acceptance is explicit.
+ * Get all pending Care Circle connections for the current user (both perspectives).
+ * @returns Object with incoming (pending approvals from me) and outgoing (pending approvals from them)
+ */
+export async function getPendingConnections() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { incoming: [], outgoing: [] };
+  }
+
+  const [incomingResult, outgoingResult] = await Promise.all([
+    supabase
+      .from('partners')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'pending'),
+    supabase
+      .from('partners')
+      .select('*')
+      .eq('partner_user_id', user.id)
+      .eq('status', 'pending'),
+  ]);
+
+  if (incomingResult.error) throw incomingResult.error;
+  if (outgoingResult.error) throw outgoingResult.error;
+
+  void logDataAccess('care_circle', 'get_pending_connections', {
+    incomingCount: incomingResult.data?.length ?? 0,
+    outgoingCount: outgoingResult.data?.length ?? 0,
+  });
+
+  return {
+    incoming: (incomingResult.data as unknown as PartnerRow[]) ?? [],
+    outgoing: (outgoingResult.data as unknown as PartnerRow[]) ?? [],
+  };
+}
+
+/**
+ * Accept a pending connection (activate it for data sharing).
  * @param connectionId – the partners row id
  */
 export async function acceptConnection(connectionId: string): Promise<PartnerRow> {
@@ -236,6 +274,23 @@ export async function acceptConnection(connectionId: string): Promise<PartnerRow
   });
 
   return data as unknown as PartnerRow;
+}
+
+/**
+ * Reject a pending connection (set status to 'revoked').
+ * @param connectionId – the partners row id
+ */
+export async function rejectConnection(connectionId: string): Promise<void> {
+  const { error } = await supabase
+    .from('partners')
+    .update({ status: 'revoked' })
+    .eq('id', connectionId);
+
+  if (error) throw error;
+
+  void logDataAccess('care_circle', 'reject_connection', {
+    connectionId,
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────────────

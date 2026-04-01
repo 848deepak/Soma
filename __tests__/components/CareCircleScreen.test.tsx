@@ -10,7 +10,12 @@ import React from 'react';
 import { CareCircleScreen } from '@/src/screens/CareCircleScreen';
 import * as careCircleService from '@/src/services/careCircleService';
 
+const mockLogDataAccess = jest.fn();
+
 jest.mock('@/src/services/careCircleService');
+jest.mock('@/src/services/auditService', () => ({
+  logDataAccess: (...args: any[]) => mockLogDataAccess(...args),
+}));
 jest.mock('@/hooks/useLinkPartner', () => ({
   normalizeInviteCode: (code: string) => {
     const cleaned = code.toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
@@ -56,6 +61,17 @@ const renderComponent = () => {
 describe('CareCircleScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLogDataAccess.mockResolvedValue(undefined);
+  });
+
+  it('emits observability event when screen is viewed', () => {
+    renderComponent();
+
+    expect(mockLogDataAccess).toHaveBeenCalledWith(
+      'care_circle',
+      'view',
+      expect.objectContaining({ source: 'care_circle_screen' }),
+    );
   });
 
   it('renders enter-code tab on initial load', () => {

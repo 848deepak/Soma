@@ -7,10 +7,12 @@ import type { PartnerRow } from '@/types/database';
 import {
   createConnection,
   getConnections,
+  getPendingConnections,
   getSharedData,
   updatePermissions,
   revokeConnection,
   acceptConnection,
+  rejectConnection,
   coercePermissions,
   roleAllowsField,
 } from '@/src/services/careCircleService';
@@ -374,6 +376,69 @@ describe('careCircleService', () => {
       const result = await acceptConnection('partner-1');
 
       expect(result).toEqual(partner);
+    });
+  });
+
+  describe('getPendingConnections', () => {
+    it('returns incoming and outgoing pending rows', async () => {
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+      });
+
+      const incoming = [{ ...mockPartnerRow({ id: 'in-1', status: 'pending' as const }) }];
+      const outgoing = [{ ...mockPartnerRow({ id: 'out-1', status: 'pending' as const }) }];
+
+      (supabase.from as jest.Mock)
+        .mockImplementationOnce(() => ({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ data: incoming, error: null }),
+            }),
+          }),
+        }))
+        .mockImplementationOnce(() => ({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ data: outgoing, error: null }),
+            }),
+          }),
+        }));
+
+      const result = await getPendingConnections();
+      expect(result.incoming).toHaveLength(1);
+      expect(result.outgoing).toHaveLength(1);
+    });
+
+    it('returns empty lists when unauthenticated', async () => {
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: null },
+      });
+
+      const result = await getPendingConnections();
+      expect(result).toEqual({ incoming: [], outgoing: [] });
+    });
+  });
+
+  describe('rejectConnection', () => {
+    it('updates connection status to revoked', async () => {
+      (supabase.from as jest.Mock).mockReturnValue({
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ error: null }),
+        }),
+      });
+
+      await expect(rejectConnection('partner-1')).resolves.not.toThrow();
+    });
+
+    it('throws error on update failure', async () => {
+      const testError = new Error('Reject failed');
+      (supabase.from as jest.Mock).mockReturnValue({
+        update: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ error: testError }),
+        }),
+      });
+
+      await expect(rejectConnection('partner-1')).rejects.toThrow('Reject failed');
     });
   });
 });

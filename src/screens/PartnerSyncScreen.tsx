@@ -7,9 +7,12 @@ import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Screen } from '@/src/components/ui/Screen';
 import { Typography } from '@/src/components/ui/Typography';
 import { PartnerView } from '@/src/components/PartnerView';
+import { PendingPartnerCard } from '@/src/components/PendingPartnerCard';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { usePartner } from '@/hooks/usePartner';
+import { usePendingConnections } from '@/hooks/usePendingConnections';
 import { isInviteCodeFormat, useEnsurePartnerInviteCode, useLinkPartner } from '@/hooks/useLinkPartner';
+import { logDataAccess } from '@/src/services/auditService';
 import type { PartnerPermissions } from '@/types/database';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,6 +72,7 @@ export function PartnerSyncScreen() {
 
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: partnerState } = usePartner();
+  const { data: pendingState } = usePendingConnections();
   const updateProfile = useUpdateProfile();
   const linkPartner = useLinkPartner();
   const ensureInviteCode = useEnsurePartnerInviteCode();
@@ -136,8 +140,40 @@ export function PartnerSyncScreen() {
   function handleLinkPartner() {
     const normalizedLength = linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').length;
     if (normalizedLength !== 6) return;
+
+    void logDataAccess('care_circle', 'request', {
+      source: 'partner_sync_link_attempt',
+      normalizedLength,
+      hasPendingIncoming: (pendingState?.incoming?.length ?? 0) > 0,
+      hasPendingOutgoing: (pendingState?.outgoing?.length ?? 0) > 0,
+    });
+
     linkPartner.mutate(linkCode, { onSuccess: () => setLinkCode('') });
   }
+
+  useEffect(() => {
+    if (profileLoading) return;
+
+    void logDataAccess('care_circle', 'view', {
+      source: 'partner_sync_screen',
+      hasInviteCode,
+      isLinkedAsViewer,
+      pendingIncoming: pendingState?.incoming?.length ?? 0,
+      pendingOutgoing: pendingState?.outgoing?.length ?? 0,
+      shareMood: permissions.share_mood,
+      shareFertility: permissions.share_fertility,
+      shareSymptoms: permissions.share_symptoms,
+    });
+  }, [
+    profileLoading,
+    hasInviteCode,
+    isLinkedAsViewer,
+    pendingState?.incoming?.length,
+    pendingState?.outgoing?.length,
+    permissions.share_mood,
+    permissions.share_fertility,
+    permissions.share_symptoms,
+  ]);
 
   return (
     <Screen>
@@ -238,6 +274,29 @@ export function PartnerSyncScreen() {
           Share this code or QR with your partner
         </Typography>
       </View>
+
+      {/* ── Pending Approvals ────────────────────────────────────────────────── */}
+      {(pendingState?.incoming?.length ?? 0) > 0 && (
+        <View style={{ marginTop: 20 }}>
+          <Typography
+            style={{
+              fontSize: 16,
+              fontWeight: '600',
+              color: isDark ? '#F2F2F2' : '#2D2327',
+              marginBottom: 12,
+            }}
+          >
+            Pending Requests
+          </Typography>
+          {pendingState?.incoming?.map((connection) => (
+            <PendingPartnerCard
+              key={connection.id}
+              connection={connection}
+              isDark={isDark}
+            />
+          ))}
+        </View>
+      )}
 
       {/* ── Sharing Permissions ──────────────────────────────────────────────── */}
       <View style={cardStyle}>

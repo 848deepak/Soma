@@ -29,6 +29,7 @@ import {
 } from "@/hooks/useProfile";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { useAuthContext } from "@/src/context/AuthProvider";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { Screen } from "@/src/components/ui/Screen";
 import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
@@ -61,6 +62,7 @@ import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
 export function SettingsScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === "dark";
+  const { isAnonymous } = useAuthContext();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
   const notificationPreferences = useNotificationPreferences();
@@ -431,6 +433,10 @@ export function SettingsScreen() {
         },
       },
     ]);
+  }
+
+  function handleSignIn() {
+    router.push("/auth/login" as never);
   }
 
   function handleStartPeriodToday() {
@@ -812,10 +818,12 @@ export function SettingsScreen() {
         cardStyle={sectionCardStyle}
         isDeletePending={deleteAllData.isPending}
         isLoggingOut={isLoggingOut}
+        isAnonymous={isAnonymous}
         handleExportData={handleExportData}
         handleSendFeedback={handleSendFeedback}
         handleDeleteAllData={handleDeleteAllData}
         handleLogout={handleLogout}
+        handleSignIn={handleSignIn}
       />
       </Screen>
     </KeyboardAvoidingView>

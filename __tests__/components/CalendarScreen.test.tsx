@@ -9,6 +9,8 @@ import React from 'react';
 
 import { CalendarScreen } from '@/src/screens/CalendarScreen';
 
+const mockLogDataAccess = jest.fn();
+
 // Mock navigation
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -47,11 +49,11 @@ jest.mock('@/hooks/useCurrentCycle', () => ({
 }));
 
 jest.mock('@/hooks/useCycleHistory', () => ({
-  useCycleHistory: () => ({
+  useCycleHistory: jest.fn(() => ({
     data: [],
     isLoading: false,
     error: null,
-  }),
+  })),
 }));
 
 jest.mock('@/hooks/useDailyLogs', () => ({
@@ -60,6 +62,10 @@ jest.mock('@/hooks/useDailyLogs', () => ({
     isLoading: false,
     error: null,
   }),
+}));
+
+jest.mock('@/src/services/auditService', () => ({
+  logDataAccess: (...args: any[]) => mockLogDataAccess(...args),
 }));
 
 jest.mock('@/src/components/SupportDashboard', () => ({
@@ -91,6 +97,67 @@ const renderComponent = () => {
 describe('CalendarScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLogDataAccess.mockResolvedValue(undefined);
+  });
+
+  it('shows prediction confidence in own view when cycle history exists', async () => {
+    const { useCycleHistory } = require('@/hooks/useCycleHistory');
+    useCycleHistory.mockReturnValue({
+      data: [
+        {
+          id: 'completed-1',
+          user_id: 'user-1',
+          start_date: '2026-02-01',
+          end_date: '2026-02-28',
+          cycle_length: 28,
+          predicted_ovulation: null,
+          predicted_next_cycle: null,
+          current_phase: null,
+          created_at: '2026-02-01',
+          updated_at: '2026-02-28',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Prediction confidence:/i)).toBeTruthy();
+    });
+  });
+
+  it('logs prediction confidence telemetry in own view', async () => {
+    const { useCycleHistory } = require('@/hooks/useCycleHistory');
+    useCycleHistory.mockReturnValue({
+      data: [
+        {
+          id: 'completed-1',
+          user_id: 'user-1',
+          start_date: '2026-02-01',
+          end_date: '2026-02-28',
+          cycle_length: 28,
+          predicted_ovulation: null,
+          predicted_next_cycle: null,
+          current_phase: null,
+          created_at: '2026-02-01',
+          updated_at: '2026-02-28',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(mockLogDataAccess).toHaveBeenCalledWith(
+        'cycle_data',
+        'view',
+        expect.objectContaining({ source: 'calendar_prediction_confidence' }),
+      );
+    });
   });
 
   it('renders calendar in own view by default', async () => {

@@ -96,6 +96,14 @@ jest.mock("@/hooks/useCycleActions", () => ({
   })),
 }));
 
+jest.mock("@/hooks/usePendingConnections", () => ({
+  usePendingConnections: jest.fn(() => ({
+    data: { incoming: [], outgoing: [] },
+    isLoading: false,
+    error: null,
+  })),
+}));
+
 describe("Settings reset safety flow", () => {
   beforeEach(() => {
     jest.clearAllMocks();

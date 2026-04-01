@@ -7,7 +7,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ActivityIndicator, View, useColorScheme, ScrollView, TextInput } from 'react-native';
 
 import { HeaderBar } from '@/src/components/ui/HeaderBar';
@@ -18,6 +18,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { normalizeInviteCode } from '@/hooks/useLinkPartner';
 import { CARE_CIRCLE_KEY } from '@/hooks/useCareCircle';
 import * as careCircleService from '@/src/services/careCircleService';
+import { logDataAccess } from '@/src/services/auditService';
 import { SymbolView } from 'expo-symbols';
 import type { CareCircleRole } from '@/types/database';
 
@@ -40,16 +41,31 @@ export function CareCircleScreen() {
       careCircleService.createConnection(inviteCode, role),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: CARE_CIRCLE_KEY });
-      Alert.alert('Connected!', `You're now connected with a ${selectedRole} view.`, [
-        {
-          text: 'Got it',
-          onPress: () => router.back(),
-        },
-      ]);
+      void logDataAccess('care_circle', 'create_connection', {
+        source: 'care_circle_submit',
+        selectedRole,
+        success: true,
+      });
+      Alert.alert(
+        'Request Sent!',
+        `Connection request sent as ${selectedRole}. They'll need to accept your request.`,
+        [
+          {
+            text: 'Got it',
+            onPress: () => router.back(),
+          },
+        ],
+      );
     },
     onError: (error: any) => {
-      const message = error?.message || 'Failed to connect. Please try again.';
-      Alert.alert('Connection Failed', message, [{ text: 'Try Again' }]);
+      void logDataAccess('care_circle', 'request', {
+        source: 'care_circle_submit',
+        selectedRole,
+        success: false,
+        message: error?.message ?? 'unknown_error',
+      });
+      const message = error?.message || 'Failed to send request. Please try again.';
+      Alert.alert('Request Failed', message, [{ text: 'Try Again' }]);
     },
   });
 
@@ -62,6 +78,10 @@ export function CareCircleScreen() {
     try {
       const normalized = normalizeInviteCode(code);
       setCode(normalized);
+      void logDataAccess('care_circle', 'request', {
+        source: 'care_circle_role_selection_open',
+        normalizedCodeLength: normalized.replace(/[^A-Z0-9]/g, '').length,
+      });
       setTab('select-role');
     } catch (err: any) {
       Alert.alert('Invalid Code', err?.message || 'Code format is incorrect.');
@@ -69,8 +89,20 @@ export function CareCircleScreen() {
   };
 
   const handleConfirmConnection = () => {
+    void logDataAccess('care_circle', 'request', {
+      source: 'care_circle_submit_attempt',
+      selectedRole,
+    });
     createConnectionMutation.mutate({ inviteCode: code, role: selectedRole });
   };
+
+  useEffect(() => {
+    void logDataAccess('care_circle', 'view', {
+      source: 'care_circle_screen',
+      tab,
+      selectedRole,
+    });
+  }, [tab, selectedRole]);
 
   const cardStyle = {
     marginTop: 20,

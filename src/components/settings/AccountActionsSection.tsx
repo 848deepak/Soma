@@ -9,10 +9,12 @@ type AccountActionsSectionProps = {
   cardStyle: ViewStyle;
   isDeletePending: boolean;
   isLoggingOut: boolean;
+  isAnonymous?: boolean;
   handleExportData: () => void;
   handleSendFeedback: () => void;
   handleDeleteAllData: () => void;
   handleLogout: () => void;
+  handleSignIn?: () => void;
 };
 
 export function AccountActionsSection({
@@ -20,10 +22,12 @@ export function AccountActionsSection({
   cardStyle,
   isDeletePending,
   isLoggingOut,
+  isAnonymous,
   handleExportData,
   handleSendFeedback,
   handleDeleteAllData,
   handleLogout,
+  handleSignIn,
 }: AccountActionsSectionProps) {
   return (
     <>
@@ -49,29 +53,59 @@ export function AccountActionsSection({
         </Typography>
       </View>
 
-      <PressableScale
-        onPress={handleLogout}
-        style={{
-          marginTop: 16,
-          marginBottom: 32,
-          alignItems: "center",
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(221,167,165,0.3)",
-          paddingVertical: 16,
-          opacity: isLoggingOut ? 0.5 : 1,
-        }}
-      >
-        <Typography
+      {isAnonymous ? (
+        <PressableScale
+          onPress={handleSignIn}
           style={{
-            fontSize: 15,
-            fontWeight: "500",
-            color: "#9B7E8C",
+            marginTop: 16,
+            marginBottom: 32,
+            alignItems: "center",
+            borderRadius: 16,
+            backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+            paddingVertical: 16,
+            opacity: isLoggingOut ? 0.5 : 1,
+            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
+            elevation: 6,
           }}
         >
-          {isLoggingOut ? "Signing out…" : "Sign Out"}
-        </Typography>
-      </PressableScale>
+          <Typography
+            style={{
+              fontSize: 15,
+              fontWeight: "600",
+              color: "#FFFFFF",
+            }}
+          >
+            {isLoggingOut ? "Signing in…" : "Create Account / Sign In"}
+          </Typography>
+        </PressableScale>
+      ) : (
+        <PressableScale
+          onPress={handleLogout}
+          style={{
+            marginTop: 16,
+            marginBottom: 32,
+            alignItems: "center",
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(221,167,165,0.3)",
+            paddingVertical: 16,
+            opacity: isLoggingOut ? 0.5 : 1,
+          }}
+        >
+          <Typography
+            style={{
+              fontSize: 15,
+              fontWeight: "500",
+              color: "#9B7E8C",
+            }}
+          >
+            {isLoggingOut ? "Signing out…" : "Sign Out"}
+          </Typography>
+        </PressableScale>
+      )}
     </>
   );
 }

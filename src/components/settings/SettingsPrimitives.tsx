@@ -31,11 +31,13 @@ export function SettingsRow({
   tone = "normal",
   isDark,
   onPress,
+  badge,
 }: {
   title: string;
   tone?: "normal" | "danger";
   isDark: boolean;
   onPress?: () => void;
+  badge?: number;
 }) {
   return (
     <PressableScale
@@ -57,15 +59,40 @@ export function SettingsRow({
           justifyContent: "space-between",
         }}
       >
-        <Typography
-          style={{
-            fontSize: 15,
-            color:
-              tone === "danger" ? "#EF4444" : isDark ? "#F2F2F2" : "#2D2327",
-          }}
-        >
-          {title}
-        </Typography>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Typography
+            style={{
+              fontSize: 15,
+              color:
+                tone === "danger" ? "#EF4444" : isDark ? "#F2F2F2" : "#2D2327",
+            }}
+          >
+            {title}
+          </Typography>
+          {badge !== undefined && badge > 0 && (
+            <View
+              style={{
+                backgroundColor: "#EF4444",
+                borderRadius: 12,
+                minWidth: 24,
+                height: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 6,
+              }}
+            >
+              <Typography
+                style={{
+                  fontSize: 12,
+                  fontWeight: "600",
+                  color: "#FFFFFF",
+                }}
+              >
+                {badge}
+              </Typography>
+            </View>
+          )}
+        </View>
         <Typography
           style={{
             fontSize: 18,

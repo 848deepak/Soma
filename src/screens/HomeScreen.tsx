@@ -13,6 +13,7 @@ import {
   estimateOvulation,
   predictFertileWindow,
 } from "@/services/CycleIntelligence";
+import { logDataAccess } from "@/src/services/auditService";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
@@ -321,6 +322,33 @@ export function HomeScreen() {
     [refetchCurrentCycle],
   );
 
+  const fertileWindowPrediction =
+    cycleData?.cycle?.start_date
+      ? predictFertileWindow(cycleHistory, cycleData.cycle.start_date)
+      : null;
+  const ovulationEstimate =
+    cycleData?.cycle?.start_date
+      ? estimateOvulation(cycleHistory, cycleData.cycle.start_date)
+      : null;
+
+  useEffect(() => {
+    if (!ovulationEstimate) return;
+
+    // Record prediction confidence usage for production diagnostics.
+    void logDataAccess("cycle_data", "view", {
+      source: "home_prediction_confidence",
+      confidence: ovulationEstimate.confidence,
+      confidenceScore: ovulationEstimate.confidenceScore,
+      cyclesUsed: ovulationEstimate.cyclesUsed,
+      variabilityDays: ovulationEstimate.variabilityDays,
+    });
+  }, [
+    ovulationEstimate?.confidence,
+    ovulationEstimate?.confidenceScore,
+    ovulationEstimate?.cyclesUsed,
+    ovulationEstimate?.variabilityDays,
+  ]);
+
   // Show loading splash only if all queries are loading AND timeout hasn't been reached AND no errors
   if ((isProfileLoading || isTodayLoading || isCycleLoading) && !forceShow && !profileError && !todayError && !cycleError) {
     return (
@@ -352,14 +380,6 @@ export function HomeScreen() {
     mood: todayLog?.mood,
     energy: todayLog?.energy_level,
   });
-  const fertileWindowPrediction =
-    cycleData?.cycle?.start_date
-      ? predictFertileWindow(cycleHistory, cycleData.cycle.start_date)
-      : null;
-  const ovulationEstimate =
-    cycleData?.cycle?.start_date
-      ? estimateOvulation(cycleHistory, cycleData.cycle.start_date)
-      : null;
 
   const homeWidgets = [
     {
@@ -411,6 +431,9 @@ export function HomeScreen() {
   const actionSectionBottomSpacing = Math.max(20, insets.bottom + 14);
   const fabBottomSpacing = Math.max(88, insets.bottom + 82);
 
+  // Show skeleton loaders only for cycle/today data after initial loading is complete
+  const shouldShowSkeleton = (isCycleLoading || isTodayLoading) && forceShow;
+
   return (
     <Screen scrollable={false}>
       <View style={{ flex: 1 }}>
@@ -419,7 +442,10 @@ export function HomeScreen() {
           contentContainerStyle={{ paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
         >
-      {/* Top bar */}
+        {shouldShowSkeleton ? (
+          <SkeletonLoader />
+        ) : (
+          <>
       <View
         style={{
           marginTop: 0,
@@ -495,7 +521,7 @@ export function HomeScreen() {
           ) : null}
           {ovulationEstimate ? (
             <Typography variant="helper">
-              Ovulation estimate: {ovulationEstimate.estimatedDate} ({ovulationEstimate.confidence} confidence)
+              Ovulation estimate: {ovulationEstimate.estimatedDate} ({ovulationEstimate.confidence} confidence, {ovulationEstimate.confidenceScore}%)
             </Typography>
           ) : null}
         </View>
@@ -927,9 +953,10 @@ export function HomeScreen() {
         )}
       </View>
 
-        </ScrollView>
+          </>
+        )}
 
-      {/* Floating FAB to mirror reference composition */}
+        </ScrollView>
       <PressableScale
         onPress={handleLogFlow}
         testID="home-log-fab"

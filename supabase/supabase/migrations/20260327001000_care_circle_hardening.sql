@@ -119,9 +119,9 @@ begin
   );
 
   insert into public.partners (user_id, partner_user_id, invite_code, status, permissions)
-  values (target_user_id, auth.uid(), code, 'active', new_permissions)
+  values (target_user_id, auth.uid(), code, 'pending', new_permissions)
   on conflict (user_id, partner_user_id)
-  do update set status = 'active', permissions = new_permissions, updated_at = now()
+  do update set status = 'pending', permissions = new_permissions, updated_at = now()
   returning * into new_partner;
 
   return new_partner;
