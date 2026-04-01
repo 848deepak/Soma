@@ -18,7 +18,9 @@ export type PhiActionType =
   | "get_shared_data"
   | "update_permissions"
   | "revoke_connection"
-  | "accept_connection";
+  | "accept_connection"
+  | "get_pending_connections"
+  | "reject_connection";
 
 const SENSITIVE_FIELDS = new Set([
   "start_date",
