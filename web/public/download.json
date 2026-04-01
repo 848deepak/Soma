@@ -3,8 +3,12 @@
   "buildNumber": "0",
   "buildId": "",
   "apkUrl": "",
+<<<<<<< HEAD
   "downloadUrl": "https://github.com/848deepak/Soma/releases/latest/download/soma-health.apk",
   "iosIpaUrl": "https://github.com/848deepak/Soma/releases/latest/download/soma-health.ipa",
+=======
+  "downloadUrl": "https://github.com/848deepak/Soma/releases/download/v1.0.0-build.1/soma-health-v1.0.0-build1.apk",
+>>>>>>> origin/main
   "releaseUrl": "https://github.com/848deepak/Soma/releases/latest",
   "buildDate": ""
 }
