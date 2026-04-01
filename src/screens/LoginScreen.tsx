@@ -11,20 +11,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
-  useColorScheme,
   View,
 } from "react-native";
 
 import {
-    ensureAnonymousSession,
-    resetPassword,
-    signInWithEmail,
+  ensureAnonymousSession,
+  resetPassword,
+  signInWithEmail,
 } from "@/lib/auth";
 import { BrandOrb } from "@/src/components/ui/BrandOrb";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import { identifyUser } from "@/src/services/analytics";
 import { recordRequiredAuthConsent } from "@/src/services/consentService";
 import { sanitizeInput, validateEmail } from "@/src/utils/validation";
@@ -32,7 +32,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function LoginScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -160,228 +160,236 @@ export function LoginScreen() {
       keyboardVerticalOffset={24}
     >
       <Screen>
-        <View style={{ justifyContent: "center", minHeight: 620, paddingTop: 18 }}>
-        {/* ── Brand orb ────────────────────────────────────── */}
-        <BrandOrb isDark={isDark} />
-
-        {/* ── App name ─────────────────────────────────────── */}
-        <Typography
-          style={{
-            fontFamily: "PlayfairDisplay-SemiBold",
-            fontSize: 14,
-            letterSpacing: 4,
-            textTransform: "uppercase",
-            color: isDark ? "rgba(242,242,242,0.5)" : "#9B7E8C",
-            textAlign: "center",
-            marginBottom: 8,
-          }}
+        <View
+          style={{ justifyContent: "center", minHeight: 620, paddingTop: 18 }}
         >
-          SOMA
-        </Typography>
+          {/* ── Brand orb ────────────────────────────────────── */}
+          <BrandOrb isDark={isDark} />
 
-        {/* ── Header ──────────────────────────────────────── */}
-        <Typography variant="serifMd" className="mb-2 text-center">
-          {mode === "login" ? "Welcome back" : "Reset password"}
-        </Typography>
-        <Typography variant="muted" className="mb-10 text-center">
-          {mode === "login"
-            ? "Sign in to continue your wellness journey."
-            : "Enter your email and we'll send a recovery link."}
-        </Typography>
-
-        {/* ── Email input ──────────────────────────────────── */}
-        <View style={inputContainerStyle}>
-          <Typography variant="helper" className="mb-1">
-            Email
-          </Typography>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor="#9B7E8C"
+          {/* ── App name ─────────────────────────────────────── */}
+          <Typography
             style={{
-              fontSize: 16,
-              color: isDark ? "#F2F2F2" : "#2D2327",
+              fontFamily: "PlayfairDisplay-SemiBold",
+              fontSize: 14,
+              letterSpacing: 4,
+              textTransform: "uppercase",
+              color: isDark ? "rgba(242,242,242,0.5)" : "#9B7E8C",
+              textAlign: "center",
+              marginBottom: 8,
             }}
-            testID="email-input"
-          />
-        </View>
+          >
+            SOMA
+          </Typography>
 
-        {/* ── Password input (login mode only) ─────────────── */}
-        {mode === "login" && (
-          <View style={{ ...inputContainerStyle, marginBottom: 24 }}>
+          {/* ── Header ──────────────────────────────────────── */}
+          <Typography variant="serifMd" className="mb-2 text-center">
+            {mode === "login" ? "Welcome back" : "Reset password"}
+          </Typography>
+          <Typography variant="muted" className="mb-10 text-center">
+            {mode === "login"
+              ? "Sign in to continue your wellness journey."
+              : "Enter your email and we'll send a recovery link."}
+          </Typography>
+
+          {/* ── Email input ──────────────────────────────────── */}
+          <View style={inputContainerStyle}>
             <Typography variant="helper" className="mb-1">
-              Password
+              Email
             </Typography>
             <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="••••••••"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="you@example.com"
               placeholderTextColor="#9B7E8C"
               style={{
                 fontSize: 16,
                 color: isDark ? "#F2F2F2" : "#2D2327",
               }}
-              testID="password-input"
+              testID="email-input"
             />
           </View>
-        )}
 
-        {/* ── Reset confirmation ───────────────────────────── */}
-        {resetSent && (
-          <View
-            style={{
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: "rgba(221,167,165,0.3)",
-              backgroundColor: "rgba(221,167,165,0.1)",
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              marginBottom: 16,
-            }}
-          >
-            <Typography className="text-center text-sm text-somaBlush">
-              Recovery email sent! Check your inbox.
-            </Typography>
-          </View>
-        )}
-
-        {/* ── Primary CTA ─────────────────────────────────── */}
-        <PressableScale
-          onPress={mode === "login" ? handleLogin : handleResetPassword}
-          className="mb-4 items-center rounded-full bg-somaBlush py-[18px] dark:bg-darkPrimary"
-          style={{
-            opacity: isLoading ? 0.6 : 1,
-            shadowColor: "#DDA7A5",
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 40,
-            elevation: 12,
-          }}
-          testID="primary-button"
-        >
-          <Typography className="text-base font-semibold text-white">
-            {isLoading
-              ? mode === "login"
-                ? "Signing in…"
-                : "Sending…"
-              : mode === "login"
-                ? "Sign In"
-                : "Send Reset Link"}
-          </Typography>
-        </PressableScale>
-
-        <PressableScale
-          onPress={() => setAcceptedLegal((prev) => !prev)}
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: 10,
-            marginBottom: 14,
-          }}
-        >
-          <View
-            style={{
-              width: 20,
-              height: 20,
-              marginTop: 2,
-              borderRadius: 5,
-              borderWidth: 1.5,
-              borderColor: isDark ? "#A78BFA" : "#DDA7A5",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: acceptedLegal
-                ? isDark
-                  ? "#A78BFA"
-                  : "#DDA7A5"
-                : "transparent",
-            }}
-          >
-            {acceptedLegal ? (
-              <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
-            ) : null}
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Typography variant="helper" style={{ lineHeight: 18 }}>
-              By continuing, you agree to our
-            </Typography>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-              <PressableScale onPress={() => router.push("/legal/privacy" as never)}>
-                <Typography
-                  variant="helper"
-                  className="text-somaBlush dark:text-darkPrimary"
-                >
-                  Privacy Policy
-                </Typography>
-              </PressableScale>
-              <Typography variant="helper">and</Typography>
-              <PressableScale onPress={() => router.push("/legal/terms" as never)}>
-                <Typography
-                  variant="helper"
-                  className="text-somaBlush dark:text-darkPrimary"
-                >
-                  Terms of Use
-                </Typography>
-              </PressableScale>
-              <Typography variant="helper">.</Typography>
-            </View>
-          </View>
-        </PressableScale>
-
-        {/* ── Secondary links ──────────────────────────────── */}
-        <View className="flex-row items-center justify-center gap-4">
-          {mode === "login" ? (
-            <>
-              <PressableScale
-                onPress={() => setMode("reset")}
-                testID="forgot-password-button"
-              >
-                <Typography variant="helper">Forgot password?</Typography>
-              </PressableScale>
-              <Typography variant="helper" className="text-somaMauve">
-                ·
+          {/* ── Password input (login mode only) ─────────────── */}
+          {mode === "login" && (
+            <View style={{ ...inputContainerStyle, marginBottom: 24 }}>
+              <Typography variant="helper" className="mb-1">
+                Password
               </Typography>
-              <PressableScale
-                onPress={() => router.push("/auth/signup" as never)}
-                testID="create-account-button"
-              >
-                <Typography
-                  variant="helper"
-                  className="text-somaBlush dark:text-darkPrimary"
-                >
-                  Create account
-                </Typography>
-              </PressableScale>
-            </>
-          ) : (
-            <PressableScale
-              onPress={() => {
-                setMode("login");
-                setResetSent(false);
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="••••••••"
+                placeholderTextColor="#9B7E8C"
+                style={{
+                  fontSize: 16,
+                  color: isDark ? "#F2F2F2" : "#2D2327",
+                }}
+                testID="password-input"
+              />
+            </View>
+          )}
+
+          {/* ── Reset confirmation ───────────────────────────── */}
+          {resetSent && (
+            <View
+              style={{
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: "rgba(221,167,165,0.3)",
+                backgroundColor: "rgba(221,167,165,0.1)",
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                marginBottom: 16,
               }}
             >
-              <Typography variant="helper">← Back to sign in</Typography>
-            </PressableScale>
+              <Typography className="text-center text-sm text-somaBlush">
+                Recovery email sent! Check your inbox.
+              </Typography>
+            </View>
           )}
-        </View>
 
-        {/* ── Continue without account ────────────────────── */}
-        <PressableScale
-          onPress={handleContinueAnonymously}
-          className="mt-8 items-center"
-          testID="skip-button"
-        >
-          <Typography
-            variant="helper"
-            className="text-somaMauve/60 dark:text-darkTextSecondary/60"
+          {/* ── Primary CTA ─────────────────────────────────── */}
+          <PressableScale
+            onPress={mode === "login" ? handleLogin : handleResetPassword}
+            className="mb-4 items-center rounded-full bg-somaBlush py-[18px] dark:bg-darkPrimary"
+            style={{
+              opacity: isLoading ? 0.6 : 1,
+              shadowColor: "#DDA7A5",
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.4,
+              shadowRadius: 40,
+              elevation: 12,
+            }}
+            testID="primary-button"
           >
-            Continue without an account
-          </Typography>
-        </PressableScale>
+            <Typography className="text-base font-semibold text-white">
+              {isLoading
+                ? mode === "login"
+                  ? "Signing in…"
+                  : "Sending…"
+                : mode === "login"
+                  ? "Sign In"
+                  : "Send Reset Link"}
+            </Typography>
+          </PressableScale>
+
+          <PressableScale
+            onPress={() => setAcceptedLegal((prev) => !prev)}
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                marginTop: 2,
+                borderRadius: 5,
+                borderWidth: 1.5,
+                borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: acceptedLegal
+                  ? isDark
+                    ? "#A78BFA"
+                    : "#DDA7A5"
+                  : "transparent",
+              }}
+            >
+              {acceptedLegal ? (
+                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>
+                  ✓
+                </Typography>
+              ) : null}
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Typography variant="helper" style={{ lineHeight: 18 }}>
+                By continuing, you agree to our
+              </Typography>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                <PressableScale
+                  onPress={() => router.push("/legal/privacy" as never)}
+                >
+                  <Typography
+                    variant="helper"
+                    className="text-somaBlush dark:text-darkPrimary"
+                  >
+                    Privacy Policy
+                  </Typography>
+                </PressableScale>
+                <Typography variant="helper">and</Typography>
+                <PressableScale
+                  onPress={() => router.push("/legal/terms" as never)}
+                >
+                  <Typography
+                    variant="helper"
+                    className="text-somaBlush dark:text-darkPrimary"
+                  >
+                    Terms of Use
+                  </Typography>
+                </PressableScale>
+                <Typography variant="helper">.</Typography>
+              </View>
+            </View>
+          </PressableScale>
+
+          {/* ── Secondary links ──────────────────────────────── */}
+          <View className="flex-row items-center justify-center gap-4">
+            {mode === "login" ? (
+              <>
+                <PressableScale
+                  onPress={() => setMode("reset")}
+                  testID="forgot-password-button"
+                >
+                  <Typography variant="helper">Forgot password?</Typography>
+                </PressableScale>
+                <Typography variant="helper" className="text-somaMauve">
+                  ·
+                </Typography>
+                <PressableScale
+                  onPress={() => router.push("/auth/signup" as never)}
+                  testID="create-account-button"
+                >
+                  <Typography
+                    variant="helper"
+                    className="text-somaBlush dark:text-darkPrimary"
+                  >
+                    Create account
+                  </Typography>
+                </PressableScale>
+              </>
+            ) : (
+              <PressableScale
+                onPress={() => {
+                  setMode("login");
+                  setResetSent(false);
+                }}
+              >
+                <Typography variant="helper">← Back to sign in</Typography>
+              </PressableScale>
+            )}
+          </View>
+
+          {/* ── Continue without account ────────────────────── */}
+          <PressableScale
+            onPress={handleContinueAnonymously}
+            className="mt-8 items-center"
+            testID="skip-button"
+          >
+            <Typography
+              variant="helper"
+              className="text-somaMauve/60 dark:text-darkTextSecondary/60"
+            >
+              Continue without an account
+            </Typography>
+          </PressableScale>
         </View>
       </Screen>
     </KeyboardAvoidingView>

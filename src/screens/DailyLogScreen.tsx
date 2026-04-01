@@ -8,18 +8,18 @@ import {
   ScrollView,
   TextInput,
   View,
-  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
-import { useTodayLog } from "@/hooks/useDailyLogs";
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
 import { useEndCurrentCycle } from "@/hooks/useCycleActions";
+import { useTodayLog } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { FlowLevel, SymptomOption } from "@/types/database";
 
@@ -66,7 +66,7 @@ function Teardrop({
 
 export function DailyLogScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
   const saveLog = useSaveLog();
   const endCurrentCycle = useEndCurrentCycle();
 
@@ -195,11 +195,9 @@ export function DailyLogScreen() {
               } else {
                 const fallbackMessage =
                   message || "Could not end the current period.";
-                Alert.alert(
-                  "Action Failed",
-                  fallbackMessage,
-                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
-                );
+                Alert.alert("Action Failed", fallbackMessage, [
+                  { text: "Try Again", onPress: () => handleEndPeriod() },
+                ]);
               }
             }
           },

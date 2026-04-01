@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { PanResponder, View, useColorScheme } from "react-native";
+import { PanResponder, View } from "react-native";
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -30,6 +30,7 @@ import { DayRow } from "@/src/components/calendar/DayRow";
 import { MiniMonth } from "@/src/components/calendar/MiniMonth";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import {
     buildMonthGrid,
     calendarWeekdays,
@@ -44,7 +45,7 @@ type CalendarScreenProps = {
 };
 
 export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
   const [isYearOverview, setIsYearOverview] = useState(false);
   const [selectedDateIso, setSelectedDateIso] = useState<string | null>(null);
   const [visibleMonth, setVisibleMonth] = useState(new Date().getMonth());

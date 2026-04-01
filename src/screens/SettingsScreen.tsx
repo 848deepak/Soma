@@ -6,12 +6,10 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Appearance,
   KeyboardAvoidingView,
   Linking,
   Platform,
   Share,
-  useColorScheme,
 } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
@@ -29,23 +27,25 @@ import {
 } from "@/hooks/useProfile";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { useAuthContext } from "@/src/context/AuthProvider";
-import { HeaderBar } from "@/src/components/ui/HeaderBar";
-import { Screen } from "@/src/components/ui/Screen";
-import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
 import { AccountActionsSection } from "@/src/components/settings/AccountActionsSection";
+import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
 import { CycleActionsSection } from "@/src/components/settings/CycleActionsSection";
 import { NotificationsSection } from "@/src/components/settings/NotificationsSection";
 import { PreferencesSection } from "@/src/components/settings/PreferencesSection";
 import { PrivacySection } from "@/src/components/settings/PrivacySection";
 import { SettingsProfileHeader } from "@/src/components/settings/SettingsProfileHeader";
 import { ThemeSection } from "@/src/components/settings/ThemeSection";
+import { HeaderBar } from "@/src/components/ui/HeaderBar";
+import { Screen } from "@/src/components/ui/Screen";
+import { useAuthContext } from "@/src/context/AuthProvider";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import {
   getAnalyticsConsentStatus,
   requestAnalyticsConsent,
   revokeAnalyticsConsent,
   track,
 } from "@/src/services/analytics";
+import { logDataAccess } from "@/src/services/auditService";
 import {
   getConsentSnapshot,
   setAnalyticsConsent,
@@ -56,12 +56,11 @@ import {
   requestPermissions,
   scheduleDailyLogReminder,
 } from "@/src/services/notificationService";
-import { logDataAccess } from "@/src/services/auditService";
 import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
 
 export function SettingsScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark, theme, setTheme, colors } = useAppTheme();
   const { isAnonymous } = useAuthContext();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
@@ -80,10 +79,6 @@ export function SettingsScreen() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [cycleLength, setCycleLength] = useState("28");
   const [periodDuration, setPeriodDuration] = useState("5");
-
-  const [activeTheme, setActiveTheme] = useState<"Cream" | "Midnight">(
-    isDark ? "Midnight" : "Cream",
-  );
 
   const { data: currentCycleData } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
@@ -109,13 +104,8 @@ export function SettingsScreen() {
     })();
   }, []);
 
-  function handleThemeSelect(themeId: "Cream" | "Midnight") {
-    setActiveTheme(themeId);
-    if (themeId === "Midnight") {
-      Appearance.setColorScheme("dark");
-    } else {
-      Appearance.setColorScheme("light");
-    }
+  function handleThemeSelect(themeId: "cream" | "midnight" | "lavender") {
+    setTheme(themeId);
   }
 
   const displayName = profile?.first_name || profile?.username || "You";
@@ -172,9 +162,7 @@ export function SettingsScreen() {
     const periodDurationValue = Number(periodDuration);
 
     return {
-      firstName: normalizedFirstName
-        ? null
-        : "Please enter your first name.",
+      firstName: normalizedFirstName ? null : "Please enter your first name.",
       username:
         isUsernameLocked || normalizedUsername
           ? null
@@ -210,8 +198,8 @@ export function SettingsScreen() {
 
   const firstValidationError = useMemo(
     () =>
-      Object.values(validationErrors).find(
-        (value): value is string => Boolean(value),
+      Object.values(validationErrors).find((value): value is string =>
+        Boolean(value),
       ) ?? null,
     [validationErrors],
   );
@@ -222,7 +210,7 @@ export function SettingsScreen() {
     marginTop: 16,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
+    borderColor: isDark ? "rgba(255,255,255,0.1)" : colors.borderLight,
     backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
     padding: 20,
     shadowColor: "#DDA7A5",
@@ -692,9 +680,7 @@ export function SettingsScreen() {
       string | undefined
     >;
     const appVersion =
-      Constants.expoConfig?.version ??
-      manifestExtra.version ??
-      "unknown";
+      Constants.expoConfig?.version ?? manifestExtra.version ?? "unknown";
     const userHint = profile?.username ? `@${profile.username}` : "anonymous";
     const body = [
       "Please describe the issue:",
@@ -702,7 +688,7 @@ export function SettingsScreen() {
       "--- Diagnostics ---",
       `Platform: ${Platform.OS}`,
       `App Version: ${appVersion}`,
-      `Theme: ${activeTheme}`,
+      `Theme: ${theme}`,
       `User: ${userHint}`,
     ].join("\n");
     const emailUrl = `mailto:support@soma-app.com?subject=${encodeURIComponent("Soma Issue Report")}&body=${encodeURIComponent(body)}`;
@@ -722,109 +708,113 @@ export function SettingsScreen() {
       keyboardVerticalOffset={96}
     >
       <Screen>
-      <SettingsProfileHeader
-        isDark={isDark}
-        isLoading={isLoading}
-        displayName={displayName}
-        memberSince={memberSince}
-      />
+        <SettingsProfileHeader
+          isDark={isDark}
+          isLoading={isLoading}
+          displayName={displayName}
+          memberSince={memberSince}
+        />
 
-      <HeaderBar title="Settings" />
+        <HeaderBar title="Settings" />
 
-      <AccountProfileSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        isEditMode={isEditMode}
-        handleEditProfile={handleEditProfile}
-        firstName={firstName}
-        setFirstName={setFirstName}
-        username={username}
-        setUsername={setUsername}
-        dateOfBirth={dateOfBirth}
-        setDateOfBirth={setDateOfBirth}
-        isUsernameLocked={isUsernameLocked}
-        validationErrors={{
-          firstName: validationErrors.firstName,
-          username: validationErrors.username,
-          dateOfBirth: validationErrors.dateOfBirth,
-        }}
-      />
+        <AccountProfileSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          isEditMode={isEditMode}
+          handleEditProfile={handleEditProfile}
+          firstName={firstName}
+          setFirstName={setFirstName}
+          username={username}
+          setUsername={setUsername}
+          dateOfBirth={dateOfBirth}
+          setDateOfBirth={setDateOfBirth}
+          isUsernameLocked={isUsernameLocked}
+          validationErrors={{
+            firstName: validationErrors.firstName,
+            username: validationErrors.username,
+            dateOfBirth: validationErrors.dateOfBirth,
+          }}
+        />
 
-      <PreferencesSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        cycleLength={cycleLength}
-        setCycleLength={setCycleLength}
-        periodDuration={periodDuration}
-        setPeriodDuration={setPeriodDuration}
-        isEditMode={isEditMode}
-        validationErrors={{
-          cycleLength: validationErrors.cycleLength,
-          periodDuration: validationErrors.periodDuration,
-        }}
-        handleCancelEdit={handleCancelEdit}
-        handleSaveProfile={handleSaveProfile}
-        isSaveDisabled={updateProfile.isPending || !hasChanges || !isFormValid}
-        isSavePending={updateProfile.isPending}
-        isFormValid={isFormValid}
-        firstValidationError={firstValidationError}
-      />
+        <PreferencesSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          cycleLength={cycleLength}
+          setCycleLength={setCycleLength}
+          periodDuration={periodDuration}
+          setPeriodDuration={setPeriodDuration}
+          isEditMode={isEditMode}
+          validationErrors={{
+            cycleLength: validationErrors.cycleLength,
+            periodDuration: validationErrors.periodDuration,
+          }}
+          handleCancelEdit={handleCancelEdit}
+          handleSaveProfile={handleSaveProfile}
+          isSaveDisabled={
+            updateProfile.isPending || !hasChanges || !isFormValid
+          }
+          isSavePending={updateProfile.isPending}
+          isFormValid={isFormValid}
+          firstValidationError={firstValidationError}
+        />
 
-      <CycleActionsSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        isResetPending={resetPredictions.isPending}
-        isStartPending={startNewCycle.isPending}
-        isEndPending={endCurrentCycle.isPending}
-        activeCycleStartDate={currentCycleData?.cycle?.start_date}
-        handleResetPredictions={handleResetPredictions}
-        handleStartPeriodToday={handleStartPeriodToday}
-        handleEndPeriodToday={handleEndPeriodToday}
-      />
+        <CycleActionsSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          isResetPending={resetPredictions.isPending}
+          isStartPending={startNewCycle.isPending}
+          isEndPending={endCurrentCycle.isPending}
+          activeCycleStartDate={currentCycleData?.cycle?.start_date}
+          handleResetPredictions={handleResetPredictions}
+          handleStartPeriodToday={handleStartPeriodToday}
+          handleEndPeriodToday={handleEndPeriodToday}
+        />
 
-      <NotificationsSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        notificationsEnabled={notificationsEnabled}
-        handleNotificationToggle={handleNotificationToggle}
-        isNotificationSaving={isNotificationSaving}
-        analyticsEnabled={analyticsEnabled}
-        handleAnalyticsToggle={handleAnalyticsToggle}
-        openPartnerSync={() => router.push("/partner" as never)}
-      />
+        <NotificationsSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          notificationsEnabled={notificationsEnabled}
+          handleNotificationToggle={handleNotificationToggle}
+          isNotificationSaving={isNotificationSaving}
+          analyticsEnabled={analyticsEnabled}
+          handleAnalyticsToggle={handleAnalyticsToggle}
+          openPartnerSync={() => router.push("/partner" as never)}
+        />
 
-      <PrivacySection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        openDataConsent={() => router.push("/legal/data-consent" as never)}
-        openDataPractices={() => router.push("/legal/data-practices" as never)}
-        openDataRights={() => router.push("/legal/data-rights" as never)}
-        openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
-        openTerms={() => router.push("/legal/terms" as never)}
-        openMedicalDisclaimer={() =>
-          router.push("/legal/medical-disclaimer" as never)
-        }
-      />
+        <PrivacySection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          openDataConsent={() => router.push("/legal/data-consent" as never)}
+          openDataPractices={() =>
+            router.push("/legal/data-practices" as never)
+          }
+          openDataRights={() => router.push("/legal/data-rights" as never)}
+          openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
+          openTerms={() => router.push("/legal/terms" as never)}
+          openMedicalDisclaimer={() =>
+            router.push("/legal/medical-disclaimer" as never)
+          }
+        />
 
-      <ThemeSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        activeTheme={activeTheme}
-        handleThemeSelect={handleThemeSelect}
-      />
+        <ThemeSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          activeTheme={theme}
+          handleThemeSelect={handleThemeSelect}
+        />
 
-      <AccountActionsSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        isDeletePending={deleteAllData.isPending}
-        isLoggingOut={isLoggingOut}
-        isAnonymous={isAnonymous}
-        handleExportData={handleExportData}
-        handleSendFeedback={handleSendFeedback}
-        handleDeleteAllData={handleDeleteAllData}
-        handleLogout={handleLogout}
-        handleSignIn={handleSignIn}
-      />
+        <AccountActionsSection
+          isDark={isDark}
+          cardStyle={sectionCardStyle}
+          isDeletePending={deleteAllData.isPending}
+          isLoggingOut={isLoggingOut}
+          isAnonymous={isAnonymous}
+          handleExportData={handleExportData}
+          handleSendFeedback={handleSendFeedback}
+          handleDeleteAllData={handleDeleteAllData}
+          handleLogout={handleLogout}
+          handleSignIn={handleSignIn}
+        />
       </Screen>
     </KeyboardAvoidingView>
   );

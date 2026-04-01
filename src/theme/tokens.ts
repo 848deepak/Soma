@@ -41,6 +41,37 @@ export const darkTheme = {
   glow: "#4F46E5",
 };
 
+export const lavenderTheme = {
+  // Backgrounds
+  background: "#F3F0FF",
+  surface: "#FFFFFF",
+  card: "#FFFFFF",
+  // Brand colors
+  primary: "#9B8AC4",
+  primaryDark: "#7C6B9E",
+  secondary: "#C1BBDD",
+  accent: "#7C6B9E",
+  // Text
+  textPrimary: "#2D2327",
+  textSecondary: "#7C6B9E",
+  // Borders
+  border: "rgba(155,138,196,0.22)",
+  borderLight: "rgba(255,255,255,0.68)",
+  // Glow tint
+  glow: "#E8E0F8",
+};
+
+export type ThemeType = "cream" | "midnight" | "lavender";
+
+export const themeByType = {
+  cream: lightTheme,
+  midnight: darkTheme,
+  lavender: lavenderTheme,
+} as const;
+
+export const isDarkThemeType = (theme: ThemeType): boolean =>
+  theme === "midnight";
+
 export const cycleCalendarTheme = {
   light: {
     screenBackground: "#FAF7F4",
