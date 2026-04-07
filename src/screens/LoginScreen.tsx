@@ -3,8 +3,15 @@
  *
  * Sign-in screen aligned with Figma design system.
  * Route: /auth/login
+ *
+ * NOTE: Login screen does NOT handle routing after successful sign-in.
+ * That decision is made by AuthBootstrap in _layout.tsx, which checks:
+ * - Session status (authenticated vs anonymous)
+ * - Profile existence and onboarding state
+ * - First-launch flag (HAS_LAUNCHED_KEY)
+ *
+ * This screen's only job after successful login is to clear its loading state.
  */
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -29,6 +36,7 @@ import { identifyUser } from "@/src/services/analytics";
 import { recordRequiredAuthConsent } from "@/src/services/consentService";
 import { sanitizeInput, validateEmail } from "@/src/utils/validation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 
 export function LoginScreen() {
   const router = useRouter();
@@ -40,11 +48,6 @@ export function LoginScreen() {
   const [mode, setMode] = useState<"login" | "reset">("login");
   const [resetSent, setResetSent] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(true);
-
-  // Required flow: Sign in/up → Welcome → Home
-  async function routeAfterLogin(_userId: string) {
-    router.replace("/welcome" as never);
-  }
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
@@ -72,10 +75,8 @@ export function LoginScreen() {
       await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
       if (user) {
         identifyUser(user.id, { auth_method: "email" });
-        await routeAfterLogin(user.id);
-      } else {
-        router.replace("/(tabs)" as never);
       }
+      // AuthBootstrap in _layout.tsx will handle routing based on auth state and profile
     } catch (error: unknown) {
       const message =
         error instanceof Error
