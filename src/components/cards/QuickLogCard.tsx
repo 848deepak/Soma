@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Card } from '@/src/components/ui/Card';
 import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Typography } from '@/src/components/ui/Typography';
-import { energyOptions, moodOptions } from '@/src/utils/mockData';
+import { ENERGY_OPTIONS, MOOD_OPTIONS } from '@/src/domain/constants/logOptions';
 
 type QuickLogCardProps = {
   selectedMood?: string;
@@ -43,7 +43,7 @@ export function QuickLogCard({ selectedMood, selectedEnergy, onMoodSelect, onEne
         Mood
       </Typography>
       <View className="mb-2 flex-row flex-wrap">
-        {moodOptions.map((mood) => (
+        {MOOD_OPTIONS.map((mood) => (
           <Pill key={mood} value={mood} active={selectedMood === mood} onPress={() => onMoodSelect(mood)} />
         ))}
       </View>
@@ -52,7 +52,7 @@ export function QuickLogCard({ selectedMood, selectedEnergy, onMoodSelect, onEne
         Energy
       </Typography>
       <View className="flex-row flex-wrap">
-        {energyOptions.map((energy) => (
+        {ENERGY_OPTIONS.map((energy) => (
           <Pill key={energy} value={energy} active={selectedEnergy === energy} onPress={() => onEnergySelect(energy)} />
         ))}
       </View>

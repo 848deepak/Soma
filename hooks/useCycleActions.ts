@@ -6,20 +6,19 @@ import { supabase } from "@/lib/supabase";
 import { enqueueSync } from "@/src/database/localDB";
 import { trackEvent } from "@/src/services/analytics";
 import { encryptionService } from "@/src/services/encryptionService";
-
-function todayIso(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function isIsoDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
+import {
+  todayLocal,
+  diffDaysInclusive,
+  addDays,
+  isValidLocalDate,
+} from "@/src/domain/utils/dateUtils";
 
 export type PeriodRangeInput = { startDate: string; endDate?: string };
+export type ResetPredictionsInput = {
+  cycleLength: number;
+  periodLength: number;
+};
+
 type PeriodRangeInputWithFallback = PeriodRangeInput & {
   fallbackActiveCycle?: ActiveCycleLike | null;
 };
@@ -37,16 +36,16 @@ export async function logPeriodRangeAction({
     throw new Error("Not authenticated");
   }
 
-  if (!isIsoDate(startDate)) {
+  if (!isValidLocalDate(startDate)) {
     throw new Error("Start date must be in YYYY-MM-DD format.");
   }
 
-  const today = todayIso();
+  const today = todayLocal();
   if (startDate > today) {
     throw new Error("Start date cannot be in the future.");
   }
 
-  if (endDate && !isIsoDate(endDate)) {
+  if (endDate && !isValidLocalDate(endDate)) {
     throw new Error("End date must be in YYYY-MM-DD format.");
   }
 
@@ -158,23 +157,7 @@ export async function logPeriodRangeAction({
   return { hasEndDate: Boolean(endDate) };
 }
 
-function diffDaysInclusive(startIso: string, endIso: string): number {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  const diff = Math.floor(
-    (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  return Math.max(1, diff + 1);
-}
-
 type ActiveCycleLike = { id: string; start_date: string };
-
-export type ResetPredictionsInput = {
-  cycleLength: number;
-  periodLength: number;
-};
 
 type EndCurrentPeriodInput = {
   userId: string;
@@ -275,15 +258,6 @@ async function fetchActiveCycleForEnd(userId: string): Promise<{
   return { data: lastData, error: lastError };
 }
 
-function addDaysIso(startIso: string, days: number): string {
-  const [year, month, day] = startIso
-    .split("-")
-    .map(Number) as [number, number, number];
-  const start = new Date(year, month - 1, day);
-  start.setDate(start.getDate() + days);
-  return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-}
-
 function computePredictions(
   startDateIso: string,
   cycleLength: number,
@@ -291,8 +265,8 @@ function computePredictions(
 ): { predicted_ovulation: string; predicted_next_cycle: string } {
   const ovulationDay = Math.max(periodLength + 2, cycleLength - 14);
   return {
-    predicted_ovulation: addDaysIso(startDateIso, ovulationDay - 1),
-    predicted_next_cycle: addDaysIso(startDateIso, cycleLength),
+    predicted_ovulation: addDays(startDateIso, ovulationDay - 1),
+    predicted_next_cycle: addDays(startDateIso, cycleLength),
   };
 }
 
@@ -346,16 +320,16 @@ export async function endCurrentPeriod({
   }
 
   // IMPROVED: Validate start_date format and value
-  if (!isIsoDate(resolvedCycle.start_date)) {
+  if (!isValidLocalDate(resolvedCycle.start_date)) {
     throw new Error(
       `Invalid start date format: "${resolvedCycle.start_date}". Expected YYYY-MM-DD.`,
     );
   }
 
-  const resolvedEndDate = endDate ?? todayIso();
+  const resolvedEndDate = endDate ?? todayLocal();
 
   // IMPROVED: Better end date validation with helpful error
-  if (!isIsoDate(resolvedEndDate)) {
+  if (!isValidLocalDate(resolvedEndDate)) {
     throw new Error(
       `Invalid end date format: "${resolvedEndDate}". Expected YYYY-MM-DD.`,
     );
@@ -502,7 +476,7 @@ export function useStartNewCycle() {
 
       const { error } = await supabase.from("cycles").insert({
         user_id: user.id,
-        start_date: todayIso(),
+        start_date: todayLocal(),
         current_phase: "menstrual",
       });
 

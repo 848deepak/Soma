@@ -82,7 +82,11 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
   const yearOpacity = useSharedValue(0);
   const yearScale = useSharedValue(0.98);
 
-  const resolvedCycleData = useCycleCalendar(cycleData);
+  const resolvedCycleData = useCycleCalendar({
+    cycleData,
+    visibleMonth,
+    visibleYear,
+  });
   const { data: currentCycle } = useCurrentCycle();
   const startCycleMutation = useStartNewCycle();
   const endCycleMutation = useEndCurrentCycle();

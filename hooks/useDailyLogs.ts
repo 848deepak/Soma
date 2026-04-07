@@ -2,8 +2,9 @@
  * hooks/useDailyLogs.ts
  * Queries daily_logs from Supabase.
  *
- * Two exports:
+ * Exports:
  *   useDailyLogs(limit)  – recent N logs (used by Insights / Calendar)
+ *   useDailyLogsByDateRange(from, to) – logs within date range (optimized for calendar views)
  *   useTodayLog()        – today's single log (used by Dashboard widgets + log screens)
  */
 import { useQuery } from "@tanstack/react-query";
@@ -11,16 +12,19 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { logDataAccess } from "@/src/services/auditService";
 import type { DailyLogRow } from "@/types/database";
+import { todayLocal } from "@/src/domain/utils/dateUtils";
 
 export const DAILY_LOGS_KEY = (limit: number) => ["daily-logs", limit] as const;
-export const todayIso = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-export const TODAY_LOG_KEY = () => ["daily-log", todayIso()] as const;
+export const DAILY_LOGS_DATE_RANGE_KEY = (from: string, to: string) =>
+  ["daily-logs-range", from, to] as const;
+
+/**
+ * Get today's ISO date string in user's LOCAL timezone.
+ * @deprecated Use todayLocal() from dateUtils instead
+ */
+export const todayIso = () => todayLocal();
+
+export const TODAY_LOG_KEY = () => ["daily-log", todayLocal()] as const;
 
 /**
  * Fetches the N most recent daily log rows for the signed-in user.
@@ -56,6 +60,44 @@ export function useDailyLogs(limit: number = 90) {
 }
 
 /**
+ * Fetches daily logs within a specific date range (optimized for calendar screens).
+ * Dramatically reduces query size from 365 days to ~90 days (prev month + current + next month).
+ *
+ * @param fromDate ISO date string "YYYY-MM-DD" (inclusive)
+ * @param toDate ISO date string "YYYY-MM-DD" (inclusive)
+ */
+export function useDailyLogsByDateRange(fromDate: string, toDate: string) {
+  return useQuery<DailyLogRow[]>({
+    queryKey: DAILY_LOGS_DATE_RANGE_KEY(fromDate, toDate),
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from("daily_logs")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", fromDate)
+        .lte("date", toDate)
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as DailyLogRow[];
+      void logDataAccess("daily_logs", "view", {
+        source: "useDailyLogsByDateRange",
+        resultCount: rows.length,
+        fromDate,
+        toDate,
+      });
+      return rows;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
  * Fetches today's log row (or null if the user hasn't logged today).
  * Used by the Dashboard to populate the mood/energy/flow widgets.
  */
@@ -79,7 +121,7 @@ export function useTodayLog() {
         .from("daily_logs")
         .select("*")
         .eq("user_id", user.id)
-        .eq("date", todayIso())
+        .eq("date", todayLocal())
         .maybeSingle();
 
       const { data, error } = await Promise.race([logPromise, timeoutPromise]);

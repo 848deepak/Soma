@@ -9,37 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { trackEvent } from "@/src/services/analytics";
 import { getPeriodAutoEndDays } from "@/src/services/remoteConfig";
-
-function todayIso(): string {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
-    today.getDate(),
-  ).padStart(2, "0")}`;
-}
-
-function isoToLocalDate(isoDate: string): Date {
-  const [year, month, day] = isoDate.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  return new Date(year, month - 1, day);
-}
-
-function addDaysIso(isoDate: string, daysToAdd: number): string {
-  const date = isoToLocalDate(isoDate);
-  date.setDate(date.getDate() + daysToAdd);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
-}
-
-function diffDaysInclusive(startIso: string, endIso: string): number {
-  const start = isoToLocalDate(startIso);
-  const end = isoToLocalDate(endIso);
-  const diff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  return Math.max(1, diff + 1);
-}
+import { todayLocal, diffDaysInclusive, addDays } from "@/src/domain/utils/dateUtils";
 
 export function usePeriodAutoEnd(): void {
   const { user } = useAuthContext();
@@ -67,13 +37,13 @@ export function usePeriodAutoEnd(): void {
       }
 
       const autoEndDays = await getPeriodAutoEndDays();
-      const activeDays = diffDaysInclusive(activeCycle.start_date, todayIso());
+      const activeDays = diffDaysInclusive(activeCycle.start_date, todayLocal());
 
       if (activeDays < autoEndDays) {
         return;
       }
 
-      const autoEndDate = addDaysIso(activeCycle.start_date, autoEndDays - 1);
+      const autoEndDate = addDays(activeCycle.start_date, autoEndDays - 1);
 
       const cachedCycle = queryClient.getQueryData<DerivedCycleData | null>(
         CURRENT_CYCLE_KEY,

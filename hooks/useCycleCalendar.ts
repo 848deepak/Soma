@@ -2,10 +2,11 @@ import { useMemo } from "react";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
 import { useCycleHistory } from "@/hooks/useCycleHistory";
-import { useDailyLogs } from "@/hooks/useDailyLogs";
+import { useDailyLogs, useDailyLogsByDateRange } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
 import { predictFertileWindow } from "@/services/CycleIntelligence";
 import type { CompletedCycle, CycleRow, DailyLogRow } from "@/types/database";
+import { addDays as utilAddDays, dateRange as computeDateRange } from "@/src/domain/utils/dateUtils";
 
 export type CycleStatus =
   | "period"
@@ -27,6 +28,10 @@ const STATUS_PRIORITY: Record<Exclude<CycleStatus, null>, number> = {
   predicted_period: 1,
 };
 
+function addDays(iso: string, days: number): string {
+  return utilAddDays(iso, days);
+}
+
 function dayIso(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
@@ -36,31 +41,13 @@ function parseIso(iso: string): Date {
   return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
 }
 
-function addDays(iso: string, days: number): string {
-  const date = parseIso(iso);
-  date.setDate(date.getDate() + days);
-  return dayIso(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
 function localTodayIso(): string {
   const now = new Date();
   return dayIso(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function inRange(startIso: string, endIso: string): string[] {
-  const result: string[] = [];
-  const start = parseIso(startIso);
-  const end = parseIso(endIso);
-  const cursor = new Date(start);
-
-  while (cursor <= end) {
-    result.push(
-      dayIso(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()),
-    );
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return result;
+  return computeDateRange(startIso, endIso);
 }
 
 function setStatus(
@@ -151,21 +138,73 @@ export function buildCycleDataMap(
   return statusMap;
 }
 
-export function useCycleCalendar(cycleData?: CycleDataMap): CycleDataMap {
+/**
+ * Compute an ISO date string from year, month, day.
+ */
+function dayIsoHelper(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Compute the visible date range for calendar queries.
+ * Returns: [visibleRangeStart, visibleRangeEnd]
+ * Window = previous month + current month + next month (approx 90 days).
+ */
+function getVisibleDateRange(
+  visibleMonth?: number,
+  visibleYear?: number,
+): [string, string] | null {
+  if (visibleMonth === undefined || visibleYear === undefined) {
+    return null;
+  }
+
+  // Start: first day of previous month
+  const prevMonth = visibleMonth === 0 ? 11 : visibleMonth - 1;
+  const prevYear = visibleMonth === 0 ? visibleYear - 1 : visibleYear;
+  const fromDate = dayIsoHelper(prevYear, prevMonth, 1);
+
+  // End: last day of next month
+  const nextMonth = visibleMonth === 11 ? 0 : visibleMonth + 1;
+  const nextYear = visibleMonth === 11 ? visibleYear + 1 : visibleYear;
+  const lastDayOfNext = new Date(nextYear, nextMonth + 1, 0).getDate();
+  const toDate = dayIsoHelper(nextYear, nextMonth, lastDayOfNext);
+
+  return [fromDate, toDate];
+}
+
+export interface UseCycleCalendarOptions {
+  /** Pre-computed cycle data (used for server-side rendering / testing) */
+  cycleData?: CycleDataMap;
+  /** Visible month (0–11) for optimized date range queries */
+  visibleMonth?: number;
+  /** Visible year for optimized date range queries */
+  visibleYear?: number;
+}
+
+export function useCycleCalendar(options?: UseCycleCalendarOptions): CycleDataMap {
   const { data: profile } = useProfile();
   const { data: cycleDataRaw } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
   const { data: completedCycles = [] } = useCycleHistory(8);
-  const { data: dailyLogs = [] } = useDailyLogs(365);
+
+  // Optimize: use date range query if visibleMonth/Year provided; fallback to 365-day limit
+  const dateRange = getVisibleDateRange(options?.visibleMonth, options?.visibleYear);
+  const { data: dailyLogsByRange = [] } = useDailyLogsByDateRange(
+    dateRange?.[0] ?? "2000-01-01",
+    dateRange?.[1] ?? "2099-12-31",
+  );
+  const { data: dailyLogsLegacy = [] } = useDailyLogs(dateRange ? 0 : 365); // Only use if no date range
+
+  const dailyLogs = dateRange ? dailyLogsByRange : dailyLogsLegacy;
 
   const periodLength = profile?.period_duration_average ?? 5;
   const cycleLength = profile?.cycle_length_average ?? 28;
 
   return useMemo(() => {
-    if (cycleData) {
-      return cycleData;
+    if (options?.cycleData) {
+      return options.cycleData;
     }
 
     return buildCycleDataMap(
@@ -176,7 +215,7 @@ export function useCycleCalendar(cycleData?: CycleDataMap): CycleDataMap {
       cycleLength,
     );
   }, [
-    cycleData,
+    options?.cycleData,
     cycleDataRaw?.cycle,
     completedCycles,
     dailyLogs,

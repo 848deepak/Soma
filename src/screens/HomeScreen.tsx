@@ -209,12 +209,10 @@ export function HomeScreen() {
   const router = useRouter();
   const { theme, isDark, colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const hydrate = useCycleStore((s) => s.hydrate);
   const { user } = useAuthContext();
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
   const [forceShow, setForceShow] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
   const { pendingCount, isSyncing, flush } = useOfflineQueue();
 
   // ─── Real-time Supabase sync ─────────────────────────────────────────────
@@ -247,24 +245,6 @@ export function HomeScreen() {
   const hasPrimaryConnections = (careCircleState?.asPrimary?.length ?? 0) > 0;
   const hasViewerConnections = (careCircleState?.asViewer?.length ?? 0) > 0;
 
-  // Initialize app state once
-  useEffect(() => {
-    if (!hasInitialized) {
-      hydrate();
-      setHasInitialized(true);
-    }
-  }, [hydrate, hasInitialized]);
-
-  // Optimized refetch logic - only run once on mount to avoid infinite loops
-  useEffect(() => {
-    if (hasInitialized && typeof refetchCurrentCycle === "function") {
-      // Use a timeout to ensure this only happens once after initialization
-      const timeoutId = setTimeout(() => {
-        void refetchCurrentCycle();
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [hasInitialized]); // Removed refetchCurrentCycle dependency to prevent infinite loops
 
   // ─── Loading timeout protection ──────────────────────────────────────────
   useEffect(() => {
@@ -368,6 +348,35 @@ export function HomeScreen() {
   ]);
 
   // Show loading splash only if all queries are loading AND timeout hasn't been reached AND no errors
+  useEffect(() => {
+    // Force show content after 10 seconds even if still loading (reduced from 15s)
+    const timeoutId = setTimeout(() => {
+      console.warn(
+        "[HomeScreen] Loading timeout reached, showing content with fallbacks",
+      );
+      setForceShow(true);
+    }, 10000);
+
+    // Clear timeout when loading completes normally or errors occur
+    if (
+      (!isProfileLoading && !isTodayLoading && !isCycleLoading) ||
+      profileError ||
+      todayError ||
+      cycleError
+    ) {
+      clearTimeout(timeoutId);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    isProfileLoading,
+    isTodayLoading,
+    isCycleLoading,
+    profileError,
+    todayError,
+    cycleError,
+  ]);
+
   if (
     (isProfileLoading || isTodayLoading || isCycleLoading) &&
     !forceShow &&

@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import type { CyclePhase, CycleRow } from "@/types/database";
+import { diffDaysExclusive, parseLocalDate, dateRange as computeDateRange, addDays } from "@/src/domain/utils/dateUtils";
 
 export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
@@ -17,14 +18,18 @@ export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
 /** Returns the 1-based day number within the cycle (Day 1 = start_date). */
 export function computeCycleDay(startDateIso: string): number {
-  const [year, month, day] = startDateIso.split("-").map(Number);
-  const start = Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1);
-  const now = new Date();
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const diff = Math.floor(
-    (today - start) / (1000 * 60 * 60 * 24),
-  );
-  return Math.max(1, diff + 1);
+  // Get today's date in local timezone
+  const today = new Date();
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  // diffDaysExclusive: 0 = same day, 1 = next day, etc.
+  // We want cycleDay: 1 = start_date, 2 = next day, etc.
+  // So cycleDay = diffDaysExclusive + 1
+  return diffDaysExclusive(startDateIso, todayStr) + 1;
 }
 
 /**
@@ -159,42 +164,37 @@ export function buildMiniCalendar(
 }> {
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
 
   const periodDates = new Set<string>();
 
-  const toIso = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   if (cycle) {
-    const start = new Date(`${cycle.start_date}T00:00:00`);
-    const end = cycle.end_date
-      ? new Date(`${cycle.end_date}T00:00:00`)
-      : (() => {
-          const inferred = new Date(start);
-          inferred.setDate(inferred.getDate() + Math.max(0, periodLen - 1));
-          return inferred;
-        })();
-
-    if (end >= start) {
-      const cursor = new Date(start);
-      while (cursor <= end) {
-        periodDates.add(toIso(cursor));
-        cursor.setDate(cursor.getDate() + 1);
-      }
+    // Compute period date range
+    let endDateStr = cycle.end_date;
+    if (!endDateStr) {
+      // Infer end date from period length
+      const inferredEnd = parseLocalDate(cycle.start_date);
+      inferredEnd.setDate(inferredEnd.getDate() + Math.max(0, periodLen - 1));
+      endDateStr = [
+        inferredEnd.getFullYear(),
+        String(inferredEnd.getMonth() + 1).padStart(2, "0"),
+        String(inferredEnd.getDate()).padStart(2, "0"),
+      ].join("-");
     }
 
-    // Predicted next period window
+    // Add all period dates
+    const periodRange = computeDateRange(cycle.start_date, endDateStr);
+    periodRange.forEach((dateStr) => periodDates.add(dateStr));
+
+    // Add predicted next period dates
     if (cycle.predicted_next_cycle) {
-      const next = new Date(`${cycle.predicted_next_cycle}T00:00:00`);
       for (let i = 0; i < periodLen; i++) {
-        const d = new Date(next);
-        d.setDate(next.getDate() + i);
-        periodDates.add(toIso(d));
+        const predictedDate = addDays(cycle.predicted_next_cycle, i);
+        periodDates.add(predictedDate);
       }
     }
   }
@@ -202,12 +202,16 @@ export function buildMiniCalendar(
   return [-3, -2, -1, 0, 1, 2, 3].map((offset) => {
     const d = new Date(today);
     d.setDate(today.getDate() + offset);
-    const iso = toIso(d);
+    const dateStr = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0"),
+    ].join("-");
     return {
       day: DAY_NAMES[d.getDay()],
       date: d.getDate(),
-      isCurrent: offset === 0,
-      hasPeriod: periodDates.has(iso),
+      isCurrent: dateStr === todayStr,
+      hasPeriod: periodDates.has(dateStr),
     };
   });
 }
