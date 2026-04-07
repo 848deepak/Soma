@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Animated, Easing, Text, View } from "react-native";
 
 import { useAppTheme } from "@/src/context/ThemeContext";
+import { logWarn } from "@/platform/monitoring/logger";
 
 interface SomaLoadingSplashProps {
   /** Force hide the splash after a timeout (default: 20 seconds) */
@@ -81,7 +82,9 @@ export function SomaLoadingSplash({
 
     // Auto-hide after timeout
     const timeoutTimer = setTimeout(() => {
-      console.warn("[SomaLoadingSplash] Timeout reached, calling onTimeout");
+      logWarn("soma_loading_splash_timeout", {
+        message: "Timeout reached, calling onTimeout",
+      });
       onTimeout?.();
     }, timeout);
 

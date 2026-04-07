@@ -19,6 +19,7 @@ import {
 } from "@/hooks/useCurrentCycle";
 import { supabase } from "@/lib/supabase";
 import { captureException } from "@/src/services/errorTracking";
+import { logError } from "@/platform/monitoring/logger";
 import type { CycleRow } from "@/types/database";
 
 type CycleState = {
@@ -161,7 +162,9 @@ export const useCycleStore = create<CycleState>((set) => ({
         });
       }
     } catch (error) {
-      console.warn("[CycleStore] Hydration failed:", error);
+      logError('store', 'cycle_store_hydration_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       captureException(
         error instanceof Error ? error : new Error(String(error)),
       );

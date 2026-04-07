@@ -20,6 +20,7 @@
 
 import { v4 as uuid } from 'uuid';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logDataEvent, logError, logWarn } from '@/platform/monitoring/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -120,9 +121,13 @@ export class OfflineQueueManager {
       queue.push(queued);
       await AsyncStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
 
-      console.log(`[OfflineQueue] Enqueued operation ${requestId} to ${table}`);
+      logDataEvent('offline_queue_enqueue', { requestId, table });
     } catch (err) {
-      console.error('[OfflineQueue] Failed to enqueue operation:', err);
+      logError('data', 'offline_queue_enqueue_failed', {
+        requestId,
+        table,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw new Error(`Failed to enqueue offline operation: ${err instanceof Error ? err.message : String(err)}`);
     }
 
@@ -139,7 +144,9 @@ export class OfflineQueueManager {
       const queue: QueuedOperation[] = JSON.parse(data);
       return queue.length;
     } catch (err) {
-      console.error('[OfflineQueue] Failed to get queue length:', err);
+      logError('data', 'offline_queue_length_read_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return 0;
     }
   }
@@ -153,7 +160,9 @@ export class OfflineQueueManager {
       if (!data) return [];
       return JSON.parse(data);
     } catch (err) {
-      console.error('[OfflineQueue] Failed to read dead-letter queue:', err);
+      logError('data', 'offline_queue_deadletter_read_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return [];
     }
   }
@@ -188,7 +197,7 @@ export class OfflineQueueManager {
       const updatedQueue: QueuedOperation[] = [];
       const deadLetterEntries: DeadLetterEntry[] = await this.getDeadLetterQueue();
 
-      console.log(`[OfflineQueue] Processing ${queue.length} queued operations`);
+      logDataEvent('offline_queue_flush_start', { queueLength: queue.length });
 
       for (const op of queue) {
         try {
@@ -198,9 +207,10 @@ export class OfflineQueueManager {
           if (op.lastAttemptAt && delaySec > 0) {
             const elapsed = (Date.now() - new Date(op.lastAttemptAt).getTime()) / 1000;
             if (elapsed < delaySec) {
-              console.log(
-                `[OfflineQueue] Delaying operation ${op.requestId} (${Math.ceil(delaySec - elapsed)}s remaining)`,
-              );
+              logDataEvent('offline_queue_operation_delayed', {
+                requestId: op.requestId,
+                secondsRemaining: Math.ceil(delaySec - elapsed),
+              });
               updatedQueue.push(op);
               continue;
             }
@@ -211,12 +221,15 @@ export class OfflineQueueManager {
 
           if (syncResult.ok) {
             // Success: operation applied
-            console.log(`[OfflineQueue] Synced operation ${op.requestId}`);
+            logDataEvent('offline_queue_operation_synced', { requestId: op.requestId });
             result.synced++;
             // Do NOT add to updatedQueue (effectively dequeuing)
           } else if (syncResult.error?.includes('409') || syncResult.error?.includes('duplicate')) {
             // 409 Conflict: operation was already applied (idempotent success)
-            console.log(`[OfflineQueue] Operation ${op.requestId} already applied (409 conflict)`);
+            logDataEvent('offline_queue_operation_idempotent_success', {
+              requestId: op.requestId,
+              error: syncResult.error,
+            });
             result.synced++;
             // Do NOT add to updatedQueue
           } else {
@@ -227,9 +240,11 @@ export class OfflineQueueManager {
 
             if (op.attemptCount >= op.maxAttempts) {
               // Move to dead-letter
-              console.warn(
-                `[OfflineQueue] Operation ${op.requestId} exhausted retries, moving to dead-letter`,
-              );
+              logWarn('offline_queue_operation_deadlettered', {
+                requestId: op.requestId,
+                attempts: op.attemptCount,
+                error: syncResult.error,
+              });
               deadLetterEntries.push({
                 requestId: op.requestId,
                 failureReason: 'max_retries_exceeded',
@@ -240,9 +255,11 @@ export class OfflineQueueManager {
               result.deadLettered++;
             } else {
               // Keep in queue for next flush
-              console.log(
-                `[OfflineQueue] Retrying operation ${op.requestId} (attempt ${op.attemptCount}/${op.maxAttempts})`,
-              );
+              logDataEvent('offline_queue_operation_retry_scheduled', {
+                requestId: op.requestId,
+                attempt: op.attemptCount,
+                maxAttempts: op.maxAttempts,
+              });
               updatedQueue.push(op);
               result.failed++;
             }
@@ -250,7 +267,10 @@ export class OfflineQueueManager {
         } catch (err) {
           // Network or sync function error: keep in queue
           const opError = err instanceof Error ? err.message : String(err);
-          console.error(`[OfflineQueue] Error syncing ${op.requestId}:`, opError);
+          logError('data', 'offline_queue_operation_sync_error', {
+            requestId: op.requestId,
+            error: opError,
+          });
 
           op.attemptCount++;
           op.lastAttemptAt = new Date().toISOString();
@@ -288,10 +308,16 @@ export class OfflineQueueManager {
         await AsyncStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterEntries));
       }
 
-      console.log(`[OfflineQueue] Flush complete:`, result);
+      logDataEvent('offline_queue_flush_complete', {
+        synced: result.synced,
+        failed: result.failed,
+        deadLettered: result.deadLettered,
+      });
       return result;
     } catch (err) {
-      console.error('[OfflineQueue] Fatal flush error:', err);
+      logError('data', 'offline_queue_flush_fatal_error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     }
   }
@@ -303,9 +329,11 @@ export class OfflineQueueManager {
   static async clearQueue(): Promise<void> {
     try {
       await AsyncStorage.removeItem(QUEUE_STORAGE_KEY);
-      console.log('[OfflineQueue] Main queue cleared');
+      logDataEvent('offline_queue_cleared', {});
     } catch (err) {
-      console.error('[OfflineQueue] Failed to clear queue:', err);
+      logError('data', 'offline_queue_clear_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -315,9 +343,11 @@ export class OfflineQueueManager {
   static async clearDeadLetter(): Promise<void> {
     try {
       await AsyncStorage.removeItem(DEAD_LETTER_STORAGE_KEY);
-      console.log('[OfflineQueue] Dead-letter queue cleared');
+      logDataEvent('offline_queue_deadletter_cleared', {});
     } catch (err) {
-      console.error('[OfflineQueue] Failed to clear dead-letter:', err);
+      logError('data', 'offline_queue_deadletter_clear_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -353,9 +383,12 @@ export class OfflineQueueManager {
         await AsyncStorage.removeItem(DEAD_LETTER_STORAGE_KEY);
       }
 
-      console.log(`[OfflineQueue] Replayed dead-letter entry ${requestId}`);
+      logDataEvent('offline_queue_deadletter_replayed', { requestId });
     } catch (err) {
-      console.error('[OfflineQueue] Failed to replay dead-letter:', err);
+      logError('data', 'offline_queue_deadletter_replay_failed', {
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     }
   }
@@ -369,7 +402,7 @@ export class OfflineQueueManager {
       return result;
     }
 
-    console.log(`[OfflineQueue] Processing ${deadLetters.length} dead-letter entries`);
+    logDataEvent('offline_queue_deadletter_processing', { count: deadLetters.length });
 
     const remainingDeadLetters: DeadLetterEntry[] = [];
 
@@ -377,7 +410,7 @@ export class OfflineQueueManager {
       try {
         const syncResult = await syncFn(entry.operation);
         if (syncResult.ok) {
-          console.log(`[OfflineQueue] Recovered dead-letter ${entry.requestId}`);
+          logDataEvent('offline_queue_deadletter_recovered', { requestId: entry.requestId });
           result.synced++;
           // Dequeue from dead-letter
         } else {

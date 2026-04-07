@@ -20,6 +20,7 @@ import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { bootstrapRPC, primeBootstrapCache } from "@/lib/bootstrapRPC";
+import { initializeMonitoring, logAuthEvent as logAuthEventMonitoring } from "@/platform/monitoring/logger";
 import { SomaErrorBoundary } from "@/src/components/ui/SomaErrorBoundary";
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
@@ -50,6 +51,9 @@ if (POSTHOG_KEY) initAnalytics(POSTHOG_KEY);
 
 // Setup global error handling
 setupGlobalErrorHandlers();
+
+// Initialize structured monitoring and logging
+initializeMonitoring();
 
 export {
     // Catch any errors thrown by the Layout component.

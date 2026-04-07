@@ -14,6 +14,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { useAppTheme } from '@/src/context/ThemeContext';
 import { captureException } from '@/src/services/errorTracking';
+import { logError, logInfo } from '@/platform/monitoring/logger';
 
 interface ScreenErrorBoundaryState {
   hasError: boolean;
@@ -59,11 +60,11 @@ export class ScreenErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(
-      `[ScreenErrorBoundary${this.props.screenName ? `:${this.props.screenName}` : ''}] Error caught:`,
-      error,
-      errorInfo,
-    );
+    logError('ui', 'screen_error_boundary_caught', {
+      screenName: this.props.screenName,
+      errorMessage: error.message,
+      componentStack: errorInfo.componentStack,
+    });
 
     // Always report to error tracking with screen context
     captureException(error, {
@@ -301,7 +302,7 @@ function ScreenErrorFallback({
           <TouchableOpacity
             onPress={() => {
               // In production, link to support page
-              console.log('[Support] Contact support for:', errorKey);
+              logInfo('ui', 'support_contact_requested', { errorKey });
             }}
           >
             <Text

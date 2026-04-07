@@ -22,6 +22,7 @@ import { Typography } from "@/src/components/ui/Typography";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
+import { logWarn } from "@/platform/monitoring/logger";
 import { useCycleStore } from "@/src/store/useCycleStore";
 import { useOfflineQueue } from "@/src/store/useOfflineQueue";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
@@ -251,9 +252,9 @@ export function HomeScreen() {
   useEffect(() => {
     // Force show content after 10 seconds even if still loading (reduced from 15s)
     const timeoutId = setTimeout(() => {
-      console.warn(
-        "[HomeScreen] Loading timeout reached, showing content with fallbacks",
-      );
+      logWarn("loading_timeout_homescreen", {
+        message: "Loading timeout reached, showing content with fallbacks",
+      });
       setForceShow(true);
     }, 10000);
 
@@ -352,9 +353,9 @@ export function HomeScreen() {
   useEffect(() => {
     // Force show content after 10 seconds even if still loading (reduced from 15s)
     const timeoutId = setTimeout(() => {
-      console.warn(
-        "[HomeScreen] Loading timeout reached, showing content with fallbacks",
-      );
+      logWarn("loading_timeout_homescreen", {
+        message: "Loading timeout reached, showing content with fallbacks",
+      });
       setForceShow(true);
     }, 10000);
 

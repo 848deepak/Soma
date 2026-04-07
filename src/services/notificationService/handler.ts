@@ -7,6 +7,7 @@
 import { Platform } from 'react-native';
 
 import { trackEvent } from '@/src/services/analytics';
+import { logWarn } from '@/platform/monitoring/logger';
 
 type NotificationData = {
   route?: string;
@@ -53,7 +54,9 @@ export function initializeNotificationHandler(): void {
         }),
       });
     } catch (error) {
-      console.warn('[Notifications] Failed to initialize handler:', error);
+      logWarn('notifications', 'handler_init_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }
@@ -97,7 +100,9 @@ export async function startNotificationListeners(
       receivedSubscription = null;
     };
   } catch (error) {
-    console.warn('[Notifications] Failed to start listeners:', error);
+    logWarn('notifications', 'listeners_start_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return () => undefined;
   }
 }

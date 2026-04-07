@@ -10,6 +10,7 @@ import {
   captureMessage,
   sanitizeErrorForTelemetry,
 } from "@/src/services/errorTracking";
+import { logError, logInfo } from "@/platform/monitoring/logger";
 
 type PromiseRejectionHandler = (event: PromiseRejectionEvent) => void;
 
@@ -45,7 +46,7 @@ export function setupGlobalErrorHandlers() {
         event.reason instanceof Error
           ? sanitizeErrorForTelemetry(event.reason)
           : { name: "UnhandledRejection", message: "Unhandled promise rejection" };
-      console.error("[Global] Unhandled promise rejection:", safeReason);
+      logError("error", "unhandled_promise_rejection", safeReason);
 
       // Report to error tracking
       const error =
@@ -75,7 +76,7 @@ export function setupGlobalErrorHandlers() {
   ) {
     const originalHandler = globalObj.ErrorUtils.getGlobalHandler();
     globalObj.ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
-      console.error("[Global] Uncaught JS error:", {
+      logError("error", "uncaught_js_error", {
         ...sanitizeErrorForTelemetry(error),
         isFatal,
       });
@@ -100,7 +101,7 @@ export function setupGlobalErrorHandlers() {
   // Setup performance monitoring
   setupPerformanceMonitoring();
 
-  console.log("[Global] Error handlers initialized");
+  logInfo("error", "global_error_handlers_initialized");
 }
 
 /**

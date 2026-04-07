@@ -9,6 +9,7 @@ import { Alert, Text, TouchableOpacity, View } from "react-native";
 
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { captureException } from "@/src/services/errorTracking";
+import { logError } from "@/platform/monitoring/logger";
 
 interface SomaErrorBoundaryState {
   hasError: boolean;
@@ -46,7 +47,10 @@ export class SomaErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("[SomaErrorBoundary] React error caught:", error, errorInfo);
+    logError('ui', 'react_error_caught', {
+      errorMessage: error.message,
+      componentStack: errorInfo.componentStack,
+    });
 
     // Report error to tracking service with React-specific context
     captureException(error, {
