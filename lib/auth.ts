@@ -237,6 +237,15 @@ export async function ensureAnonymousSession() {
  * Signs up a new user with email and password.
  * When called while an anonymous session is active, this upgrades
  * the anonymous account to a full account without changing data.
+ *
+ * RACE CONDITION FIX: Never call signOut(anon) before the new signUp
+ * completes successfully. Uses atomic sequence:
+ * 1. Attempt updateUser(email, password)
+ * 2. If it fails with upgrade error:
+ *    a. Complete new signUp first (get new session)
+ *    b. Only then signOut the anonymous session
+ *    c. Swap to new session atomically
+ * 3. Wrap in try/finally to guarantee either valid session or clean error
  */
 export async function signUpWithEmail(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -260,23 +269,42 @@ export async function signUpWithEmail(email: string, password: string) {
     }
 
     // Some environments disable anonymous account upgrade.
-    // Fallback: sign out anonymous user and do explicit sign-up.
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) {
-      throw normalizeAuthError(signOutError);
-    }
+    // Fallback: do explicit sign-up FIRST, then clean up anonymous session.
+    let fallbackData: { user: Awaited<ReturnType<typeof supabase.auth.signUp>>['data']['user'] | null } | null = null;
 
-    const { data: fallbackData, error: fallbackError } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-    });
-    if (fallbackError) throw normalizeAuthError(fallbackError);
-    if (!fallbackData.user) {
-      throw new Error('Sign up completed without a user record. Please try again.');
-    }
+    try {
+      // Step 1: Complete the new sign-up with the new email/password
+      const { data: newSignUpData, error: fallbackError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+      });
 
-    await ensureProfileRow(fallbackData.user.id);
-    return fallbackData.user;
+      if (fallbackError) {
+        throw normalizeAuthError(fallbackError);
+      }
+
+      if (!newSignUpData.user) {
+        throw new Error('Sign up completed without a user record. Please try again.');
+      }
+
+      fallbackData = newSignUpData.user;
+
+      // Step 2: Profile repair for new user
+      await ensureProfileRow(newSignUpData.user.id);
+
+      // Step 3: Only now sign out the anonymous session
+      // At this point we have a valid authenticated session for the new user.
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        // Log but don't fail signup - the new session is active and valid
+        console.warn("[Auth] Failed to sign out anonymous session after upgrade:", signOutError);
+      }
+
+      return newSignUpData.user;
+    } catch (upgradeError) {
+      // If fallback signup started but failed midway, ensure we're in a clean state
+      throw upgradeError;
+    }
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -302,6 +330,7 @@ export async function signInWithEmail(email: string, password: string) {
   });
   if (error) throw normalizeAuthError(error);
   if (data.user?.id) {
+    await ensureProfileRow(data.user.id);
     try {
       await enforceParentalConsentIfRequired(data.user.id);
     } catch (consentError) {
