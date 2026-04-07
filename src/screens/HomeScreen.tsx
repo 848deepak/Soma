@@ -24,6 +24,7 @@ import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
 import { useCycleStore } from "@/src/store/useCycleStore";
 import { useOfflineQueue } from "@/src/store/useOfflineQueue";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { SymbolView } from "expo-symbols";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -1066,5 +1067,13 @@ export function HomeScreen() {
         />
       </View>
     </Screen>
+  );
+}
+
+export function HomeScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="HomeScreen">
+      <HomeScreen />
+    </ScreenErrorBoundary>
   );
 }

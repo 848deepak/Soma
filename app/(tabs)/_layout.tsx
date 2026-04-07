@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Platform, View } from 'react-native';
 
 import { useAppTheme } from '@/src/context/ThemeContext';
+import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 
 export default function TabLayout() {
   const { theme, isDark } = useAppTheme();

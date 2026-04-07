@@ -2,9 +2,13 @@
  * src/platform/supabase/adapters/cycleAdapter.ts
  * Centralized, typed adapter for cycle and daily log operations.
  * Single source of truth for cycle/daily_logs Supabase queries.
+ *
+ * SECURITY: All mutations validate input before calling Supabase.
+ * RLS policies are the last line of defense.
  */
 import { supabase } from "@/lib/supabase";
 import type { CycleRow, DailyLogRow, DailyLogInsert } from "@/types/database";
+import { validateDailyLog } from "@/src/domain/validators";
 
 export const cycleAdapter = {
   /**
@@ -80,8 +84,27 @@ export const cycleAdapter = {
   /**
    * Upsert a daily log (insert or update).
    * Conflicts on user_id + date combination.
+   *
+   * SECURITY: Validates input before mutations. If validation fails,
+   * returns an error object that matches the Supabase response shape.
    */
   upsertLog: async (log: DailyLogInsert) => {
+    // Validate before mutation (first line of defense)
+    const validation = validateDailyLog(log);
+    if (!validation.valid) {
+      return {
+        data: null,
+        error: {
+          message: validation.reason || "Validation failed",
+          details: validation.details,
+          code: "validation_failed",
+          status: 400,
+        },
+        status: 400,
+        statusText: "Validation Error",
+      };
+    }
+
     return supabase
       .from("daily_logs")
       .upsert(log, { onConflict: "user_id,date" })

@@ -21,6 +21,7 @@ import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import type { FlowLevel, SymptomOption } from "@/types/database";
 
 const flowLevels = [
@@ -581,5 +582,13 @@ export function DailyLogScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+export function DailyLogScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="DailyLogScreen">
+      <DailyLogScreen />
+    </ScreenErrorBoundary>
   );
 }

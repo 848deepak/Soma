@@ -22,6 +22,7 @@ import {
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
 import { useQueryClient } from "@tanstack/react-query";
 import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { CalendarHeader } from "@/src/components/calendar/CalendarHeader";
 import {
     dayIso,
@@ -519,5 +520,13 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
         ) : null}
       </View>
     </Screen>
+  );
+}
+
+export function SmartCalendarScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SmartCalendarScreen">
+      <SmartCalendarScreen />
+    </ScreenErrorBoundary>
   );
 }

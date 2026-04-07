@@ -26,6 +26,7 @@ import {
 } from "@/hooks/useProfile";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { AccountActionsSection } from "@/src/components/settings/AccountActionsSection";
 import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
 import { CycleActionsSection } from "@/src/components/settings/CycleActionsSection";
@@ -596,5 +597,13 @@ export function SettingsScreen() {
         handleSignIn={handleSignIn}
       />
     </Screen>
+  );
+}
+
+export function SettingsScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SettingsScreen">
+      <SettingsScreen />
+    </ScreenErrorBoundary>
   );
 }
