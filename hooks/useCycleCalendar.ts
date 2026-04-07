@@ -215,10 +215,18 @@ export function useCycleCalendar(options?: UseCycleCalendarOptions): CycleDataMa
       cycleLength,
     );
   }, [
+    // ─── OPTIMIZATION: Use scalar values instead of object references ───
+    // This prevents recomputation when objects are referentially new but
+    // semantically identical (e.g., after non-mutation query refetches)
     options?.cycleData,
-    cycleDataRaw?.cycle,
-    completedCycles,
-    dailyLogs,
+    // Extract stable scalar identifiers from cycle
+    cycleDataRaw?.cycle?.id,
+    cycleDataRaw?.cycle?.start_date,
+    cycleDataRaw?.cycle?.end_date,
+    // Use derived scalar from cycles array instead of array reference
+    completedCycles.map(c => `${c.id}|${c.start_date}`).join(','),
+    // Use derived scalar from logs instead of array reference
+    dailyLogs.map(l => `${l.date}|${l.flow_level}`).join(','),
     periodLength,
     cycleLength,
   ]);

@@ -5,7 +5,7 @@ import {
 } from "@expo-google-fonts/playfair-display";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,6 +18,8 @@ import "../global.css";
 import { useNetworkSync } from "@/hooks/useNetworkSync";
 import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
 import { supabase } from "@/lib/supabase";
+import { queryClient } from "@/lib/queryClient";
+import { bootstrapRPC, primeBootstrapCache } from "@/lib/bootstrapRPC";
 import { SomaErrorBoundary } from "@/src/components/ui/SomaErrorBoundary";
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
@@ -69,15 +71,7 @@ SplashScreen.setOptions({
 // Keep the splash screen visible while fonts are loading
 SplashScreen.preventAutoHideAsync();
 
-// Singleton QueryClient
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 60 * 1000,
-    },
-  },
-});
+// QueryClient is now initialized in lib/queryClient.ts with persistence
 
 const PROFILE_BOOTSTRAP_TIMEOUT_MS = 10000;
 const PROFILE_BOOTSTRAP_MAX_RETRIES = 2;
@@ -307,6 +301,23 @@ function AuthBootstrap({
           }
           return;
         }
+
+        // ─── Prime bootstrap cache ────────────────────────────────────
+        // Fetch profile + currentCycle + todayLog in one batch (or in parallel)
+        // This reduces startup queries from 5+ sequential to 1 batch call
+        try {
+          const bootstrapData = await bootstrapRPC(user.id);
+          if (isMounted) {
+            primeBootstrapCache(queryClient, bootstrapData, user.id);
+          }
+        } catch (bootstrapError) {
+          console.warn(
+            "[Auth] Bootstrap cache priming failed (non-blocking):",
+            bootstrapError,
+          );
+          // Continue bootstrap even if RPC fails; individual hooks will fetch
+        }
+        // ────────────────────────────────────────────────────────────────
 
         if (!hasLaunched && isAnonymous) {
           // First launch with anonymous session → prompt to sign in/up

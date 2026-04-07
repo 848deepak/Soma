@@ -139,11 +139,11 @@ function shouldFallbackToExplicitSignUp(error: unknown): boolean {
   );
 }
 
-function delay(ms: number): Promise<void> {
+async function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function ensureProfileRow(userId: string): Promise<void> {
+export async function ensureProfileRow(userId: string): Promise<void> {
   for (let attempt = 1; attempt <= PROFILE_CHECK_RETRIES; attempt += 1) {
     const { data, error } = await supabase
       .from('profiles')
