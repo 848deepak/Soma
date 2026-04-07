@@ -3,13 +3,13 @@
  */
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Linking,
   Platform,
   Share,
+  View,
 } from "react-native";
 
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
@@ -23,7 +23,6 @@ import {
   useNotificationPreferences,
   useProfile,
   useUpdateNotificationPreferences,
-  useUpdateProfile,
 } from "@/hooks/useProfile";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -33,10 +32,9 @@ import { CycleActionsSection } from "@/src/components/settings/CycleActionsSecti
 import { NotificationsSection } from "@/src/components/settings/NotificationsSection";
 import { PreferencesSection } from "@/src/components/settings/PreferencesSection";
 import { PrivacySection } from "@/src/components/settings/PrivacySection";
-import { SettingsProfileHeader } from "@/src/components/settings/SettingsProfileHeader";
 import { ThemeSection } from "@/src/components/settings/ThemeSection";
-import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { Screen } from "@/src/components/ui/Screen";
+import { Typography } from "@/src/components/ui/Typography";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import {
@@ -56,14 +54,24 @@ import {
   requestPermissions,
   scheduleDailyLogReminder,
 } from "@/src/services/notificationService";
-import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
+
+function formatDateOfBirth(isoDate: string | null | undefined): string {
+  if (!isoDate) return "Not set";
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+
+  return parsed.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function SettingsScreen() {
   const router = useRouter();
-  const { isDark, theme, setTheme, colors } = useAppTheme();
+  const { isDark, theme, setTheme } = useAppTheme();
   const { isAnonymous } = useAuthContext();
-  const { data: profile, isLoading } = useProfile();
-  const updateProfile = useUpdateProfile();
+  const { data: profile } = useProfile();
   const notificationPreferences = useNotificationPreferences();
   const updateNotificationPreferences = useUpdateNotificationPreferences();
   const startNewCycle = useStartNewCycle();
@@ -73,26 +81,11 @@ export function SettingsScreen() {
 
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [username, setUsername] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [cycleLength, setCycleLength] = useState("28");
-  const [periodDuration, setPeriodDuration] = useState("5");
 
   const { data: currentCycleData } = useCurrentCycle(
     profile?.cycle_length_average ?? 28,
     profile?.period_duration_average ?? 5,
   );
-
-  useEffect(() => {
-    if (!profile) return;
-    setFirstName(profile.first_name ?? "");
-    setUsername(profile.username ?? "");
-    setDateOfBirth(profile.date_of_birth ?? "");
-    setCycleLength(String(profile.cycle_length_average ?? 28));
-    setPeriodDuration(String(profile.period_duration_average ?? 5));
-  }, [profile]);
 
   useEffect(() => {
     void (async () => {
@@ -108,116 +101,14 @@ export function SettingsScreen() {
     setTheme(themeId);
   }
 
-  const displayName = profile?.first_name || profile?.username || "You";
-  const isUsernameLocked = Boolean(profile?.username?.trim());
   const notificationsEnabled =
     notificationPreferences.data?.daily_reminders ?? false;
   const isNotificationSaving = updateNotificationPreferences.isPending;
-  const memberSince = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      })
-    : null;
-
-  const hasChanges = useMemo(() => {
-    if (!profile) return false;
-    return (
-      firstName.trim() !== (profile.first_name ?? "") ||
-      (!isUsernameLocked &&
-        username.trim().toLowerCase() !==
-          (profile.username ?? "").trim().toLowerCase()) ||
-      dateOfBirth.trim() !== (profile.date_of_birth ?? "") ||
-      Number(cycleLength) !== profile.cycle_length_average ||
-      Number(periodDuration) !== profile.period_duration_average
-    );
-  }, [
-    profile,
-    firstName,
-    username,
-    dateOfBirth,
-    cycleLength,
-    periodDuration,
-    isUsernameLocked,
-  ]);
-
-  const validationErrors = useMemo(() => {
-    if (!profile) {
-      return {
-        firstName: null,
-        username: null,
-        dateOfBirth: null,
-        cycleLength: null,
-        periodDuration: null,
-      };
-    }
-
-    const normalizedFirstName = firstName.trim();
-    const normalizedUsername = username
-      .trim()
-      .replace(/\s+/g, "")
-      .toLowerCase();
-    const normalizedDob = dateOfBirth.trim();
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
-
-    return {
-      firstName: normalizedFirstName ? null : "Please enter your first name.",
-      username:
-        isUsernameLocked || normalizedUsername
-          ? null
-          : "Please choose a username.",
-      dateOfBirth:
-        normalizedDob && !validateIsoDate(normalizedDob)
-          ? "Use YYYY-MM-DD format for date of birth."
-          : normalizedDob && !validateMinimumAge(normalizedDob, 13)
-            ? "You must be at least 13 years old to use Soma without parental consent."
-            : null,
-      cycleLength:
-        Number.isFinite(cycleLengthValue) &&
-        cycleLengthValue >= 15 &&
-        cycleLengthValue <= 60
-          ? null
-          : "Cycle length must be between 15 and 60 days.",
-      periodDuration:
-        Number.isFinite(periodDurationValue) &&
-        periodDurationValue >= 1 &&
-        periodDurationValue <= 15
-          ? null
-          : "Period duration must be between 1 and 15 days.",
-    };
-  }, [
-    profile,
-    firstName,
-    username,
-    dateOfBirth,
-    cycleLength,
-    periodDuration,
-    isUsernameLocked,
-  ]);
-
-  const firstValidationError = useMemo(
-    () =>
-      Object.values(validationErrors).find((value): value is string =>
-        Boolean(value),
-      ) ?? null,
-    [validationErrors],
-  );
-
-  const isFormValid = firstValidationError === null;
-
-  const sectionCardStyle = {
-    marginTop: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : colors.borderLight,
-    backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
-    padding: 20,
-    shadowColor: "#DDA7A5",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 2,
+  const primarySectionStyle = {
+    marginTop: 20,
+  };
+  const secondarySectionStyle = {
+    marginTop: 24,
   };
 
   async function handleNotificationToggle(value: boolean) {
@@ -292,109 +183,6 @@ export function SettingsScreen() {
           : "Could not update analytics consent.";
       Alert.alert("Consent Update Failed", message);
     }
-  }
-
-  async function handleSaveProfile() {
-    const normalizedFirstName = firstName.trim();
-    const normalizedUsername = username
-      .trim()
-      .replace(/\s+/g, "")
-      .toLowerCase();
-    const resolvedUsername = isUsernameLocked
-      ? (profile?.username ?? "")
-      : normalizedUsername;
-    const normalizedDob = dateOfBirth.trim();
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
-
-    if (!normalizedFirstName) {
-      void HapticsService.error();
-      Alert.alert("Missing name", "Please enter your first name.");
-      return;
-    }
-    if (!resolvedUsername) {
-      void HapticsService.error();
-      Alert.alert("Missing username", "Please choose a username.");
-      return;
-    }
-    if (normalizedDob && !validateIsoDate(normalizedDob)) {
-      void HapticsService.error();
-      Alert.alert("Invalid date", "Use YYYY-MM-DD format for date of birth.");
-      return;
-    }
-    if (normalizedDob && !validateMinimumAge(normalizedDob, 13)) {
-      void HapticsService.error();
-      Alert.alert(
-        "Age requirement",
-        "You must be at least 13 years old to use Soma without parental consent.",
-      );
-      return;
-    }
-    if (
-      !Number.isFinite(cycleLengthValue) ||
-      cycleLengthValue < 15 ||
-      cycleLengthValue > 60
-    ) {
-      void HapticsService.error();
-      Alert.alert(
-        "Invalid cycle length",
-        "Cycle length must be between 15 and 60 days.",
-      );
-      return;
-    }
-    if (
-      !Number.isFinite(periodDurationValue) ||
-      periodDurationValue < 1 ||
-      periodDurationValue > 15
-    ) {
-      void HapticsService.error();
-      Alert.alert(
-        "Invalid period duration",
-        "Period duration must be between 1 and 15 days.",
-      );
-      return;
-    }
-
-    try {
-      await HapticsService.impactMedium();
-      const basePayload = {
-        first_name: normalizedFirstName,
-        date_of_birth: normalizedDob || null,
-        cycle_length_average: cycleLengthValue,
-        period_duration_average: periodDurationValue,
-      };
-
-      await updateProfile.mutateAsync(
-        isUsernameLocked
-          ? basePayload
-          : { ...basePayload, username: resolvedUsername },
-      );
-      await HapticsService.success();
-      setIsEditMode(false);
-      Alert.alert("Saved", "Your settings were updated.");
-    } catch (error: unknown) {
-      await HapticsService.error();
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not update your settings.";
-      Alert.alert("Save Failed", message);
-    }
-  }
-
-  function handleEditProfile() {
-    setIsEditMode(true);
-  }
-
-  function handleCancelEdit() {
-    if (profile) {
-      setFirstName(profile.first_name ?? "");
-      setUsername(profile.username ?? "");
-      setDateOfBirth(profile.date_of_birth ?? "");
-      setCycleLength(String(profile.cycle_length_average ?? 28));
-      setPeriodDuration(String(profile.period_duration_average ?? 5));
-    }
-    setIsEditMode(false);
   }
 
   async function handleLogout() {
@@ -535,8 +323,8 @@ export function SettingsScreen() {
   }
 
   function handleResetPredictions() {
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
+    const cycleLengthValue = profile?.cycle_length_average ?? 28;
+    const periodDurationValue = profile?.period_duration_average ?? 5;
 
     Alert.alert(
       "Reset predictions?",
@@ -702,120 +490,111 @@ export function SettingsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={96}
-    >
-      <Screen>
-        <SettingsProfileHeader
-          isDark={isDark}
-          isLoading={isLoading}
-          displayName={displayName}
-          memberSince={memberSince}
-        />
-
-        <HeaderBar title="Settings" />
-
-        <AccountProfileSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          isEditMode={isEditMode}
-          handleEditProfile={handleEditProfile}
-          firstName={firstName}
-          setFirstName={setFirstName}
-          username={username}
-          setUsername={setUsername}
-          dateOfBirth={dateOfBirth}
-          setDateOfBirth={setDateOfBirth}
-          isUsernameLocked={isUsernameLocked}
-          validationErrors={{
-            firstName: validationErrors.firstName,
-            username: validationErrors.username,
-            dateOfBirth: validationErrors.dateOfBirth,
+    <Screen horizontalPadding={16}>
+      <View style={{ marginTop: 6 }}>
+        <Typography
+          style={{
+            fontSize: 34,
+            lineHeight: 40,
+            fontWeight: "700",
           }}
-        />
+        >
+          Settings
+        </Typography>
+        <Typography variant="muted" style={{ marginTop: 4 }}>
+          Manage your profile and preferences.
+        </Typography>
+      </View>
 
-        <PreferencesSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          cycleLength={cycleLength}
-          setCycleLength={setCycleLength}
-          periodDuration={periodDuration}
-          setPeriodDuration={setPeriodDuration}
-          isEditMode={isEditMode}
-          validationErrors={{
-            cycleLength: validationErrors.cycleLength,
-            periodDuration: validationErrors.periodDuration,
-          }}
-          handleCancelEdit={handleCancelEdit}
-          handleSaveProfile={handleSaveProfile}
-          isSaveDisabled={
-            updateProfile.isPending || !hasChanges || !isFormValid
-          }
-          isSavePending={updateProfile.isPending}
-          isFormValid={isFormValid}
-          firstValidationError={firstValidationError}
-        />
+      <AccountProfileSection
+        isDark={isDark}
+        sectionStyle={primarySectionStyle}
+        fullName={profile?.first_name?.trim() || "Deepak"}
+        username={profile?.username?.trim() || "deepak"}
+        dateOfBirth={formatDateOfBirth(profile?.date_of_birth) || "24 Aug 2002"}
+        openEditProfile={() => router.push("/settings/edit-profile" as never)}
+      />
 
-        <CycleActionsSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          isResetPending={resetPredictions.isPending}
-          isStartPending={startNewCycle.isPending}
-          isEndPending={endCurrentCycle.isPending}
-          activeCycleStartDate={currentCycleData?.cycle?.start_date}
-          handleResetPredictions={handleResetPredictions}
-          handleStartPeriodToday={handleStartPeriodToday}
-          handleEndPeriodToday={handleEndPeriodToday}
-        />
+      <PreferencesSection
+        isDark={isDark}
+        sectionStyle={primarySectionStyle}
+        cycleLength={String(profile?.cycle_length_average ?? 28)}
+        periodDuration={String(profile?.period_duration_average ?? 5)}
+        openCycleLength={() => router.push("/settings/cycle-length" as never)}
+        openPeriodDuration={() => router.push("/settings/period-duration" as never)}
+      />
 
-        <NotificationsSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          notificationsEnabled={notificationsEnabled}
-          handleNotificationToggle={handleNotificationToggle}
-          isNotificationSaving={isNotificationSaving}
-          analyticsEnabled={analyticsEnabled}
-          handleAnalyticsToggle={handleAnalyticsToggle}
-          openPartnerSync={() => router.push("/partner" as never)}
-        />
+      <NotificationsSection
+        isDark={isDark}
+        cardStyle={primarySectionStyle}
+        notificationsEnabled={notificationsEnabled}
+        handleNotificationToggle={handleNotificationToggle}
+        isNotificationSaving={isNotificationSaving}
+        analyticsEnabled={analyticsEnabled}
+        handleAnalyticsToggle={handleAnalyticsToggle}
+        openPartnerSync={() => router.push("/partner" as never)}
+      />
 
-        <PrivacySection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          openDataConsent={() => router.push("/legal/data-consent" as never)}
-          openDataPractices={() =>
-            router.push("/legal/data-practices" as never)
-          }
-          openDataRights={() => router.push("/legal/data-rights" as never)}
-          openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
-          openTerms={() => router.push("/legal/terms" as never)}
-          openMedicalDisclaimer={() =>
-            router.push("/legal/medical-disclaimer" as never)
-          }
-        />
+      <PrivacySection
+        isDark={isDark}
+        cardStyle={primarySectionStyle}
+        openDataConsent={() => router.push("/legal/data-consent" as never)}
+        openDataPractices={() =>
+          router.push("/legal/data-practices" as never)
+        }
+        openDataRights={() => router.push("/legal/data-rights" as never)}
+        openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
+        openTerms={() => router.push("/legal/terms" as never)}
+        openMedicalDisclaimer={() =>
+          router.push("/legal/medical-disclaimer" as never)
+        }
+      />
 
-        <ThemeSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          activeTheme={theme}
-          handleThemeSelect={handleThemeSelect}
-        />
+      <Typography
+        style={{
+          marginTop: 30,
+          marginBottom: 2,
+          fontSize: 11,
+          fontWeight: "600",
+          letterSpacing: 2,
+          textTransform: "uppercase",
+          color: isDark ? "rgba(242,242,242,0.5)" : "rgba(45,35,39,0.45)",
+        }}
+      >
+        More
+      </Typography>
 
-        <AccountActionsSection
-          isDark={isDark}
-          cardStyle={sectionCardStyle}
-          isDeletePending={deleteAllData.isPending}
-          isLoggingOut={isLoggingOut}
-          isAnonymous={isAnonymous}
-          handleExportData={handleExportData}
-          handleSendFeedback={handleSendFeedback}
-          handleDeleteAllData={handleDeleteAllData}
-          handleLogout={handleLogout}
-          handleSignIn={handleSignIn}
-        />
-      </Screen>
-    </KeyboardAvoidingView>
+      <CycleActionsSection
+        isDark={isDark}
+        cardStyle={secondarySectionStyle}
+        isResetPending={resetPredictions.isPending}
+        isStartPending={startNewCycle.isPending}
+        isEndPending={endCurrentCycle.isPending}
+        activeCycleStartDate={currentCycleData?.cycle?.start_date}
+        handleResetPredictions={handleResetPredictions}
+        handleStartPeriodToday={handleStartPeriodToday}
+        handleEndPeriodToday={handleEndPeriodToday}
+      />
+
+      <ThemeSection
+        isDark={isDark}
+        cardStyle={secondarySectionStyle}
+        activeTheme={theme}
+        handleThemeSelect={handleThemeSelect}
+      />
+
+      <AccountActionsSection
+        isDark={isDark}
+        cardStyle={secondarySectionStyle}
+        isDeletePending={deleteAllData.isPending}
+        isLoggingOut={isLoggingOut}
+        isAnonymous={isAnonymous}
+        handleExportData={handleExportData}
+        handleSendFeedback={handleSendFeedback}
+        handleDeleteAllData={handleDeleteAllData}
+        handleLogout={handleLogout}
+        handleSignIn={handleSignIn}
+      />
+    </Screen>
   );
 }
