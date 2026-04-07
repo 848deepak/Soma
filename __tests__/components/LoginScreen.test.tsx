@@ -81,13 +81,23 @@ describe("LoginScreen – login mode", () => {
     );
   });
 
-  it("navigates to welcome on successful login", async () => {
-    // Default mock already resolves successfully; just verify navigation
-    const { getByTestId } = render(<LoginScreen />);
+  it("clears loading state and records auth consent on successful login", async () => {
+    // Per architectural change (TASK 2): LoginScreen no longer routes after login.
+    // AuthBootstrap in _layout.tsx handles all routing decisions.
+    // This test verifies that sign-in succeeds and consent is recorded.
+    const { getByTestId, queryByText } = render(<LoginScreen />);
     fireEvent.changeText(getByTestId("email-input"), "test@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.press(getByTestId("primary-button"));
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/welcome"));
+    await waitFor(() => {
+      // Verify sign-in was called
+      expect(mockSignIn).toHaveBeenCalledWith(
+        "test@example.com",
+        "password123",
+      );
+      // Verify loading button text changes back (loading cleared)
+      expect(queryByText("Signing in…")).toBeNull();
+    });
   });
 
   it("shows alert on sign in failure", async () => {
