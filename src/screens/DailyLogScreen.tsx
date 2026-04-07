@@ -12,10 +12,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { useEndCurrentCycle } from "@/hooks/useCycleActions";
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
+import { useCurrentCycle } from "@/src/domain/cycle";
+import { useEndCurrentCycle } from "@/src/domain/cycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";

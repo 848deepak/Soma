@@ -3,8 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
-import { CURRENT_CYCLE_KEY, type DerivedCycleData } from "@/hooks/useCurrentCycle";
-import { endCurrentPeriod } from "@/hooks/useCycleActions";
+import { CURRENT_CYCLE_KEY, type DerivedCycleData } from "@/src/domain/cycle";
+import { endCurrentPeriod } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { trackEvent } from "@/src/services/analytics";

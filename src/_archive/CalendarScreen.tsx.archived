@@ -12,14 +12,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, View } from "react-native";
 
 import { useCareCircle } from "@/hooks/useCareCircle";
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useCurrentCycle } from "@/src/domain/cycle";
 import {
   logPeriodRangeAction,
   useEndCurrentCycle,
-} from "@/hooks/useCycleActions";
-import { useCycleHistory } from "@/hooks/useCycleHistory";
-import { useDailyLogs } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
+} from "@/src/domain/cycle";
+import { useCycleHistory } from "@/src/domain/cycle";
+import { useDailyLogs } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
 import {
   derivePeriodVisualizationDays,
   estimateOvulation,

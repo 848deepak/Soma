@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { useProfile } from "@/hooks/useProfile";
+import { useProfile } from "@/src/domain/auth";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
@@ -17,6 +17,7 @@ import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 // ── Multi-layer animated orb matching Figma welcome screen ──────────────────
 function AnimatedOrb({
@@ -320,5 +321,13 @@ export function WelcomeScreen() {
         </PressableScale>
       </View>
     </Screen>
+  );
+}
+
+export function WelcomeScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="WelcomeScreen">
+      <WelcomeScreen />
+    </ScreenErrorBoundary>
   );
 }

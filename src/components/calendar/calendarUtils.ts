@@ -1,4 +1,4 @@
-import type { CycleStatus } from "@/hooks/useCycleCalendar";
+import type { CycleStatus } from "@/src/domain/calendar";
 import { cycleCalendarMotion, cycleCalendarTheme } from "@/src/theme/tokens";
 
 export const MONTH_NAMES = [

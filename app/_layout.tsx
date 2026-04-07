@@ -15,8 +15,8 @@ import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
-import { useNetworkSync } from "@/hooks/useNetworkSync";
-import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
+import { useNetworkSync } from "@/src/domain/logging";
+import { usePeriodAutoEnd } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { bootstrapRPC, primeBootstrapCache } from "@/lib/bootstrapRPC";

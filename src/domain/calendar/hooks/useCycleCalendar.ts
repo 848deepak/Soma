@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { useCycleHistory } from "@/hooks/useCycleHistory";
-import { useDailyLogs, useDailyLogsByDateRange } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
+import { useCurrentCycle } from "@/src/domain/cycle";
+import { useCycleHistory } from "@/src/domain/cycle";
+import { useDailyLogs, useDailyLogsByDateRange } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
 import { predictFertileWindow } from "@/services/CycleIntelligence";
 import type { CompletedCycle, CycleRow, DailyLogRow } from "@/types/database";
-import { addDays as utilAddDays, dateRange as computeDateRange } from "@/src/domain/utils/dateUtils";
+import { addDays as utilAddDays, dateRange as computeDateRange, todayLocal } from "@/src/domain/utils/dateUtils";
 
 export type CycleStatus =
   | "period"
@@ -28,22 +28,12 @@ const STATUS_PRIORITY: Record<Exclude<CycleStatus, null>, number> = {
   predicted_period: 1,
 };
 
+/**
+ * Internal helpers that delegate to dateUtils.
+ * These are kept for backward compatibility within this file.
+ */
 function addDays(iso: string, days: number): string {
   return utilAddDays(iso, days);
-}
-
-function dayIso(year: number, month: number, day: number): string {
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function parseIso(iso: string): Date {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
-}
-
-function localTodayIso(): string {
-  const now = new Date();
-  return dayIso(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function inRange(startIso: string, endIso: string): string[] {
@@ -71,7 +61,7 @@ export function buildCycleDataMap(
   const statusMap: Record<string, Exclude<CycleStatus, null>> = {};
 
   if (cycle?.start_date) {
-    const today = localTodayIso();
+    const today = todayLocal();
 
     if (cycle.end_date && cycle.end_date >= cycle.start_date) {
       inRange(cycle.start_date, cycle.end_date).forEach((iso) => {
@@ -139,7 +129,8 @@ export function buildCycleDataMap(
 }
 
 /**
- * Compute an ISO date string from year, month, day.
+ * Compute an ISO date string from year, month (0-11), day.
+ * Uses local timezone (month is 0-indexed).
  */
 function dayIsoHelper(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

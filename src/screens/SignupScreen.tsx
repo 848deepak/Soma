@@ -13,6 +13,7 @@ import { BrandOrb } from "@/src/components/ui/BrandOrb";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import {
@@ -381,5 +382,13 @@ export function SignupScreen() {
         </PressableScale>
       </View>
     </Screen>
+  );
+}
+
+export function SignupScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SignupScreen">
+      <SignupScreen />
+    </ScreenErrorBoundary>
   );
 }

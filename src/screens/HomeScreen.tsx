@@ -3,12 +3,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 
 import { useCareCircle } from "@/hooks/useCareCircle";
-import { buildMiniCalendar, useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { logPeriodRangeAction } from "@/hooks/useCycleActions";
-import { useCycleHistory } from "@/hooks/useCycleHistory";
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
-import { useRealtimeSync } from "@/hooks/useRealtimeSync";
+import { buildMiniCalendar, useCurrentCycle } from "@/src/domain/cycle";
+import { logPeriodRangeAction } from "@/src/domain/cycle";
+import { useCycleHistory } from "@/src/domain/cycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
+import { useRealtimeSync } from "@/src/domain/logging";
 import {
     estimateOvulation,
     predictFertileWindow,
@@ -23,7 +23,6 @@ import { useAuthContext } from "@/src/context/AuthProvider";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
 import { logWarn } from "@/platform/monitoring/logger";
-import { useCycleStore } from "@/src/store/useCycleStore";
 import { useOfflineQueue } from "@/src/store/useOfflineQueue";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { SymbolView } from "expo-symbols";

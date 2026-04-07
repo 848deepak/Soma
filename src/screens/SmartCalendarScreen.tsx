@@ -14,14 +14,14 @@ import {
     useCycleCalendar,
     type CycleDataMap,
     type CycleStatus,
-} from "@/hooks/useCycleCalendar";
+} from "@/src/domain/calendar";
 import {
   useEndCurrentCycle,
   useStartNewCycle,
-} from "@/hooks/useCycleActions";
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+} from "@/src/domain/cycle";
+import { useCurrentCycle } from "@/src/domain/cycle";
 import { useQueryClient } from "@tanstack/react-query";
-import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
+import { CURRENT_CYCLE_KEY } from "@/src/domain/cycle";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { CalendarHeader } from "@/src/components/calendar/CalendarHeader";
 import {

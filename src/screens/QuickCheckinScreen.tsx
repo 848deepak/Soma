@@ -21,6 +21,7 @@ import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { FlowLevel, MoodOption } from "@/types/database";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -434,5 +435,13 @@ export function QuickCheckinScreen() {
         </PressableScale>
       </Animated.View>
     </View>
+  );
+}
+
+export function QuickCheckinScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="QuickCheckinScreen">
+      <QuickCheckinScreen />
+    </ScreenErrorBoundary>
   );
 }

@@ -2,13 +2,14 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, View } from "react-native";
 
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useProfile, useUpdateProfile } from "@/src/domain/auth";
 import { InputField } from "@/src/components/settings/SettingsPrimitives";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 type PreferenceKind = "cycleLength" | "periodDuration";
 
@@ -164,5 +165,15 @@ export function EditPreferenceScreen({ kind }: EditPreferenceScreenProps) {
         </View>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+export function EditPreferenceScreenWithErrorBoundary(
+  props: EditPreferenceScreenProps
+) {
+  return (
+    <ScreenErrorBoundary screenName="EditPreferenceScreen">
+      <EditPreferenceScreen {...props} />
+    </ScreenErrorBoundary>
   );
 }

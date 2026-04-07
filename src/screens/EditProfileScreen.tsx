@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, View } from "react-native";
 
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useProfile, useUpdateProfile } from "@/src/domain/auth";
 import { InputField } from "@/src/components/settings/SettingsPrimitives";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
@@ -10,6 +10,7 @@ import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 export function EditProfileScreen() {
   const router = useRouter();
@@ -214,5 +215,13 @@ export function EditProfileScreen() {
         </View>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+export function EditProfileScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="EditProfileScreen">
+      <EditProfileScreen />
+    </ScreenErrorBoundary>
   );
 }

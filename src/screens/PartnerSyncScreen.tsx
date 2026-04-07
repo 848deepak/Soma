@@ -9,7 +9,7 @@ import {
 } from "@/hooks/useLinkPartner";
 import { usePartner } from "@/hooks/usePartner";
 import { usePendingConnections } from "@/hooks/usePendingConnections";
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useProfile, useUpdateProfile } from "@/src/domain/auth";
 import { PartnerView } from "@/src/components/PartnerView";
 import { PendingPartnerCard } from "@/src/components/PendingPartnerCard";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
@@ -19,6 +19,7 @@ import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
 import type { PartnerPermissions } from "@/types/database";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -522,5 +523,13 @@ export function PartnerSyncScreen() {
         </View>
       </View>
     </Screen>
+  );
+}
+
+export function PartnerSyncScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="PartnerSyncScreen">
+      <PartnerSyncScreen />
+    </ScreenErrorBoundary>
   );
 }

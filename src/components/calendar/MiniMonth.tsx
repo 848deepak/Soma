@@ -5,7 +5,7 @@ import Animated, {
     withSpring,
 } from "react-native-reanimated";
 
-import type { CycleDataMap } from "@/hooks/useCycleCalendar";
+import type { CycleDataMap } from "@/src/domain/calendar";
 import { Typography } from "@/src/components/ui/Typography";
 import { buildMonthGrid } from "@/src/features/cycle/uiCycleData";
 import { HapticsService } from "@/src/services/haptics/HapticsService";

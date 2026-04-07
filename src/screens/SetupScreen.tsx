@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { PROFILE_QUERY_KEY, useProfile } from "@/hooks/useProfile";
+import { PROFILE_QUERY_KEY, useProfile } from "@/src/domain/auth";
 import { ensureAnonymousSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { PressableScale } from "@/src/components/ui/PressableScale";
@@ -27,6 +27,7 @@ import {
   validateIsoDate,
   validateMinimumAge,
 } from "@/src/utils/validation";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 function localTodayIso(): string {
   const now = new Date();
@@ -489,5 +490,13 @@ export function SetupScreen() {
         </View>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+export function SetupScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SetupScreen">
+      <SetupScreen />
+    </ScreenErrorBoundary>
   );
 }

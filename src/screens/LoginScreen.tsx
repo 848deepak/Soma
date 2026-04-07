@@ -30,6 +30,7 @@ import { BrandOrb } from "@/src/components/ui/BrandOrb";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { identifyUser } from "@/src/services/analytics";
@@ -394,5 +395,13 @@ export function LoginScreen() {
         </View>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+export function LoginScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="LoginScreen">
+      <LoginScreen />
+    </ScreenErrorBoundary>
   );
 }

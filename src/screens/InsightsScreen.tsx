@@ -2,8 +2,8 @@ import { useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
-import { useCycleHistory } from "@/hooks/useCycleHistory";
-import { useDailyLogs } from "@/hooks/useDailyLogs";
+import { useCycleHistory } from "@/src/domain/cycle";
+import { useDailyLogs } from "@/src/domain/calendar";
 import {
     buildCycleHistoryBars,
     buildSymptomStats,
@@ -15,6 +15,7 @@ import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 export function InsightsScreen() {
   const { theme, isDark, colors } = useAppTheme();
@@ -226,5 +227,13 @@ export function InsightsScreen() {
       {/* ── Trend Insight callout ───────────────────────────────── */}
       <InsightCard delay={220} title={insight.title} body={insight.body} />
     </Screen>
+  );
+}
+
+export function InsightsScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="InsightsScreen">
+      <InsightsScreen />
+    </ScreenErrorBoundary>
   );
 }

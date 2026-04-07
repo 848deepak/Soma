@@ -1,26 +1,49 @@
 /**
  * store/useCycleStore.ts
- * Zustand store for in-memory cycle state.
  *
- * Role in Phase 2:
- *  - `hydrate()` seeds the store from Supabase on app start.
- *  - TanStack Query hooks (useCurrentCycle, useTodayLog, useSaveLog) are the
- *    reactive data layer used by screens. The store is the bridge that
- *    pre-populates the progress ring before TQ's first response arrives.
- *  - `isSaving` is still used to disable Save buttons during mutations.
+ * ⚠️ DEPRECATED (2026-04-07)
+ *
+ * This store is no longer used. All cycle data flows through TanStack Query hooks:
+ *   - useCurrentCycle()
+ *   - useCycleHistory()
+ *   - useCycleCalendar()
+ *
+ * The store was originally used to bridge data before TanStack Query queries resolved,
+ * but with query persistence and bootstrap RPC optimization, this is no longer necessary.
+ *
+ * REMOVAL TIMELINE:
+ *   - v1.x (current): Import works but logs deprecation warning
+ *   - v2.0: Remove completely
+ *
+ * DO NOT use this store for new code. Use the domain hooks instead:
+ *   import { useCurrentCycle } from '@/domain/cycle';
+ *   import { useCycleCalendar } from '@/domain/calendar';
  */
-import { create } from "zustand";
 
-import {
-    computeCycleDay,
-    computePhase,
-    computeProgress,
-    getPhaseLabel,
-} from "@/hooks/useCurrentCycle";
-import { supabase } from "@/lib/supabase";
-import { captureException } from "@/src/services/errorTracking";
-import { logError } from "@/platform/monitoring/logger";
-import type { CycleRow } from "@/types/database";
+import { create } from "zustand";
+import { logWarn } from "@/platform/monitoring/logger";
+
+const DEPRECATION_WARNING = `
+⚠️ DEPRECATION WARNING (2026-04-07):
+useCycleStore is no longer used and will be removed in v2.0.
+Please migrate to TanStack Query hooks:
+  - useCurrentCycle() from '@/domain/cycle'
+  - useCycleHistory() from '@/domain/cycle'
+  - useCycleCalendar() from '@/domain/calendar'
+
+For migration help, see: docs/MIGRATION_GUIDE.md
+`;
+
+let deprecationWarningLogged = false;
+
+function logDeprecationWarning() {
+  if (!deprecationWarningLogged) {
+    logWarn('store', 'cycle_store_deprecated', {
+      message: DEPRECATION_WARNING,
+    });
+    deprecationWarningLogged = true;
+  }
+}
 
 type CycleState = {
   cycleDay: number;
@@ -33,154 +56,40 @@ type CycleState = {
   energy?: string;
   isSaving: boolean;
 
-  /** Pull latest cycle + today's log from Supabase and update store state. */
+  /** @deprecated Use TanStack Query hooks instead */
   hydrate: () => Promise<void>;
 };
 
-const PHASE_INSIGHT: Record<string, { title: string; description: string }> = {
-  menstrual: {
-    title: "Rest and restore.",
-    description:
-      "Your body is working hard. Gentle movement and warm nourishment help today.",
-  },
-  follicular: {
-    title: "Energy is building.",
-    description:
-      "Rising estrogen lifts your mood and focus. A great time for new projects.",
-  },
-  ovulation: {
-    title: "Your estrogen is peaking today.",
-    description:
-      "You may notice a natural glow and higher energy levels. Great day for connections.",
-  },
-  luteal: {
-    title: "Slow down and reflect.",
-    description:
-      "Progesterone is rising. Honour rest needs and reduce high-intensity commitments.",
-  },
-};
+export const useCycleStore = create<CycleState>((set) => {
+  logDeprecationWarning();
 
-export const useCycleStore = create<CycleState>((set) => ({
-  // Sensible defaults shown while Supabase loads
-  cycleDay: 1,
-  cycleLength: 28,
-  phaseLabel: "Cycle Phase",
-  progress: 0,
-  insightTitle: "Loading…",
-  insightDescription: "",
-  mood: undefined,
-  energy: undefined,
-  isSaving: false,
+  return {
+    // Sensible defaults (placeholder values)
+    cycleDay: 1,
+    cycleLength: 28,
+    phaseLabel: "Cycle Phase",
+    progress: 0,
+    insightTitle: "Loading…",
+    insightDescription: "",
+    mood: undefined,
+    energy: undefined,
+    isSaving: false,
 
-  hydrate: async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch active cycle and today's log in parallel with simplified error handling
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-
-      // Use Promise.allSettled for better error handling - no timeouts needed
-      const [cycleResult, logResult, profileResult] = await Promise.allSettled([
-        supabase
-          .from("cycles")
-          .select("*")
-          .eq("user_id", user.id)
-          .is("end_date", null)
-          .order("start_date", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("daily_logs")
-          .select("mood, energy_level")
-          .eq("user_id", user.id)
-          .eq("date", today)
-          .maybeSingle(),
-        supabase
-          .from("profiles")
-          .select("cycle_length_average, period_duration_average")
-          .eq("id", user.id)
-          .maybeSingle(),
-      ]);
-
-      // Extract data safely from settled promises
-      const cycleData =
-        cycleResult.status === "fulfilled" && cycleResult.value.data
-          ? cycleResult.value.data
-          : null;
-      const logData =
-        logResult.status === "fulfilled" && logResult.value.data
-          ? logResult.value.data
-          : null;
-      const profileData =
-        profileResult.status === "fulfilled" && profileResult.value.data
-          ? profileResult.value.data
-          : null;
-
-      if (cycleData) {
-        const cycle = cycleData as unknown as CycleRow;
-        const profile = profileData as unknown as {
-          cycle_length_average: number | null;
-          period_duration_average: number | null;
-        } | null;
-        const log = logData as unknown as {
-          mood: string | null;
-          energy_level: string | null;
-        } | null;
-
-        const cycleLength = profile?.cycle_length_average ?? 28;
-        const periodLen = profile?.period_duration_average ?? 5;
-        const cycleDay = computeCycleDay(cycle.start_date);
-        const phase = computePhase(cycleDay, cycleLength, periodLen);
-        const insight = PHASE_INSIGHT[phase] ?? PHASE_INSIGHT.follicular!;
-
-        set({
-          cycleDay,
-          cycleLength,
-          phaseLabel: getPhaseLabel(phase),
-          progress: computeProgress(cycleDay, cycleLength),
-          insightTitle: insight.title,
-          insightDescription: insight.description,
-          mood: log?.mood ?? undefined,
-          energy: log?.energy_level ?? undefined,
-        });
-      } else {
-        // No cycle data found, set sensible defaults
-        set({
-          cycleDay: 1,
-          cycleLength: 28,
-          phaseLabel: "Welcome to SOMA",
-          progress: 0,
-          insightTitle: "Get started",
-          insightDescription:
-            "Track your cycle to unlock personalized insights.",
-          mood: undefined,
-          energy: undefined,
-        });
-      }
-    } catch (error) {
-      logError('store', 'cycle_store_hydration_failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      captureException(
-        error instanceof Error ? error : new Error(String(error)),
-      );
-
-      // Set fallback state even on error
+    hydrate: async () => {
+      logDeprecationWarning();
+      // No-op: hydration no longer needed with TanStack Query persistence
       set({
         cycleDay: 1,
         cycleLength: 28,
         phaseLabel: "Welcome to SOMA",
         progress: 0,
-        insightTitle: "Welcome",
+        insightTitle: "Get started",
         insightDescription:
-          "Start tracking your cycle for personalized insights.",
+          "Track your cycle to unlock personalized insights.",
         mood: undefined,
         energy: undefined,
       });
-    }
-  },
-}));
+    },
+  };
+});
+

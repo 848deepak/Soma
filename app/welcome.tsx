@@ -1,5 +1,5 @@
-import { WelcomeScreen } from '@/src/screens/WelcomeScreen';
+import { WelcomeScreenWithErrorBoundary } from '@/src/screens/WelcomeScreen';
 
 export default function WelcomeRoute() {
-  return <WelcomeScreen />;
+  return <WelcomeScreenWithErrorBoundary />;
 }

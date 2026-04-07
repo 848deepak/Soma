@@ -29,6 +29,8 @@ import type { CareCircleRole } from "@/types/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SymbolView } from "expo-symbols";
 
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
+
 // ─ Tab state ──────────────────────────────────────────────────────────────
 type TabMode = "enter-code" | "select-role";
 
@@ -478,5 +480,13 @@ export function CareCircleScreen() {
         )}
       </ScrollView>
     </Screen>
+  );
+}
+
+export function CareCircleScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="CareCircleScreen">
+      <CareCircleScreen />
+    </ScreenErrorBoundary>
   );
 }

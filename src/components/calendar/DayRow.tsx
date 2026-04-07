@@ -8,7 +8,7 @@ import Animated, {
     withTiming,
 } from "react-native-reanimated";
 
-import type { CycleDataMap } from "@/hooks/useCycleCalendar";
+import type { CycleDataMap } from "@/src/domain/calendar";
 
 import { dayIso } from "./calendarUtils";
 import { DayCell } from "./DayCell";

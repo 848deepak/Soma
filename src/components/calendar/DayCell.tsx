@@ -7,7 +7,7 @@ import Animated, {
     withTiming,
 } from "react-native-reanimated";
 
-import type { CycleStatus } from "@/hooks/useCycleCalendar";
+import type { CycleStatus } from "@/src/domain/calendar";
 import { Typography } from "@/src/components/ui/Typography";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import { cycleCalendarTheme } from "@/src/theme/tokens";

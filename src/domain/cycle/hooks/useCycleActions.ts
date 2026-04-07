@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { DerivedCycleData } from "@/hooks/useCurrentCycle";
-import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
+import type { DerivedCycleData } from "@/src/domain/cycle";
+import { CURRENT_CYCLE_KEY } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
 import { enqueueSync } from "@/src/database/localDB";
 import { trackEvent } from "@/src/services/analytics";
