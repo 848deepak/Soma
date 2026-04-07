@@ -34,6 +34,8 @@ import {
     requestAndSyncPushToken,
     revokePushToken,
 } from "@/src/services/notificationService/pushTokenService";
+import { logAuthEvent } from "@/lib/logAuthEvent";
+import { ensureProfileRow } from "@/lib/auth";
 
 // ─── Observability bootstrap ────────────────────────────────────────────────
 // Both services are opt-in: they only activate when the corresponding
@@ -77,6 +79,125 @@ const queryClient = new QueryClient({
   },
 });
 
+const PROFILE_BOOTSTRAP_TIMEOUT_MS = 10000;
+const PROFILE_BOOTSTRAP_MAX_RETRIES = 2;
+
+type BootstrapProfileResult =
+  | {
+      status: "found";
+      profile: {
+        id: string;
+        is_onboarded: boolean;
+      };
+    }
+  | { status: "missing" }
+  | {
+      status: "error";
+      error: Error;
+    };
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientProfileLookupError(error: Error): boolean {
+  const normalized = error.message.toLowerCase();
+  return (
+    normalized.includes("timeout") ||
+    normalized.includes("network") ||
+    normalized.includes("fetch") ||
+    normalized.includes("failed to fetch")
+  );
+}
+
+async function fetchProfileForBootstrap(userId: string): Promise<BootstrapProfileResult> {
+  for (let attempt = 1; attempt <= PROFILE_BOOTSTRAP_MAX_RETRIES; attempt += 1) {
+    const startedAt = Date.now();
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Profile query timeout"));
+        }, PROFILE_BOOTSTRAP_TIMEOUT_MS);
+      });
+
+      const queryPromise = supabase
+        .from("profiles")
+        .select("id,is_onboarded")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      const durationMs = Date.now() - startedAt;
+
+      if (error) {
+        throw new Error(error.message || "Profile query failed");
+      }
+
+      if (!data) {
+        console.log("[Auth] Profile lookup result:", {
+          userId,
+          durationMs,
+          status: "missing",
+        });
+        return { status: "missing" };
+      }
+
+      if (data.id !== userId) {
+        const mismatchError = new Error(
+          `Profile uid mismatch: auth uid=${userId}, profile uid=${data.id}`,
+        );
+        return {
+          status: "error",
+          error: mismatchError,
+        };
+      }
+
+      console.log("[Auth] Profile lookup result:", {
+        userId,
+        durationMs,
+        status: "found",
+        isOnboarded: Boolean(data.is_onboarded),
+      });
+
+      return {
+        status: "found",
+        profile: {
+          id: data.id,
+          is_onboarded: Boolean(data.is_onboarded),
+        },
+      };
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error("Unknown profile lookup error");
+
+      console.warn("[Auth] Profile lookup attempt failed:", {
+        userId,
+        attempt,
+        maxRetries: PROFILE_BOOTSTRAP_MAX_RETRIES,
+        message: normalizedError.message,
+      });
+
+      if (
+        attempt < PROFILE_BOOTSTRAP_MAX_RETRIES &&
+        isTransientProfileLookupError(normalizedError)
+      ) {
+        await delay(250 * attempt);
+        continue;
+      }
+
+      return {
+        status: "error",
+        error: normalizedError,
+      };
+    }
+  }
+
+  return {
+    status: "error",
+    error: new Error("Profile lookup exhausted all retries"),
+  };
+}
+
 /**
  * Bootstraps auth and implements the correct user flow:
  *
@@ -96,10 +217,16 @@ function AuthBootstrap({
   const { user, isLoading, isAnonymous } = useAuthContext();
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const previousUserIdRef = useRef<string | null>(null);
+  const currentSegmentRef = useRef<string | undefined>(segments[0]);
+  const bootstrapRunIdRef = useRef(0);
 
   // Flush offline queue whenever connectivity is restored
   useNetworkSync();
   usePeriodAutoEnd();
+
+  useEffect(() => {
+    currentSegmentRef.current = segments[0];
+  }, [segments]);
 
   useEffect(() => {
     // Re-run bootstrap when auth identity changes (login/logout/account switch).
@@ -142,13 +269,33 @@ function AuthBootstrap({
     if (isLoading || hasBootstrapped) return;
 
     let isMounted = true;
+    const bootstrapRunId = ++bootstrapRunIdRef.current;
 
     async function bootstrap() {
       try {
         const hasLaunched = await AsyncStorage.getItem(HAS_LAUNCHED_KEY);
-        const inAuth = segments[0] === "auth";
-        const inOnboarding =
-          segments[0] === "welcome" || segments[0] === "setup";
+        const currentSegment = currentSegmentRef.current;
+        const inAuth = currentSegment === "auth";
+        const inOnboarding = currentSegment === "welcome" || currentSegment === "setup";
+
+        if (!isMounted || bootstrapRunId !== bootstrapRunIdRef.current) {
+          return;
+        }
+
+        console.log("[Auth] Bootstrap start:", {
+          userId: user?.id ?? null,
+          email: user?.email ?? null,
+          isAnonymous,
+          hasLaunched: Boolean(hasLaunched),
+          currentSegment: currentSegment ?? null,
+        });
+
+        // Log session restore event
+        logAuthEvent({
+          type: "session_restore",
+          success: !!user,
+          userId: user?.id,
+        });
 
         if (!user) {
           // No session at all — first-time user → show auth
@@ -173,51 +320,139 @@ function AuthBootstrap({
           return;
         }
 
-        // Add timeout protection for profile query
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error("Profile query timeout"));
-          }, 5000); // Reduced timeout for faster fallback
-        });
+        const profileResult = await fetchProfileForBootstrap(user.id);
+        if (!isMounted || bootstrapRunId !== bootstrapRunIdRef.current) {
+          return;
+        }
 
-        const profilePromise = supabase
-          .from("profiles")
-          .select("is_onboarded")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        try {
-          const { data: profile } = await Promise.race([
-            profilePromise,
-            timeoutPromise,
-          ]);
-
-          if (isMounted) {
-            if (!profile || !profile.is_onboarded) {
-              if (!inOnboarding) {
-                router.replace("/welcome" as never);
-              }
-            } else {
-              // First valid launch with a complete profile.
-              if (!hasLaunched) {
-                await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
-              }
-              if (inAuth || inOnboarding || segments[0] !== "(tabs)") {
-                router.replace("/(tabs)" as never);
-              }
-            }
-            setHasBootstrapped(true);
-          }
-        } catch (profileError) {
-          console.warn("[Auth] Profile query failed:", profileError);
-          // Fail safe to onboarding to avoid bypassing setup on transient profile errors.
-          if (isMounted) {
+        if (profileResult.status === "found") {
+          if (!profileResult.profile.is_onboarded) {
+            console.log("[Auth] Routing decision:", {
+              userId: user.id,
+              destination: "/welcome",
+              reason: "profile_found_not_onboarded",
+            });
+            logAuthEvent({
+              type: "bootstrap_routing",
+              userId: user.id,
+              reason: "needs_onboarding",
+              route: "/welcome",
+            });
             if (!inOnboarding) {
               router.replace("/welcome" as never);
             }
             setHasBootstrapped(true);
+            return;
           }
+
+          if (!hasLaunched) {
+            await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
+          }
+
+          if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
+            console.log("[Auth] Routing decision:", {
+              userId: user.id,
+              destination: "/(tabs)",
+              reason: "profile_found_onboarded",
+            });
+            logAuthEvent({
+              type: "bootstrap_routing",
+              userId: user.id,
+              reason: "onboarded",
+              route: "/(tabs)",
+            });
+            router.replace("/(tabs)" as never);
+          }
+          setHasBootstrapped(true);
+          return;
         }
+
+        if (profileResult.status === "missing") {
+          // User has valid session with email but profile lookup returned null.
+          // Do NOT force re-onboarding. Route to tabs and trigger background repair.
+          if (user.email) {
+            console.log("[Auth] Profile missing but user has email. Routing to tabs and triggering repair:", {
+              userId: user.id,
+              email: user.email,
+            });
+
+            // Background repair - don't block routing
+            ensureProfileRow(user.id).catch((repairError) => {
+              console.error("[Auth] Profile repair failed:", repairError);
+              logAuthEvent({
+                type: "profile_repair_failure",
+                userId: user.id,
+                error: repairError instanceof Error ? repairError.message : String(repairError),
+              });
+            });
+
+            logAuthEvent({
+              type: "bootstrap_routing",
+              userId: user.id,
+              reason: "profile_repair",
+              route: "/(tabs)",
+            });
+
+            if (!inAuth && !inOnboarding && currentSegmentRef.current === "(tabs)") {
+              setHasBootstrapped(true);
+              return;
+            }
+            router.replace("/(tabs)" as never);
+            setHasBootstrapped(true);
+            return;
+          }
+
+          // No email - user is anonymous. Route to onboarding.
+          console.log("[Auth] Routing decision:", {
+            userId: user.id,
+            destination: "/welcome",
+            reason: "profile_missing_anonymous",
+          });
+          logAuthEvent({
+            type: "bootstrap_routing",
+            userId: user.id,
+            reason: "needs_onboarding",
+            route: "/welcome",
+          });
+          if (!inOnboarding) {
+            router.replace("/welcome" as never);
+          }
+          setHasBootstrapped(true);
+          return;
+        }
+
+        const cachedProfile = queryClient.getQueryData<
+          { id?: string; is_onboarded?: boolean } | null
+        >(["profile"]);
+
+        if (cachedProfile?.id === user.id && typeof cachedProfile.is_onboarded === "boolean") {
+          console.log("[Auth] Using cached profile fallback:", {
+            userId: user.id,
+            isOnboarded: cachedProfile.is_onboarded,
+          });
+
+          if (cachedProfile.is_onboarded) {
+            if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
+              router.replace("/(tabs)" as never);
+            }
+          } else if (!inOnboarding) {
+            router.replace("/welcome" as never);
+          }
+
+          setHasBootstrapped(true);
+          return;
+        }
+
+        console.warn("[Auth] Profile lookup error fallback:", {
+          userId: user.id,
+          message: profileResult.error.message,
+        });
+
+        // Avoid misclassifying existing users as new users on transient DB failures.
+        if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
+          router.replace("/(tabs)" as never);
+        }
+        setHasBootstrapped(true);
       } catch (error) {
         console.warn("[Auth] Bootstrap critical error:", error);
         // Last resort: route to login when route resolution fails.
@@ -235,7 +470,7 @@ function AuthBootstrap({
     };
     // We intentionally run this during bootstrap transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, hasBootstrapped, user?.id, isAnonymous, segments[0]]);
+  }, [isLoading, hasBootstrapped, user?.id, isAnonymous, router]);
 
   useEffect(() => {
     if (hasBootstrapped) {
@@ -395,6 +630,18 @@ function RootAppShell() {
                       <Stack.Screen
                         name="profile"
                         options={{ title: "Profile", headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="settings/edit-profile"
+                        options={{ title: "Edit Profile", animation: "slide_from_right" }}
+                      />
+                      <Stack.Screen
+                        name="settings/cycle-length"
+                        options={{ title: "Cycle Length", animation: "slide_from_right" }}
+                      />
+                      <Stack.Screen
+                        name="settings/period-duration"
+                        options={{ title: "Period Duration", animation: "slide_from_right" }}
                       />
                     </Stack>
                   </NavigationThemeProvider>
