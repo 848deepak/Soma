@@ -46,7 +46,9 @@ function redactValue(value: unknown): unknown {
   return value;
 }
 
-function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+function sanitizeMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(metadata)) {
@@ -62,7 +64,9 @@ function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unk
 
 function sanitizeError(error: Error): { name: string; message: string } {
   const safeMessage =
-    error.message.length > 240 ? `${error.message.slice(0, 240)}...` : error.message;
+    error.message.length > 240
+      ? `${error.message.slice(0, 240)}...`
+      : error.message;
   return {
     name: error.name || "Error",
     message: safeMessage,
@@ -356,10 +360,16 @@ export function trackPerformance(metric: PerformanceMetric) {
  * Add debugging breadcrumb
  */
 export function addBreadcrumb(message: string, data?: Record<string, unknown>) {
-  errorTrackingService.addBreadcrumb(message, data ? sanitizeMetadata(data) : undefined);
+  errorTrackingService.addBreadcrumb(
+    message,
+    data ? sanitizeMetadata(data) : undefined,
+  );
 }
 
-export function sanitizeErrorForTelemetry(error: Error): { name: string; message: string } {
+export function sanitizeErrorForTelemetry(error: Error): {
+  name: string;
+  message: string;
+} {
   return sanitizeError(error);
 }
 

@@ -1,41 +1,38 @@
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  PlayfairDisplay_400Regular,
-  PlayfairDisplay_600SemiBold,
-  useFonts,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_600SemiBold,
+    useFonts,
 } from "@expo-google-fonts/playfair-display";
-import * as SplashScreen from "expo-splash-screen";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useColorScheme, View } from "react-native";
-import "react-native-reanimated";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 
 import { useNetworkSync } from "@/hooks/useNetworkSync";
 import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
 import { supabase } from "@/lib/supabase";
-import { AuthProvider, useAuthContext } from "@/src/context/AuthProvider";
-import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
-import { initSentry } from "@/src/services/errorTracking";
-import { initAnalytics } from "@/src/services/analytics";
-import { setupGlobalErrorHandlers } from "@/src/services/globalErrorHandlers";
-import {
-  initializeNotificationHandler,
-  startNotificationListeners,
-} from "@/src/services/notificationService/handler";
 import { SomaErrorBoundary } from "@/src/components/ui/SomaErrorBoundary";
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
+import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
+import { AuthProvider, useAuthContext } from "@/src/context/AuthProvider";
+import { ThemeProvider, useAppTheme } from "@/src/context/ThemeContext";
+import { initAnalytics } from "@/src/services/analytics";
+import { initSentry } from "@/src/services/errorTracking";
+import { setupGlobalErrorHandlers } from "@/src/services/globalErrorHandlers";
 import {
-  requestAndSyncPushToken,
-  revokePushToken,
+    initializeNotificationHandler,
+    startNotificationListeners,
+} from "@/src/services/notificationService/handler";
+import {
+    requestAndSyncPushToken,
+    revokePushToken,
 } from "@/src/services/notificationService/pushTokenService";
 
 // ─── Observability bootstrap ────────────────────────────────────────────────
@@ -51,8 +48,8 @@ if (POSTHOG_KEY) initAnalytics(POSTHOG_KEY);
 setupGlobalErrorHandlers();
 
 export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
+    // Catch any errors thrown by the Layout component.
+    ErrorBoundary
 } from "expo-router";
 
 export const unstable_settings = {
@@ -129,7 +126,7 @@ function AuthBootstrap({
       return;
     };
     void startNotificationListeners((data) => {
-      if (typeof data.route === 'string' && data.route.length > 0) {
+      if (typeof data.route === "string" && data.route.length > 0) {
         router.push(data.route as never);
       }
     }).then((cleanup) => {
@@ -179,7 +176,7 @@ function AuthBootstrap({
         // Add timeout protection for profile query
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Profile query timeout'));
+            reject(new Error("Profile query timeout"));
           }, 5000); // Reduced timeout for faster fallback
         });
 
@@ -249,8 +246,8 @@ function AuthBootstrap({
   return <>{children}</>;
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function RootAppShell() {
+  const { isHydrated: isThemeHydrated, navigationTheme } = useAppTheme();
   const [appReady, setAppReady] = useState(false);
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
 
@@ -272,10 +269,10 @@ export default function RootLayout() {
 
   // Enhanced app readiness check - wait for fonts AND auth bootstrap.
   useEffect(() => {
-    if ((fontsLoaded || fontError) && authBootstrapped) {
+    if ((fontsLoaded || fontError) && authBootstrapped && isThemeHydrated) {
       setAppReady(true);
     }
-  }, [fontsLoaded, fontError, authBootstrapped]);
+  }, [fontsLoaded, fontError, authBootstrapped, isThemeHydrated]);
 
   // Fail-safe so startup never hangs if auth/network is slow.
   useEffect(() => {
@@ -307,76 +304,100 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <QueryClientProvider client={queryClient}>
               <AuthProvider>
-                <AuthBootstrap onBootstrapComplete={() => setAuthBootstrapped(true)}>
-                  <ThemeProvider
-                    value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-                  >
-                <Stack>
-                  <Stack.Screen
-                    name="(tabs)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="auth/login"
-                    options={{ headerShown: false, animation: "fade" }}
-                  />
-                  <Stack.Screen
-                    name="auth/signup"
-                    options={{ headerShown: false, animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/privacy"
-                    options={{ title: "Privacy Policy", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/terms"
-                    options={{ title: "Terms of Use", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/medical-disclaimer"
-                    options={{ title: "Medical Disclaimer", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/data-consent"
-                    options={{ title: "Data Consent Center", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/data-practices"
-                    options={{ title: "Data Practices", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="legal/data-rights"
-                    options={{ title: "Data Rights Requests", animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="welcome"
-                    options={{ headerShown: false, animation: "fade" }}
-                  />
-                  <Stack.Screen
-                    name="setup"
-                    options={{ headerShown: false, animation: "slide_from_right" }}
-                  />
-                  <Stack.Screen
-                    name="log"
-                    options={{ title: "Daily Log", presentation: "modal" }}
-                  />
-                  <Stack.Screen
-                    name="quick-checkin"
-                    options={{
-                      title: "Quick Check-in",
-                      presentation: "transparentModal",
-                    }}
-                  />
-                  <Stack.Screen
-                    name="partner"
-                    options={{ title: "Partner Sync", headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="profile"
-                    options={{ title: "Profile", headerShown: false }}
-                  />
-                  </Stack>
-                  </ThemeProvider>
+                <AuthBootstrap
+                  onBootstrapComplete={() => setAuthBootstrapped(true)}
+                >
+                  <NavigationThemeProvider value={navigationTheme}>
+                    <Stack>
+                      <Stack.Screen
+                        name="(tabs)"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="auth/login"
+                        options={{ headerShown: false, animation: "fade" }}
+                      />
+                      <Stack.Screen
+                        name="auth/signup"
+                        options={{
+                          headerShown: false,
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/privacy"
+                        options={{
+                          title: "Privacy Policy",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/terms"
+                        options={{
+                          title: "Terms of Use",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/medical-disclaimer"
+                        options={{
+                          title: "Medical Disclaimer",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/data-consent"
+                        options={{
+                          title: "Data Consent Center",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/data-practices"
+                        options={{
+                          title: "Data Practices",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="legal/data-rights"
+                        options={{
+                          title: "Data Rights Requests",
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="welcome"
+                        options={{ headerShown: false, animation: "fade" }}
+                      />
+                      <Stack.Screen
+                        name="setup"
+                        options={{
+                          headerShown: false,
+                          animation: "slide_from_right",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="log"
+                        options={{ title: "Daily Log", presentation: "modal" }}
+                      />
+                      <Stack.Screen
+                        name="quick-checkin"
+                        options={{
+                          title: "Quick Check-in",
+                          presentation: "transparentModal",
+                        }}
+                      />
+                      <Stack.Screen
+                        name="partner"
+                        options={{ title: "Partner Sync", headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="profile"
+                        options={{ title: "Profile", headerShown: false }}
+                      />
+                    </Stack>
+                  </NavigationThemeProvider>
                 </AuthBootstrap>
               </AuthProvider>
             </QueryClientProvider>
@@ -384,5 +405,13 @@ export default function RootLayout() {
         </View>
       </SomaErrorBoundary>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootAppShell />
+    </ThemeProvider>
   );
 }

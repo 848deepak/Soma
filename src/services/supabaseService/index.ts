@@ -18,6 +18,54 @@ function conflictTargetForTable(table: string): string {
   return 'id';
 }
 
+function parseIsoTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isConflictSensitiveTable(table: string): boolean {
+  return table === 'daily_logs' || table === 'cycles';
+}
+
+async function hasNewerServerRecord(
+  table: string,
+  payload: Record<string, unknown>,
+): Promise<{ stale: boolean; error?: string }> {
+  const incomingUpdatedAt = parseIsoTimestamp(payload.updated_at);
+  if (!incomingUpdatedAt) return { stale: false };
+
+  let query = supabase.from(table).select('updated_at').limit(1);
+
+  if (table === 'daily_logs') {
+    const userId = payload.user_id;
+    const date = payload.date;
+    if (typeof userId !== 'string' || typeof date !== 'string') {
+      return { stale: false };
+    }
+    query = query.eq('user_id', userId).eq('date', date);
+  } else if (table === 'cycles') {
+    const userId = payload.user_id;
+    const startDate = payload.start_date;
+    if (typeof userId !== 'string' || typeof startDate !== 'string') {
+      return { stale: false };
+    }
+    query = query.eq('user_id', userId).eq('start_date', startDate);
+  } else {
+    return { stale: false };
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    return { stale: false, error: error.message };
+  }
+
+  const serverUpdatedAt = parseIsoTimestamp((data as { updated_at?: unknown } | null)?.updated_at);
+  if (!serverUpdatedAt) return { stale: false };
+
+  return { stale: serverUpdatedAt > incomingUpdatedAt };
+}
+
 export type SupabaseSyncPayload = {
   /** The Supabase table name (e.g. 'symptom_logs', 'cycle_entries'). */
   table: string;
@@ -36,6 +84,17 @@ export type PushResult = {
 export const supabaseService = {
   push: async ({ table, operation, payload, entityId }: SupabaseSyncPayload): Promise<PushResult> => {
     if (operation === 'upsert') {
+      if (isConflictSensitiveTable(table)) {
+        const conflictCheck = await hasNewerServerRecord(table, payload);
+        if (conflictCheck.error) return { ok: false, error: conflictCheck.error };
+        if (conflictCheck.stale) {
+          return {
+            ok: false,
+            error: 'Stale payload rejected: server already has newer data',
+          };
+        }
+      }
+
       const onConflict = conflictTargetForTable(table);
       const { error } = await supabase
         .from(table)

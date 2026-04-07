@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { logDataAccess } from "@/src/services/auditService";
 
 type ConsentType =
   | "privacy_policy"
@@ -46,13 +47,21 @@ export async function setConsent(
   granted: boolean,
   version = POLICY_VERSION,
 ): Promise<void> {
+  const changedAt = new Date().toISOString();
   const snapshot = await readSnapshot();
   snapshot[type] = {
     granted,
-    timestamp: new Date().toISOString(),
+    timestamp: changedAt,
     version,
   };
   await writeSnapshot(snapshot);
+
+  void logDataAccess("consent_data", "update_consent", {
+    consent_type: type,
+    granted,
+    version,
+    changed_at: changedAt,
+  });
 }
 
 export async function getConsentSnapshot(): Promise<ConsentSnapshot> {
@@ -79,6 +88,14 @@ export async function recordRequiredAuthConsent(
     };
   }
   await writeSnapshot(snapshot);
+
+  void logDataAccess("consent_data", "update_consent", {
+    consent_type: "required_auth_bundle",
+    granted: true,
+    version,
+    changed_at: now,
+    included_consents: REQUIRED_AUTH_CONSENTS,
+  });
 }
 
 export async function setAnalyticsConsent(granted: boolean): Promise<void> {

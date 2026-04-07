@@ -27,10 +27,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSUserNotificationUsageDescription": "Soma sends reminders to log your daily symptoms and alerts before your period starts.",
         "NSFaceIDUsageDescription": "Soma uses Face ID to protect your encryption key.",
-        "UIBackgroundModes": [
-          "fetch",
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["fetch", "remote-notification"]
       }
     },
     "android": {

@@ -6,7 +6,7 @@
  */
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, TextInput, useColorScheme, View } from "react-native";
+import { Alert, TextInput, View } from "react-native";
 
 import { signUpWithEmail } from "@/lib/auth";
 import { BrandOrb } from "@/src/components/ui/BrandOrb";
@@ -14,25 +14,26 @@ import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import {
-  requestAnalyticsConsent,
-  revokeAnalyticsConsent,
+    requestAnalyticsConsent,
+    revokeAnalyticsConsent,
 } from "@/src/services/analytics";
 import {
-  recordRequiredAuthConsent,
-  setAnalyticsConsent,
+    recordRequiredAuthConsent,
+    setAnalyticsConsent,
 } from "@/src/services/consentService";
 import { ensureNotificationPreferencesRow } from "@/src/services/notificationPreferencesService";
 import {
-  sanitizeInput,
-  validateEmail,
-  validatePassword,
+    sanitizeInput,
+    validateEmail,
+    validatePassword,
 } from "@/src/utils/validation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function SignupScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,7 +53,10 @@ export function SignupScreen() {
       return;
     }
     if (!validatePassword(password)) {
-      Alert.alert("Weak password", "Password must be at least 6 characters.");
+      Alert.alert(
+        "Weak password",
+        "Password must be at least 10 characters and include both letters and numbers.",
+      );
       return;
     }
     if (password !== confirmPassword) {
@@ -273,7 +277,9 @@ export function SignupScreen() {
               }}
             >
               {acceptedLegal ? (
-                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
+                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>
+                  ✓
+                </Typography>
               ) : null}
             </View>
 
@@ -282,7 +288,9 @@ export function SignupScreen() {
                 By continuing, you agree to our
               </Typography>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-                <PressableScale onPress={() => router.push("/legal/privacy" as never)}>
+                <PressableScale
+                  onPress={() => router.push("/legal/privacy" as never)}
+                >
                   <Typography
                     variant="helper"
                     className="text-somaBlush dark:text-darkPrimary"
@@ -291,7 +299,9 @@ export function SignupScreen() {
                   </Typography>
                 </PressableScale>
                 <Typography variant="helper">and</Typography>
-                <PressableScale onPress={() => router.push("/legal/terms" as never)}>
+                <PressableScale
+                  onPress={() => router.push("/legal/terms" as never)}
+                >
                   <Typography
                     variant="helper"
                     className="text-somaBlush dark:text-darkPrimary"
@@ -326,7 +336,9 @@ export function SignupScreen() {
               }}
             >
               {analyticsOptIn ? (
-                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>✓</Typography>
+                <Typography style={{ color: "#FFFFFF", fontSize: 12 }}>
+                  ✓
+                </Typography>
               ) : null}
             </View>
             <Typography variant="helper" style={{ flex: 1, lineHeight: 18 }}>

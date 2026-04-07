@@ -9,34 +9,38 @@
  * Replaces all mock data with live calculations from CycleIntelligence.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, View, useColorScheme } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 
+import { useCareCircle } from "@/hooks/useCareCircle";
 import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { logPeriodRangeAction, useEndCurrentCycle } from "@/hooks/useCycleActions";
+import {
+  logPeriodRangeAction,
+  useEndCurrentCycle,
+} from "@/hooks/useCycleActions";
 import { useCycleHistory } from "@/hooks/useCycleHistory";
 import { useDailyLogs } from "@/hooks/useDailyLogs";
 import { useProfile } from "@/hooks/useProfile";
-import { useCareCircle } from "@/hooks/useCareCircle";
 import {
   derivePeriodVisualizationDays,
   estimateOvulation,
   predictFertileWindow,
 } from "@/services/CycleIntelligence";
 import { CycleCalendarCard } from "@/src/components/cards/CycleCalendarCard";
+import { SupportDashboard } from "@/src/components/SupportDashboard";
 import { HeaderBar } from "@/src/components/ui/HeaderBar";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { SkeletonLoader } from "@/src/components/ui/SkeletonLoader";
 import { Typography } from "@/src/components/ui/Typography";
-import { SupportDashboard } from "@/src/components/SupportDashboard";
-import { logDataAccess } from "@/src/services/auditService";
-import { HapticsService } from "@/src/services/haptics/HapticsService";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import type { MonthCalendarMeta } from "@/src/features/cycle/uiCycleData";
 import {
-    buildMonthGrid,
-    calendarWeekdays,
+  buildMonthGrid,
+  calendarWeekdays,
 } from "@/src/features/cycle/uiCycleData";
+import { logDataAccess } from "@/src/services/auditService";
+import { HapticsService } from "@/src/services/haptics/HapticsService";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -112,7 +116,7 @@ export function CalendarScreen() {
   );
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
-  const [viewMode, setViewMode] = useState<'own' | 'shared'>('own');
+  const [viewMode, setViewMode] = useState<"own" | "shared">("own");
   const endCurrentCycle = useEndCurrentCycle();
 
   const { data: profile } = useProfile();
@@ -175,9 +179,9 @@ export function CalendarScreen() {
       );
     });
 
-    const actualPeriodDays = [...new Set([...loggedPeriodDays, ...cycleRangeDays])].sort(
-      (a, b) => a - b,
-    );
+    const actualPeriodDays = [
+      ...new Set([...loggedPeriodDays, ...cycleRangeDays]),
+    ].sort((a, b) => a - b);
 
     periodDays = actualPeriodDays;
 
@@ -290,7 +294,7 @@ export function CalendarScreen() {
   );
   const hasCycle = Boolean(cycleData?.cycle);
   const hasActiveCycle = Boolean(cycleData?.cycle);
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const ovulationEstimate = useMemo(() => {
     if (!cycleData?.cycle?.start_date) return null;
@@ -370,8 +374,9 @@ export function CalendarScreen() {
               Alert.alert("Saved", "Current period ended today.");
             } catch (error: unknown) {
               await HapticsService.error();
-              const message = error instanceof Error ? error.message : String(error);
-              
+              const message =
+                error instanceof Error ? error.message : String(error);
+
               // Debug logging
               console.error("[CalendarScreen] End period error:", {
                 message,
@@ -413,11 +418,9 @@ export function CalendarScreen() {
               } else {
                 const fallbackMessage =
                   message || "Could not end the current period.";
-                Alert.alert(
-                  "Action Failed",
-                  fallbackMessage,
-                  [{ text: "Try Again", onPress: () => handleEndPeriod() }],
-                );
+                Alert.alert("Action Failed", fallbackMessage, [
+                  { text: "Try Again", onPress: () => handleEndPeriod() },
+                ]);
               }
             }
           },
@@ -435,323 +438,359 @@ export function CalendarScreen() {
       ) : (
         <>
           {isViewer && (
-        <View testID="calendar-view-toggle" style={{ flexDirection: "row", gap: 8, marginBottom: 16, marginTop: 16, paddingHorizontal: 8 }}>
-          <PressableScale
-            testID="view-mode-own"
-            onPress={() => setViewMode('own')}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 12,
-              backgroundColor: viewMode === 'own' ? '#DDA7A5' : isDark ? 'rgba(167,139,250,0.14)' : 'rgba(221,167,165,0.2)',
-            }}
-          >
-            <Typography
+            <View
+              testID="calendar-view-toggle"
               style={{
-                textAlign: 'center',
-                fontWeight: '600',
-                fontSize: 14,
-                color: viewMode === 'own' ? '#FFFFFF' : isDark ? '#F2F2F2' : '#2D2327',
+                flexDirection: "row",
+                gap: 8,
+                marginBottom: 16,
+                marginTop: 16,
+                paddingHorizontal: 8,
               }}
             >
-              My Cycle
-            </Typography>
-          </PressableScale>
-          <PressableScale
-            testID="view-mode-partner"
-            onPress={() => setViewMode('shared')}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 12,
-              backgroundColor: viewMode === 'shared' ? '#DDA7A5' : isDark ? 'rgba(167,139,250,0.14)' : 'rgba(221,167,165,0.2)',
-            }}
-          >
-            <Typography
-              style={{
-                textAlign: 'center',
-                fontWeight: '600',
-                fontSize: 14,
-                color: viewMode === 'shared' ? '#FFFFFF' : isDark ? '#F2F2F2' : '#2D2327',
-              }}
-            >
-              Shared
-            </Typography>
-          </PressableScale>
-        </View>
-      )}
+              <PressableScale
+                testID="view-mode-own"
+                onPress={() => setViewMode("own")}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor:
+                    viewMode === "own"
+                      ? "#DDA7A5"
+                      : isDark
+                        ? "rgba(167,139,250,0.14)"
+                        : "rgba(221,167,165,0.2)",
+                }}
+              >
+                <Typography
+                  style={{
+                    textAlign: "center",
+                    fontWeight: "600",
+                    fontSize: 14,
+                    color:
+                      viewMode === "own"
+                        ? "#FFFFFF"
+                        : isDark
+                          ? "#F2F2F2"
+                          : "#2D2327",
+                  }}
+                >
+                  My Cycle
+                </Typography>
+              </PressableScale>
+              <PressableScale
+                testID="view-mode-partner"
+                onPress={() => setViewMode("shared")}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor:
+                    viewMode === "shared"
+                      ? "#DDA7A5"
+                      : isDark
+                        ? "rgba(167,139,250,0.14)"
+                        : "rgba(221,167,165,0.2)",
+                }}
+              >
+                <Typography
+                  style={{
+                    textAlign: "center",
+                    fontWeight: "600",
+                    fontSize: 14,
+                    color:
+                      viewMode === "shared"
+                        ? "#FFFFFF"
+                        : isDark
+                          ? "#F2F2F2"
+                          : "#2D2327",
+                  }}
+                >
+                  Shared
+                </Typography>
+              </PressableScale>
+            </View>
+          )}
 
-      {/* ── Shared view: Support Dashboard (viewer role) ─────────── */}
-      {viewMode === 'shared' && isViewer && viewerConnection ? (
-        <SupportDashboard
-          partnerId={viewerConnection.user_id}
-          partnerName={`Partner's`}
-        />
-      ) : viewMode === 'shared' ? null : (
-        <>
-          {/* ── My Cycle view ────────────────────────────────────── */}
-          {/* ── Month navigation ─────────────────────────────────────── */}
-      <View
-        style={{
-          marginTop: 20,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: isDark
-            ? "rgba(255,255,255,0.1)"
-            : "rgba(221,167,165,0.2)",
-          backgroundColor: isDark
-            ? "rgba(30,33,40,0.9)"
-            : "rgba(255,255,255,0.8)",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 16,
-          elevation: 2,
-        }}
-      >
-        <PressableScale
-          onPress={goToPrevMonth}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: isDark
-              ? "rgba(167,139,250,0.15)"
-              : "rgba(255,218,185,0.4)",
-          }}
-        >
-          <Typography
-            style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
-          >
-            ‹
-          </Typography>
-        </PressableScale>
+          {/* ── Shared view: Support Dashboard (viewer role) ─────────── */}
+          {viewMode === "shared" && isViewer && viewerConnection ? (
+            <SupportDashboard
+              partnerId={viewerConnection.user_id}
+              partnerName={`Partner's`}
+            />
+          ) : viewMode === "shared" ? null : (
+            <>
+              {/* ── My Cycle view ────────────────────────────────────── */}
+              {/* ── Month navigation ─────────────────────────────────────── */}
+              <View
+                style={{
+                  marginTop: 20,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: isDark
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(221,167,165,0.2)",
+                  backgroundColor: isDark
+                    ? "rgba(30,33,40,0.9)"
+                    : "rgba(255,255,255,0.8)",
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 16,
+                  elevation: 2,
+                }}
+              >
+                <PressableScale
+                  onPress={goToPrevMonth}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isDark
+                      ? "rgba(167,139,250,0.15)"
+                      : "rgba(255,218,185,0.4)",
+                  }}
+                >
+                  <Typography
+                    style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
+                  >
+                    ‹
+                  </Typography>
+                </PressableScale>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {cycleLoading && <ActivityIndicator size="small" color="#DDA7A5" />}
-          <Typography
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
-            }}
-          >
-            {calendarMeta.monthLabel} {calendarMeta.year}
-          </Typography>
-        </View>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  {cycleLoading && (
+                    <ActivityIndicator size="small" color="#DDA7A5" />
+                  )}
+                  <Typography
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "600",
+                      color: isDark ? "#F2F2F2" : "#2D2327",
+                    }}
+                  >
+                    {calendarMeta.monthLabel} {calendarMeta.year}
+                  </Typography>
+                </View>
 
-        <PressableScale
-          onPress={goToNextMonth}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: isDark
-              ? "rgba(167,139,250,0.15)"
-              : "rgba(255,218,185,0.4)",
-          }}
-        >
-          <Typography
-            style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
-          >
-            ›
-          </Typography>
-        </PressableScale>
-      </View>
+                <PressableScale
+                  onPress={goToNextMonth}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isDark
+                      ? "rgba(167,139,250,0.15)"
+                      : "rgba(255,218,185,0.4)",
+                  }}
+                >
+                  <Typography
+                    style={{ fontSize: 22, color: "#9B7E8C", lineHeight: 26 }}
+                  >
+                    ›
+                  </Typography>
+                </PressableScale>
+              </View>
 
-      <CycleCalendarCard
-        weekdays={calendarWeekdays}
-        weeks={weeks}
-        meta={calendarMeta}
-        selectedDay={selectedDay}
-        onSelectDay={setSelectedDay}
-      />
+              <CycleCalendarCard
+                weekdays={calendarWeekdays}
+                weeks={weeks}
+                meta={calendarMeta}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
 
-      {viewMode === 'own' && ovulationEstimate ? (
-        <View
-          style={{
-            marginTop: 12,
-            marginBottom: 8,
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: isDark
-              ? 'rgba(255,255,255,0.1)'
-              : 'rgba(221,167,165,0.24)',
-            backgroundColor: isDark
-              ? 'rgba(30,33,40,0.75)'
-              : 'rgba(255,255,255,0.7)',
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-          }}
-        >
-          <Typography
-            style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
-            }}
-          >
-            Prediction confidence: {ovulationEstimate.confidence} ({ovulationEstimate.confidenceScore}%)
-          </Typography>
-          <Typography variant="helper" style={{ marginTop: 2 }}>
-            Based on {ovulationEstimate.cyclesUsed} cycle{ovulationEstimate.cyclesUsed === 1 ? '' : 's'}; variability {ovulationEstimate.variabilityDays} days.
-          </Typography>
-        </View>
-      ) : null}
+              {viewMode === "own" && ovulationEstimate ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    marginBottom: 8,
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(221,167,165,0.24)",
+                    backgroundColor: isDark
+                      ? "rgba(30,33,40,0.75)"
+                      : "rgba(255,255,255,0.7)",
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                  }}
+                >
+                  <Typography
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: isDark ? "#F2F2F2" : "#2D2327",
+                    }}
+                  >
+                    Prediction confidence: {ovulationEstimate.confidence} (
+                    {ovulationEstimate.confidenceScore}%)
+                  </Typography>
+                  <Typography variant="helper" style={{ marginTop: 2 }}>
+                    Based on {ovulationEstimate.cyclesUsed} cycle
+                    {ovulationEstimate.cyclesUsed === 1 ? "" : "s"}; variability{" "}
+                    {ovulationEstimate.variabilityDays} days.
+                  </Typography>
+                </View>
+              ) : null}
 
-      {/* ── Selected day detail card ──────────────────────────────── */}
-      {selectedDay && dayNote ? (
-        <View
-          style={{
-            marginTop: 16,
-            marginBottom: 16,
-            borderRadius: 28,
-            borderWidth: 1,
-            borderColor: isDark
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(255,255,255,0.7)",
-            backgroundColor: isDark
-              ? "rgba(30,33,40,0.8)"
-              : "rgba(255,218,185,0.2)",
-            padding: 20,
-            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.12,
-            shadowRadius: 24,
-            elevation: 4,
-          }}
-        >
-          <Typography
-            style={{
-              fontFamily: "PlayfairDisplay-SemiBold",
-              fontSize: 22,
-              color: isDark ? "#F2F2F2" : "#2D2327",
-              marginBottom: 8,
-            }}
-          >
-            {calendarMeta.monthLabel} {selectedDay}
-          </Typography>
-          <Typography
-            style={{
-              fontSize: 15,
-              lineHeight: 24,
-              color: isDark ? "rgba(242,242,242,0.8)" : "#9B7E8C",
-            }}
-          >
-            {dayNote}
-          </Typography>
-        </View>
-      ) : null}
+              {/* ── Selected day detail card ──────────────────────────────── */}
+              {selectedDay && dayNote ? (
+                <View
+                  style={{
+                    marginTop: 16,
+                    marginBottom: 16,
+                    borderRadius: 28,
+                    borderWidth: 1,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(255,255,255,0.7)",
+                    backgroundColor: isDark
+                      ? "rgba(30,33,40,0.8)"
+                      : "rgba(255,218,185,0.2)",
+                    padding: 20,
+                    shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 24,
+                    elevation: 4,
+                  }}
+                >
+                  <Typography
+                    style={{
+                      fontFamily: "PlayfairDisplay-SemiBold",
+                      fontSize: 22,
+                      color: isDark ? "#F2F2F2" : "#2D2327",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {calendarMeta.monthLabel} {selectedDay}
+                  </Typography>
+                  <Typography
+                    style={{
+                      fontSize: 15,
+                      lineHeight: 24,
+                      color: isDark ? "rgba(242,242,242,0.8)" : "#9B7E8C",
+                    }}
+                  >
+                    {dayNote}
+                  </Typography>
+                </View>
+              ) : null}
 
-      {/* ── Empty state ───────────────────────────────────────────── */}
-      {!cycleLoading && !hasCycle ? (
-        <View
-          style={{
-            marginTop: 16,
-            marginBottom: 32,
-            alignItems: "center",
-            borderRadius: 24,
-            borderWidth: 1,
-            borderColor: isDark
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(221,167,165,0.2)",
-            backgroundColor: isDark
-              ? "rgba(30,33,40,0.8)"
-              : "rgba(255,255,255,0.75)",
-            padding: 24,
-          }}
-        >
-          <Typography
-            variant="helper"
-            style={{ textAlign: "center", lineHeight: 20 }}
-          >
-            Start logging your cycle to see period days, fertile windows, and
-            ovulation predictions here.
-          </Typography>
-        </View>
-      ) : null}
+              {/* ── Empty state ───────────────────────────────────────────── */}
+              {!cycleLoading && !hasCycle ? (
+                <View
+                  style={{
+                    marginTop: 16,
+                    marginBottom: 32,
+                    alignItems: "center",
+                    borderRadius: 24,
+                    borderWidth: 1,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(221,167,165,0.2)",
+                    backgroundColor: isDark
+                      ? "rgba(30,33,40,0.8)"
+                      : "rgba(255,255,255,0.75)",
+                    padding: 24,
+                  }}
+                >
+                  <Typography
+                    variant="helper"
+                    style={{ textAlign: "center", lineHeight: 20 }}
+                  >
+                    Start logging your cycle to see period days, fertile
+                    windows, and ovulation predictions here.
+                  </Typography>
+                </View>
+              ) : null}
 
-      <View
-        style={{
-          marginBottom: 24,
-          marginTop: 4,
-          flexDirection: "row",
-          gap: 10,
-        }}
-      >
-        <PressableScale
-          onPress={() => setShowPeriodModal(true)}
-          hapticOnPress="selection"
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: isDark
-              ? "rgba(255,255,255,0.2)"
-              : "rgba(221,167,165,0.45)",
-            backgroundColor: isDark
-              ? "rgba(167,139,250,0.14)"
-              : "rgba(255,255,255,0.7)",
-            paddingVertical: 14,
-          }}
-        >
-          <Typography
-            style={{
-              fontSize: 15,
-              fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
-            }}
-          >
-            Log Period
-          </Typography>
-        </PressableScale>
+              <View
+                style={{
+                  marginBottom: 24,
+                  marginTop: 4,
+                  flexDirection: "row",
+                  gap: 10,
+                }}
+              >
+                <PressableScale
+                  onPress={() => setShowPeriodModal(true)}
+                  hapticOnPress="selection"
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.2)"
+                      : "rgba(221,167,165,0.45)",
+                    backgroundColor: isDark
+                      ? "rgba(167,139,250,0.14)"
+                      : "rgba(255,255,255,0.7)",
+                    paddingVertical: 14,
+                  }}
+                >
+                  <Typography
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                      color: isDark ? "#F2F2F2" : "#2D2327",
+                    }}
+                  >
+                    Log Period
+                  </Typography>
+                </PressableScale>
 
-        {hasActiveCycle ? (
-          <PressableScale
-            onPress={handleEndPeriod}
-            hapticOnPress="impactMedium"
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 999,
-              backgroundColor: "#DDA7A5",
-              paddingVertical: 14,
-              opacity: endCurrentCycle.isPending ? 0.7 : 1,
-            }}
-          >
-            <Typography
-              style={{
-                fontSize: 15,
-                fontWeight: "600",
-                color: "#FFFFFF",
-              }}
-            >
-              {endCurrentCycle.isPending ? "Ending…" : "End Period"}
-            </Typography>
-          </PressableScale>
-        ) : null}
-      </View>
+                {hasActiveCycle ? (
+                  <PressableScale
+                    onPress={handleEndPeriod}
+                    hapticOnPress="impactMedium"
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 999,
+                      backgroundColor: "#DDA7A5",
+                      paddingVertical: 14,
+                      opacity: endCurrentCycle.isPending ? 0.7 : 1,
+                    }}
+                  >
+                    <Typography
+                      style={{
+                        fontSize: 15,
+                        fontWeight: "600",
+                        color: "#FFFFFF",
+                      }}
+                    >
+                      {endCurrentCycle.isPending ? "Ending…" : "End Period"}
+                    </Typography>
+                  </PressableScale>
+                ) : null}
+              </View>
 
-      <PeriodLogModal
-        visible={showPeriodModal}
-        onClose={() => setShowPeriodModal(false)}
-        onSubmit={handleSubmitPeriodModal}
-        isSubmitting={isLoggingPeriod}
-      />
-        </>
-        )}
+              <PeriodLogModal
+                visible={showPeriodModal}
+                onClose={() => setShowPeriodModal(false)}
+                onSubmit={handleSubmitPeriodModal}
+                isSubmitting={isLoggingPeriod}
+              />
+            </>
+          )}
         </>
       )}
     </Screen>

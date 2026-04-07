@@ -1,72 +1,38 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import React from 'react';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 
-import { SmartCalendarScreen } from '@/src/screens/SmartCalendarScreen';
+import {
+    SmartCalendarScreen,
+    type CycleDataMap,
+} from "@/src/screens/SmartCalendarScreen";
 
-const mockCreateFromText = jest.fn();
-
-jest.mock('react-native-gesture-handler', () => ({
-  PinchGestureHandler: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+jest.mock("@/hooks/useProfile", () => ({
+  useProfile: () => ({
+    data: {
+      cycle_length_average: 28,
+      period_duration_average: 5,
+    },
+  }),
 }));
 
-jest.mock('@/hooks/useSmartCalendar', () => ({
-  useSmartCalendar: () => ({
-    events: [
-      {
-        id: 'evt-1',
-        userId: 'user-1',
-        title: 'Morning Workout',
-        startTime: '2026-04-01T07:00:00',
-        endTime: '2026-04-01T08:00:00',
-        type: 'manual',
-        location: 'Gym',
-        tags: ['fitness'],
-        participants: [],
-        recurrence: null,
-        metadata: {},
+jest.mock("@/hooks/useCurrentCycle", () => ({
+  useCurrentCycle: () => ({
+    data: {
+      cycle: {
+        start_date: "2026-03-18",
+        predicted_next_cycle: "2026-04-14",
+        predicted_ovulation: "2026-04-01",
       },
-      {
-        id: 'evt-2',
-        userId: 'user-1',
-        title: 'Daily check-in',
-        startTime: '2026-04-01T08:00:00',
-        endTime: '2026-04-01T08:20:00',
-        type: 'log',
-        location: null,
-        tags: ['mood'],
-        participants: [],
-        recurrence: null,
-        metadata: {},
-      },
-    ],
-    suggestions: [
-      {
-        id: 's1',
-        title: 'You usually workout around this time. Schedule it?',
-        rationale: 'Based on recent fitness events',
-        suggestedStartTime: '07:00',
-        suggestedEndTime: '08:00',
-        confidence: 0.82,
-        source: 'habit',
-        tags: ['fitness'],
-      },
-    ],
-    logInsights: {
-      totalLogs: 12,
-      lowMoodCount: 3,
-      avgSleepHours: 6.8,
-      avgHydrationGlasses: 5.4,
-      topSymptoms: ['Cramps', 'Bloating'],
-      latestMood: 'Calm',
-      latestEnergyLevel: 'High',
     },
-    isLoading: false,
-    isError: false,
-    createFromText: (...args: unknown[]) => mockCreateFromText(...args),
-    updateEvent: jest.fn(),
-    deleteEvent: jest.fn(),
   }),
+}));
+
+jest.mock("@/hooks/useCycleHistory", () => ({
+  useCycleHistory: () => ({ data: [] }),
+}));
+
+jest.mock("@/hooks/useDailyLogs", () => ({
+  useDailyLogs: () => ({ data: [] }),
 }));
 
 const queryClient = new QueryClient({
@@ -76,61 +42,52 @@ const queryClient = new QueryClient({
   },
 });
 
-function renderScreen() {
+function renderScreen(cycleData?: CycleDataMap) {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SmartCalendarScreen />
+      <SmartCalendarScreen cycleData={cycleData} />
     </QueryClientProvider>,
   );
 }
 
-describe('SmartCalendarScreen', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockCreateFromText.mockResolvedValue({
-      title: 'Workout',
-      date: '2026-04-02',
-      startTime: '07:00',
-      endTime: '08:00',
-      location: null,
-      participants: [],
-      tags: ['fitness'],
-      recurrence: null,
-      rawText: 'Workout tomorrow at 7 am',
-      confidence: 0.9,
-      needsReview: false,
-      editableFields: ['title', 'date', 'startTime', 'endTime', 'location', 'participants', 'recurrence'],
+describe("SmartCalendarScreen", () => {
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-04-01T10:00:00Z"));
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  it("renders cycle calendar heading and legend", () => {
+    renderScreen();
+
+    expect(screen.getByText("Your Cycle Calendar")).toBeTruthy();
+    expect(screen.getByText("Period")).toBeTruthy();
+    expect(screen.getByText("Fertile")).toBeTruthy();
+    expect(screen.getByText("Ovulation")).toBeTruthy();
+    expect(screen.getByText("Predicted")).toBeTruthy();
+  });
+
+  it("toggles to year overview and selects a mini month", () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByText("April 2026"));
+    fireEvent.press(screen.getAllByText("Jan")[0]!);
+
+    expect(screen.getByText("January 2026")).toBeTruthy();
+  });
+
+  it("renders provided cycle status and updates selected day detail", () => {
+    renderScreen({
+      "2026-04-01": "period",
+      "2026-04-02": "predicted_period",
     });
-  });
 
-  it('renders text-first input and today intelligence', () => {
-    renderScreen();
+    const dayButton = screen.getByLabelText("Day 1, period, today");
+    fireEvent.press(dayButton);
 
-    expect(screen.getByText('Smart Calendar')).toBeTruthy();
-    expect(screen.getByText('Natural language input')).toBeTruthy();
-    expect(screen.getByText('Today Intelligence')).toBeTruthy();
-  });
-
-  it('creates event from natural language input', async () => {
-    renderScreen();
-
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Workout tomorrow at 7 am'),
-      'Workout tomorrow at 7 am',
-    );
-    fireEvent.press(screen.getByText('Parse and add event'));
-
-    await waitFor(() => {
-      expect(mockCreateFromText).toHaveBeenCalledWith('Workout tomorrow at 7 am');
-    });
-  });
-
-  it('opens year overview and shows month cards', () => {
-    renderScreen();
-
-    fireEvent.press(screen.getByText('Year'));
-
-    expect(screen.getByText('January')).toBeTruthy();
-    expect(screen.getAllByText(/logged days/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("period day")).toBeTruthy();
   });
 });

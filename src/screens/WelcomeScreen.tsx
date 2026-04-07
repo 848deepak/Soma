@@ -1,12 +1,12 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { View, useColorScheme } from "react-native";
+import { View } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withSequence,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 
 import { useProfile } from "@/hooks/useProfile";
@@ -15,6 +15,7 @@ import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { HAS_LAUNCHED_KEY } from "@/src/constants/storage";
 import { useAuthContext } from "@/src/context/AuthProvider";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ── Multi-layer animated orb matching Figma welcome screen ──────────────────
@@ -151,11 +152,12 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
 
 export function WelcomeScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
   const { user, isAnonymous } = useAuthContext();
   const { data: profile } = useProfile();
 
-  const displayName = profile?.first_name?.trim() || (isAnonymous ? "Guest User" : "there");
+  const displayName =
+    profile?.first_name?.trim() || (isAnonymous ? "Guest User" : "there");
   const username =
     profile?.username?.trim() ||
     (user?.email
@@ -163,7 +165,8 @@ export function WelcomeScreen() {
       : isAnonymous
         ? "guest"
         : `user-${user?.id?.slice(0, 6) ?? "guest"}`);
-  const email = user?.email ?? (isAnonymous ? "Guest Account" : "Private account");
+  const email =
+    user?.email ?? (isAnonymous ? "Guest Account" : "Private account");
   const profileInfo = profile?.date_of_birth
     ? `DOB: ${profile.date_of_birth}`
     : "Profile can be completed anytime in Settings";

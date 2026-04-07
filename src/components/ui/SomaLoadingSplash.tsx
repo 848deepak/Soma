@@ -3,7 +3,9 @@
  * Keeps launch visuals aligned with native splash assets.
  */
 import { useEffect, useState } from "react";
-import { Animated, Easing, Text, View, useColorScheme } from "react-native";
+import { Animated, Easing, Text, View } from "react-native";
+
+import { useAppTheme } from "@/src/context/ThemeContext";
 
 interface SomaLoadingSplashProps {
   /** Force hide the splash after a timeout (default: 20 seconds) */
@@ -19,7 +21,7 @@ export function SomaLoadingSplash({
   onTimeout,
   subtitle = "cycle intelligence",
 }: SomaLoadingSplashProps) {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
   const [opacity] = useState(new Animated.Value(0));
   const [heartPulse] = useState(new Animated.Value(1));
 
@@ -45,7 +47,7 @@ export function SomaLoadingSplash({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     pulseLoop.start();
 

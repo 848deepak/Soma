@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, View, useColorScheme } from "react-native";
+import { Animated, Easing, View } from "react-native";
+
+import { useAppTheme } from "@/src/context/ThemeContext";
 
 function PulseBlock({
   style,
@@ -35,7 +37,7 @@ function PulseBlock({
 }
 
 export function SkeletonLoader() {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const shell = isDark ? "rgba(255,255,255,0.12)" : "rgba(221,167,165,0.15)";
   const shellSoft = isDark ? "rgba(255,255,255,0.08)" : "rgba(221,167,165,0.1)";

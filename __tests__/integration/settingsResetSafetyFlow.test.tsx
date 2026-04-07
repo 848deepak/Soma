@@ -1,7 +1,15 @@
-import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react-native";
 import { Alert } from "react-native";
 
+import { THEME_PREFERENCE_KEY } from "@/src/constants/storage";
+import { ThemeProvider } from "@/src/context/ThemeContext";
 import { SettingsScreen } from "@/src/screens/SettingsScreen";
 
 const mockResetPredictionsMutateAsync = jest.fn();
@@ -39,6 +47,8 @@ jest.mock("@/lib/auth", () => ({
 jest.mock("@/src/services/analytics", () => ({
   track: jest.fn(),
 }));
+
+jest.mock("@react-native-async-storage/async-storage");
 
 jest.mock("@/src/services/notificationService", () => ({
   cancelAllNotifications: (...args: unknown[]) =>
@@ -107,6 +117,7 @@ jest.mock("@/hooks/usePendingConnections", () => ({
 describe("Settings reset safety flow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    void AsyncStorage.clear();
     mockResetPredictionsMutateAsync.mockResolvedValue({ updatedCycles: 1 });
     mockDeleteAllDataMutateAsync.mockResolvedValue(undefined);
     mockRequestPermissions.mockResolvedValue({ granted: true });
@@ -125,7 +136,9 @@ describe("Settings reset safety flow", () => {
 
     expect(screen.getByText("Reset Predictions")).toBeTruthy();
     expect(
-      screen.getByText("Reset Predictions updates forecast dates only. It never deletes logs."),
+      screen.getByText(
+        "Reset Predictions updates forecast dates only. It never deletes logs.",
+      ),
     ).toBeTruthy();
 
     fireEvent.press(screen.getByText("Reset Predictions"));
@@ -169,7 +182,9 @@ describe("Settings reset safety flow", () => {
     const deleteButtons = deletePromptCall?.[2] as
       | Array<{ text: string; onPress?: () => void | Promise<void> }>
       | undefined;
-    const deleteAction = deleteButtons?.find((button) => button.text === "Delete");
+    const deleteAction = deleteButtons?.find(
+      (button) => button.text === "Delete",
+    );
 
     await act(async () => {
       await deleteAction?.onPress?.();
@@ -185,12 +200,16 @@ describe("Settings reset safety flow", () => {
     fireEvent.press(screen.getByText("Edit"));
 
     await act(async () => {
-      fireEvent.changeText(screen.getByTestId("settings-cycle-length-input"), "8");
+      fireEvent.changeText(
+        screen.getByTestId("settings-cycle-length-input"),
+        "8",
+      );
     });
 
     await waitFor(() => {
       expect(
-        screen.getAllByText("Cycle length must be between 15 and 60 days.").length,
+        screen.getAllByText("Cycle length must be between 15 and 60 days.")
+          .length,
       ).toBeGreaterThan(0);
     });
 
@@ -207,7 +226,10 @@ describe("Settings reset safety flow", () => {
     fireEvent.press(screen.getByText("Edit"));
 
     await act(async () => {
-      fireEvent.changeText(screen.getByTestId("settings-first-name-input"), "Janet");
+      fireEvent.changeText(
+        screen.getByTestId("settings-first-name-input"),
+        "Janet",
+      );
     });
 
     const saveButton = screen.getByTestId("settings-save-button");
@@ -235,7 +257,11 @@ describe("Settings reset safety flow", () => {
     render(<SettingsScreen />);
 
     await act(async () => {
-      fireEvent(screen.getByTestId("settings-daily-reminders-toggle"), "valueChange", true);
+      fireEvent(
+        screen.getByTestId("settings-daily-reminders-toggle"),
+        "valueChange",
+        true,
+      );
     });
 
     expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
@@ -256,7 +282,11 @@ describe("Settings reset safety flow", () => {
     render(<SettingsScreen />);
 
     await act(async () => {
-      fireEvent(screen.getByTestId("settings-daily-reminders-toggle"), "valueChange", true);
+      fireEvent(
+        screen.getByTestId("settings-daily-reminders-toggle"),
+        "valueChange",
+        true,
+      );
     });
 
     expect(mockRequestPermissions).toHaveBeenCalledTimes(1);
@@ -268,4 +298,39 @@ describe("Settings reset safety flow", () => {
     );
   });
 
+  it("persists selected theme when user picks lavender", async () => {
+    render(
+      <ThemeProvider>
+        <SettingsScreen />
+      </ThemeProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId("settings-theme-lavender"));
+    });
+
+    await waitFor(() => {
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+        THEME_PREFERENCE_KEY,
+        "lavender",
+      );
+    });
+  });
+
+  it("restores midnight theme from storage on cold start", async () => {
+    await AsyncStorage.setItem(THEME_PREFERENCE_KEY, "midnight");
+
+    render(
+      <ThemeProvider>
+        <SettingsScreen />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("settings-theme-midnight").props.accessibilityState
+          ?.selected,
+      ).toBe(true);
+    });
+  });
 });

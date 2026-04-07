@@ -5,14 +5,9 @@
  */
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import {
-    Alert,
-    Text,
-    TouchableOpacity,
-    useColorScheme,
-    View,
-} from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 
+import { useAppTheme } from "@/src/context/ThemeContext";
 import { captureException } from "@/src/services/errorTracking";
 
 interface SomaErrorBoundaryState {
@@ -147,7 +142,7 @@ function DefaultErrorFallback({
   retry: () => void;
   reset: () => void;
 }) {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const handleSendReport = () => {
     Alert.alert(
