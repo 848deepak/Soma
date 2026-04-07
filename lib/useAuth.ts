@@ -12,6 +12,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
+import { logAuthEvent } from "@/lib/logAuthEvent";
 
 export interface AuthState {
   user: User | null;
@@ -31,17 +32,42 @@ export function useAuth(): AuthState {
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
+    let initialSessionResolved = false;
+
+    const finalizeInitialLoading = () => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    };
+
+    // Subscribe first so we never miss an auth event during startup.
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        if (!isMounted) return;
+
+        setSession(newSession);
+        if (event === "INITIAL_SESSION" || initialSessionResolved) {
+          setIsLoading(false);
+        }
+      },
+    );
 
     const resolveInitialSession = async () => {
       try {
-        // Reduced timeout to 3 seconds for faster failure and app startup
+        // Keep startup bounded while still allowing persisted session restoration.
         timeoutId = setTimeout(() => {
           if (isMounted) {
             console.warn(
               "[Auth] Session timeout after 3s, defaulting to no session",
             );
+            initialSessionResolved = true;
             setSession(null);
-            setIsLoading(false);
+            finalizeInitialLoading();
+            logAuthEvent({
+              type: "session_restore",
+              success: false,
+              error: "Session timeout",
+            });
           }
         }, 3000);
 
@@ -49,36 +75,43 @@ export function useAuth(): AuthState {
 
         if (isMounted) {
           clearTimeout(timeoutId);
+          initialSessionResolved = true;
           if (error) {
             console.warn("[Auth] Session error:", error.message);
             setSession(null);
+            logAuthEvent({
+              type: "session_restore",
+              success: false,
+              error: error.message,
+            });
           } else {
             setSession(data.session ?? null);
+            logAuthEvent({
+              type: "session_restore",
+              success: !!data.session,
+              userId: data.session?.user?.id,
+            });
           }
-          setIsLoading(false);
+          finalizeInitialLoading();
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown session error";
         console.warn("[Auth] Session resolution error:", message);
         if (isMounted) {
           clearTimeout(timeoutId);
+          initialSessionResolved = true;
           setSession(null);
-          setIsLoading(false);
+          finalizeInitialLoading();
+          logAuthEvent({
+            type: "session_restore",
+            success: false,
+            error: message,
+          });
         }
       }
     };
 
     resolveInitialSession();
-
-    // Subscribe to auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        if (isMounted) {
-          setSession(newSession);
-          setIsLoading(false);
-        }
-      },
-    );
 
     return () => {
       isMounted = false;
