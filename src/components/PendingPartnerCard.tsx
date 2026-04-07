@@ -4,10 +4,11 @@
  * Displays incoming pending partner connection requests with Accept/Reject options.
  */
 
-import { ActivityIndicator, Alert, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Typography } from '@/src/components/ui/Typography';
 import { PressableScale } from '@/src/components/ui/PressableScale';
+import { useAppTheme } from '@/src/context/ThemeContext';
 import * as careCircleService from '@/src/services/careCircleService';
 import { PENDING_CONNECTIONS_KEY } from '@/hooks/usePendingConnections';
 import { CARE_CIRCLE_KEY } from '@/hooks/useCareCircle';
@@ -24,6 +25,7 @@ export function PendingPartnerCard({
   isDark,
   onActionComplete,
 }: PendingPartnerCardProps) {
+  const { colors } = useAppTheme();
   const queryClient = useQueryClient();
 
   const acceptMutation = useMutation({
@@ -55,13 +57,13 @@ export function PendingPartnerCard({
   const cardStyle = {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(221,167,165,0.2)',
-    backgroundColor: isDark ? 'rgba(30,33,40,0.85)' : 'rgba(255,255,255,0.75)',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 16,
     marginBottom: 12,
   };
 
-  const roleColor = connection.permissions?.role === 'trusted' ? '#A78BFA' : '#DDA7A5';
+  const roleColor = connection.permissions?.role === 'trusted' ? colors.secondary : colors.primary;
 
   return (
     <View style={cardStyle}>
@@ -92,7 +94,7 @@ export function PendingPartnerCard({
             flex: 1,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(221,167,165,0.3)',
+            borderColor: colors.border,
             paddingVertical: 10,
             alignItems: 'center',
             justifyContent: 'center',

@@ -5,11 +5,11 @@ import { Typography } from "@/src/components/ui/Typography";
 import { cycleCalendarTheme } from "@/src/theme/tokens";
 
 type CycleLegendProps = {
-  isDark: boolean;
+  themeVariant: "cream" | "midnight" | "lavender";
 };
 
-export function CycleLegend({ isDark }: CycleLegendProps) {
-  const theme = isDark ? cycleCalendarTheme.dark : cycleCalendarTheme.light;
+export function CycleLegend({ themeVariant }: CycleLegendProps) {
+  const theme = cycleCalendarTheme[themeVariant];
 
   return (
     <View

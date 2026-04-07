@@ -42,6 +42,11 @@ function addDays(iso: string, days: number): string {
   return dayIso(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function localTodayIso(): string {
+  const now = new Date();
+  return dayIso(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 function inRange(startIso: string, endIso: string): string[] {
   const result: string[] = [];
   const start = parseIso(startIso);
@@ -77,6 +82,24 @@ export function buildCycleDataMap(
   cycleLength: number,
 ): CycleDataMap {
   const statusMap: Record<string, Exclude<CycleStatus, null>> = {};
+
+  if (cycle?.start_date) {
+    const today = localTodayIso();
+
+    if (cycle.end_date && cycle.end_date >= cycle.start_date) {
+      inRange(cycle.start_date, cycle.end_date).forEach((iso) => {
+        setStatus(statusMap, iso, "period");
+      });
+    } else {
+      const inferredEnd = addDays(cycle.start_date, Math.max(0, periodLength - 1));
+      const activeEnd = inferredEnd < today ? inferredEnd : today;
+      if (activeEnd >= cycle.start_date) {
+        inRange(cycle.start_date, activeEnd).forEach((iso) => {
+          setStatus(statusMap, iso, "period");
+        });
+      }
+    }
+  }
 
   logs
     .filter((entry) => (entry.flow_level ?? 0) > 0)

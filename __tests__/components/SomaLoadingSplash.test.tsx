@@ -4,15 +4,22 @@ import { Animated } from "react-native";
 
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 
+jest.mock("@/src/context/ThemeContext", () => ({
+  useAppTheme: jest.fn(),
+}));
+
 describe("SomaLoadingSplash", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it("uses light launch colors when color scheme is light", () => {
-    jest
-      .spyOn(require("react-native"), "useColorScheme")
-      .mockReturnValue("light");
+    const { useAppTheme } = require("@/src/context/ThemeContext");
+    useAppTheme.mockReturnValue({
+      isDark: false,
+      theme: "cream",
+      colors: {},
+    });
 
     const view = render(<SomaLoadingSplash subtitle="SOMA" />);
     const animatedViews = view.UNSAFE_getAllByType(Animated.View);
@@ -21,9 +28,12 @@ describe("SomaLoadingSplash", () => {
   });
 
   it("uses dark launch colors when color scheme is dark", () => {
-    jest
-      .spyOn(require("react-native"), "useColorScheme")
-      .mockReturnValue("dark");
+    const { useAppTheme } = require("@/src/context/ThemeContext");
+    useAppTheme.mockReturnValue({
+      isDark: true,
+      theme: "midnight",
+      colors: {},
+    });
 
     const view = render(<SomaLoadingSplash subtitle="SOMA" />);
     const animatedViews = view.UNSAFE_getAllByType(Animated.View);

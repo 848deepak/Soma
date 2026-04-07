@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -19,7 +19,17 @@ import { useAppTheme } from "@/src/context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ── Multi-layer animated orb matching Figma welcome screen ──────────────────
-function AnimatedOrb({ isDark }: { isDark: boolean }) {
+function AnimatedOrb({
+  isDark,
+  theme,
+  primary,
+  primaryDark,
+}: {
+  isDark: boolean;
+  theme: "cream" | "midnight" | "lavender";
+  primary: string;
+  primaryDark: string;
+}) {
   // Outer glow pulse — slow 3s cycle
   const outerScale = useSharedValue(1);
   const outerOpacity = useSharedValue(0.5);
@@ -97,7 +107,9 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
             borderRadius: 160,
             backgroundColor: isDark
               ? "rgba(167,139,250,0.2)"
-              : "rgba(255,218,185,0.55)",
+              : theme === "lavender"
+                ? "rgba(193,187,221,0.55)"
+                : "rgba(255,218,185,0.55)",
           },
           outerAnimStyle,
         ]}
@@ -112,7 +124,9 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
             borderRadius: 144,
             backgroundColor: isDark
               ? "rgba(167,139,250,0.35)"
-              : "rgba(221,167,165,0.6)",
+              : theme === "lavender"
+                ? "rgba(155,138,196,0.6)"
+                : "rgba(221,167,165,0.6)",
           },
           midAnimStyle,
         ]}
@@ -123,8 +137,8 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
           width: 224,
           height: 224,
           borderRadius: 112,
-          backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+          backgroundColor: primary,
+          shadowColor: isDark ? primaryDark : primary,
           shadowOffset: { width: 0, height: 20 },
           shadowOpacity: 0.5,
           shadowRadius: 40,
@@ -152,9 +166,9 @@ function AnimatedOrb({ isDark }: { isDark: boolean }) {
 
 export function WelcomeScreen() {
   const router = useRouter();
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
   const { user, isAnonymous } = useAuthContext();
-  const { data: profile } = useProfile();
+  const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useProfile();
 
   const displayName =
     profile?.first_name?.trim() || (isAnonymous ? "Guest User" : "there");
@@ -172,7 +186,19 @@ export function WelcomeScreen() {
     : "Profile can be completed anytime in Settings";
 
   async function handleGetStarted() {
+    if (isProfileLoading) {
+      Alert.alert("One moment", "Loading your profile...");
+      return;
+    }
+
     await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
+
+    if (isProfileError) {
+      // Keep users unblocked during transient DB issues without classifying them as new.
+      router.replace("/(tabs)" as never);
+      return;
+    }
+
     if (profile?.is_onboarded) {
       router.replace("/(tabs)" as never);
       return;
@@ -194,7 +220,9 @@ export function WelcomeScreen() {
           borderRadius: 60,
           backgroundColor: isDark
             ? "rgba(79,70,229,0.15)"
-            : "rgba(255,218,185,0.5)",
+            : theme === "lavender"
+              ? "rgba(193,187,221,0.5)"
+              : "rgba(255,218,185,0.5)",
           opacity: 0.6,
         }}
       />
@@ -209,14 +237,19 @@ export function WelcomeScreen() {
           borderRadius: 80,
           backgroundColor: isDark
             ? "rgba(167,139,250,0.12)"
-            : "rgba(155,126,140,0.3)",
+              : "rgba(155,138,196,0.3)",
           opacity: 0.5,
         }}
       />
 
       <View style={{ marginTop: 26, alignItems: "center" }}>
         {/* ── Animated aurora orb ─────────────────────────── */}
-        <AnimatedOrb isDark={isDark} />
+        <AnimatedOrb
+          isDark={isDark}
+          theme={theme}
+          primary={colors.primary}
+          primaryDark={colors.primaryDark}
+        />
 
         {/* ── Heading ─────────────────────────────────────── */}
         <Typography variant="serif" className="text-center">
@@ -252,19 +285,25 @@ export function WelcomeScreen() {
 
         {/* ── Get Started CTA ─────────────────────────────── */}
         <PressableScale
+          disabled={isProfileLoading}
           onPress={handleGetStarted}
           className="mt-14 w-full items-center rounded-full bg-somaBlush py-[20px] dark:bg-darkPrimary"
           style={{
-            shadowColor: "#DDA7A5",
+            backgroundColor: colors.primary,
+            shadowColor: colors.primary,
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.4,
             shadowRadius: 40,
             elevation: 12,
           }}
         >
-          <Typography className="text-base font-semibold text-white">
-            {profile?.is_onboarded ? "Go to Home" : "Get Started"}
-          </Typography>
+          {isProfileLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Typography className="text-base font-semibold text-white">
+              {profile?.is_onboarded ? "Go to Home" : "Get Started"}
+            </Typography>
+          )}
         </PressableScale>
 
         {/* ── Sign in link for returning users ─────────────── */}

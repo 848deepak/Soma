@@ -4,20 +4,20 @@
     "slug": "soma-health",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/2.png",
     "scheme": "soma",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FDF7F5",
+      "backgroundColor": "#FFFDFB",
       "dark": {
         "backgroundColor": "#0F1115"
       }
     },
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/2.png",
       "bundleIdentifier": "com.soma.health",
       "buildNumber": "1",
       "config": {

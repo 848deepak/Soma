@@ -21,9 +21,37 @@ export function SomaLoadingSplash({
   onTimeout,
   subtitle = "cycle intelligence",
 }: SomaLoadingSplashProps) {
-  const { isDark } = useAppTheme();
+  const { isDark, theme } = useAppTheme();
   const [opacity] = useState(new Animated.Value(0));
   const [heartPulse] = useState(new Animated.Value(1));
+
+  const palette =
+    theme === "lavender"
+      ? {
+          background: "#F3F0FF",
+          halo: "#E8E0F8",
+          orb: "#9B8AC4",
+          shadow: "#7C6B9E",
+          title: "#6E4FA3",
+          subtitle: "#7C6B9E",
+        }
+      : isDark
+        ? {
+            background: "#0F1115",
+            halo: "#1A2024",
+            orb: "#A78BFA",
+            shadow: "#A78BFA",
+            title: "#EADFF0",
+            subtitle: "#C9B9D1",
+          }
+        : {
+            background: "#FDF7F5",
+            halo: "#F6E6E3",
+            orb: "#DDA7A5",
+            shadow: "#DDA7A5",
+            title: "#6E4A57",
+            subtitle: "#8A6977",
+          };
 
   useEffect(() => {
     // Fade in animation
@@ -67,7 +95,7 @@ export function SomaLoadingSplash({
     <Animated.View
       style={{
         flex: 1,
-        backgroundColor: isDark ? "#0F1115" : "#FDF7F5",
+        backgroundColor: palette.background,
         alignItems: "center",
         justifyContent: "center",
         opacity,
@@ -79,7 +107,7 @@ export function SomaLoadingSplash({
           width: 320,
           height: 320,
           borderRadius: 160,
-          backgroundColor: isDark ? "#1A2024" : "#F6E6E3",
+          backgroundColor: palette.halo,
           opacity: 0.9,
         }}
       />
@@ -88,11 +116,11 @@ export function SomaLoadingSplash({
           width: 154,
           height: 154,
           borderRadius: 77,
-          backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+          backgroundColor: palette.orb,
           alignItems: "center",
           justifyContent: "center",
           transform: [{ scale: heartPulse }],
-          shadowColor: isDark ? "#A78BFA" : "#DDA7A5",
+          shadowColor: palette.shadow,
           shadowOffset: { width: 0, height: 10 },
           shadowOpacity: 0.35,
           shadowRadius: 20,
@@ -115,7 +143,7 @@ export function SomaLoadingSplash({
         style={{
           fontFamily: "PlayfairDisplay-SemiBold",
           fontSize: 44,
-          color: isDark ? "#EADFF0" : "#6E4A57",
+          color: palette.title,
           letterSpacing: 6,
           textAlign: "center",
           marginBottom: 10,
@@ -128,7 +156,7 @@ export function SomaLoadingSplash({
       <Text
         style={{
           fontSize: 15,
-          color: isDark ? "#C9B9D1" : "#8A6977",
+          color: palette.subtitle,
           letterSpacing: 1.2,
           textAlign: "center",
           textTransform: "lowercase",

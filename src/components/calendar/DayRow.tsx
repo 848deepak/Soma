@@ -21,7 +21,7 @@ type DayRowProps = {
   selectedDateIso: string | null;
   todayIso: string;
   cycleDataMap: CycleDataMap;
-  isDark: boolean;
+  themeVariant: "cream" | "midnight" | "lavender";
   onPressDate: (iso: string) => void;
   todayScale: { value: number };
   monthAnimationSeed: string;
@@ -35,7 +35,7 @@ export function DayRow({
   selectedDateIso,
   todayIso,
   cycleDataMap,
-  isDark,
+  themeVariant,
   onPressDate,
   todayScale,
   monthAnimationSeed,
@@ -73,10 +73,11 @@ export function DayRow({
             key={`day-${weekIndex}-${day}`}
             day={day}
             iso={iso}
+            isSunday={dayIndex === 0}
             status={cycleDataMap[iso] ?? null}
             isToday={iso === todayIso}
             isSelected={selectedDateIso === iso}
-            isDark={isDark}
+            themeVariant={themeVariant}
             onPress={onPressDate}
             todayScale={todayScale}
           />

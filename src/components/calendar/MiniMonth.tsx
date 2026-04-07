@@ -10,14 +10,16 @@ import { Typography } from "@/src/components/ui/Typography";
 import { buildMonthGrid } from "@/src/features/cycle/uiCycleData";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 
-import { buildMiniMonthDots, dayIso, MONTH_NAMES } from "./calendarUtils";
+import { dayIso, MONTH_NAMES } from "./calendarUtils";
+
+const MINI_WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 
 type MiniMonthProps = {
   monthIndex: number;
   year: number;
   isSelected: boolean;
   cycleDataMap: CycleDataMap;
-  isDark: boolean;
+  themeVariant: "cream" | "midnight" | "lavender";
   onPress: (month: number) => void;
 };
 
@@ -26,27 +28,29 @@ export function MiniMonth({
   year,
   isSelected,
   cycleDataMap,
-  isDark,
+  themeVariant,
   onPress,
 }: MiniMonthProps) {
+  const today = new Date();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const firstWeekDay = new Date(year, monthIndex, 1).getDay();
   const monthWeeks = buildMonthGrid(daysInMonth, firstWeekDay);
+  const normalizedWeeks = [
+    ...monthWeeks,
+    ...Array.from({ length: Math.max(0, 6 - monthWeeks.length) }, () =>
+      Array(7).fill(null),
+    ),
+  ];
   const pressScale = useSharedValue(1);
 
   const animatedScale = useAnimatedStyle(() => ({
     transform: [{ scale: pressScale.value }],
   }));
 
-  const activeDotCount = Math.min(
-    3,
-    Math.ceil(buildMiniMonthDots(year, monthIndex, cycleDataMap) / 4),
-  );
-
   return (
     <Animated.View
       style={animatedScale}
-      className="mb-3 w-[31%] rounded-2xl px-2 py-2"
+      className="mb-1.5 w-[31.5%]"
     >
       <Pressable
         onPressIn={() => {
@@ -59,37 +63,76 @@ export function MiniMonth({
           void HapticsService.selection();
           onPress(monthIndex);
         }}
-        className="rounded-2xl px-1 py-2"
+        className="h-[154px] rounded-2xl px-1 py-1.5"
         style={{
           backgroundColor: isSelected
-            ? isDark
-              ? "rgba(182,123,129,0.24)"
-              : "rgba(232,160,160,0.18)"
-            : "transparent",
+            ? themeVariant === "midnight"
+              ? "rgba(255,255,255,0.15)"
+              : themeVariant === "lavender"
+                ? "rgba(232,224,248,0.95)"
+              : "rgba(255,255,255,0.96)"
+            : themeVariant === "midnight"
+              ? "rgba(255,255,255,0.08)"
+              : themeVariant === "lavender"
+                ? "rgba(255,255,255,0.86)"
+              : "rgba(255,255,255,0.92)",
+          borderWidth: isSelected ? 1 : 0,
+          borderColor:
+            themeVariant === "midnight"
+              ? "rgba(255,255,255,0.3)"
+              : "rgba(10,132,255,0.22)",
         }}
       >
         <Typography
           variant="helper"
-          className={`mb-1 text-center text-[13px] font-semibold ${isSelected ? "text-[#C56D74]" : "text-somaMauve"}`}
+          className={`mb-1 text-center text-[11px] font-semibold tracking-[0.4px] ${isSelected ? "text-[#0A84FF]" : "dark:text-darkTextPrimary"}`}
+          style={
+            !isSelected && themeVariant !== "midnight"
+              ? { color: "#161616" }
+              : undefined
+          }
         >
-          {MONTH_NAMES[monthIndex]!.slice(0, 3)}
+          {MONTH_NAMES[monthIndex]!.slice(0, 3).toUpperCase()}
         </Typography>
 
-        {monthWeeks.map((week, weekIndex) => (
+        <View className="mb-0.5 flex-row">
+          {MINI_WEEKDAY_LABELS.map((label, index) => (
+            <View
+              key={`mini-weekday-${monthIndex}-${label}-${index}`}
+              className="h-3 flex-1 items-center justify-center"
+            >
+              <Typography
+                variant="helper"
+                className={`text-[7px] leading-[9px] ${index === 0 ? "font-semibold" : "text-somaMauve/70"}`}
+                style={index === 0 ? { color: "#D70015" } : undefined}
+              >
+                {label}
+              </Typography>
+            </View>
+          ))}
+        </View>
+
+        {normalizedWeeks.map((week, weekIndex) => (
           <View
             key={`mini-week-${monthIndex}-${weekIndex}`}
-            className="flex-row justify-between"
+            className="flex-row"
           >
             {week.map((day, dayIndex) => {
               if (!day) {
                 return (
                   <View
                     key={`mini-empty-${monthIndex}-${weekIndex}-${dayIndex}`}
-                    className="h-4 w-4"
+                    className="h-[13px] flex-1"
                   />
                 );
               }
 
+              const date = new Date(year, monthIndex, day);
+              const isSunday = date.getDay() === 0;
+              const isToday =
+                date.getFullYear() === today.getFullYear() &&
+                date.getMonth() === today.getMonth() &&
+                date.getDate() === today.getDate();
               const hasStatus = Boolean(
                 cycleDataMap[dayIso(year, monthIndex, day)],
               );
@@ -97,39 +140,45 @@ export function MiniMonth({
               return (
                 <View
                   key={`mini-day-${monthIndex}-${weekIndex}-${day}`}
-                  className="h-4 w-4 items-center justify-center"
+                  className="h-[13px] flex-1 items-center justify-center"
                 >
-                  <Typography
-                    className={`text-[10px] ${
-                      hasStatus
-                        ? "font-semibold text-somaCharcoal dark:text-darkTextPrimary"
-                        : "text-somaMauve"
-                    }`}
+                  <View
+                    className="items-center justify-center rounded-full"
+                    style={{
+                      width: isToday ? 12 : undefined,
+                      height: isToday ? 12 : undefined,
+                      backgroundColor: isToday ? "#FF453A" : "transparent",
+                    }}
                   >
-                    {day}
-                  </Typography>
+                    <Typography
+                      variant="helper"
+                      className={`text-[9px] ${
+                        isToday
+                          ? "font-semibold text-white"
+                          : isSunday
+                            ? "font-semibold"
+                          : hasStatus
+                            ? "font-semibold dark:text-darkTextPrimary"
+                            : "dark:text-darkTextPrimary"
+                      }`}
+                      style={{
+                        lineHeight: 10,
+                        fontVariant: ["tabular-nums"],
+                        ...(isSunday && !isToday
+                          ? { color: "#D70015" }
+                          : themeVariant !== "midnight"
+                            ? { color: "#1A1A1A" }
+                            : null),
+                      }}
+                    >
+                      {day}
+                    </Typography>
+                  </View>
                 </View>
               );
             })}
           </View>
         ))}
-
-        <View className="mt-1 flex-row justify-center">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <View
-              key={`month-dot-${monthIndex}-${idx}`}
-              className="mx-[2px] h-[4px] w-[4px] rounded-full"
-              style={{
-                backgroundColor:
-                  idx < activeDotCount
-                    ? isDark
-                      ? "rgba(244,182,140,0.8)"
-                      : "rgba(197,109,116,0.85)"
-                    : "rgba(191,174,184,0.3)",
-              }}
-            />
-          ))}
-        </View>
       </Pressable>
     </Animated.View>
   );

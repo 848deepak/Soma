@@ -17,7 +17,9 @@ import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
 
 export function InsightsScreen() {
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
+  const nonDarkBarSurface =
+    theme === "lavender" ? "rgba(193,187,221,0.25)" : "rgba(255,218,185,0.25)";
   const { data: cycles = [], isLoading: cyclesLoading } = useCycleHistory(6);
   const { data: logs = [], isLoading: logsLoading } = useDailyLogs(90);
 
@@ -54,10 +56,10 @@ export function InsightsScreen() {
     marginTop: 16,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
-    backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 20,
-    shadowColor: "#DDA7A5",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 24,
@@ -78,7 +80,7 @@ export function InsightsScreen() {
             marginBottom: 16,
             fontSize: 17,
             fontWeight: "600",
-            color: isDark ? "#F2F2F2" : "#2D2327",
+            color: colors.textPrimary,
           }}
         >
           Cycle History
@@ -99,7 +101,7 @@ export function InsightsScreen() {
               borderRadius: 16,
               backgroundColor: isDark
                 ? "rgba(167,139,250,0.08)"
-                : "rgba(255,218,185,0.25)",
+                : nonDarkBarSurface,
               paddingHorizontal: 12,
               paddingVertical: 16,
             }}
@@ -114,12 +116,8 @@ export function InsightsScreen() {
               const height = Math.max(26, (bar.length - 25) * 12);
               const barColor =
                 index % 2 === 0
-                  ? isDark
-                    ? "#A78BFA"
-                    : "#DDA7A5"
-                  : isDark
-                    ? "#818CF8"
-                    : "#FFDAB9";
+                  ? colors.primary
+                  : colors.secondary;
               return (
                 <View
                   key={`${bar.month}-${index}`}
@@ -153,7 +151,7 @@ export function InsightsScreen() {
             marginBottom: 16,
             fontSize: 17,
             fontWeight: "600",
-            color: isDark ? "#F2F2F2" : "#2D2327",
+            color: colors.textPrimary,
           }}
         >
           Symptom Patterns

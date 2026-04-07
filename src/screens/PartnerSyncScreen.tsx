@@ -48,6 +48,7 @@ function PermissionRow({
   disabled?: boolean;
   isDark: boolean;
 }) {
+  const { colors } = useAppTheme();
   return (
     <View
       style={{
@@ -62,7 +63,7 @@ function PermissionRow({
           style={{
             fontSize: 15,
             fontWeight: "500",
-            color: isDark ? "#F2F2F2" : "#2D2327",
+            color: colors.textPrimary,
           }}
         >
           {title}
@@ -75,7 +76,7 @@ function PermissionRow({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: "#D7CFCA", true: "#DDA7A5" }}
+        trackColor={{ false: "#D7CFCA", true: colors.primary }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -86,7 +87,7 @@ function PermissionRow({
 
 export function PartnerSyncScreen() {
   const [linkCode, setLinkCode] = useState("");
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
 
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: partnerState } = usePartner();
@@ -139,10 +140,10 @@ export function PartnerSyncScreen() {
     marginTop: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
-    backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 20,
-    shadowColor: "#DDA7A5",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
@@ -213,7 +214,7 @@ export function PartnerSyncScreen() {
             marginBottom: 16,
             fontSize: 16,
             fontWeight: "600",
-            color: isDark ? "#F2F2F2" : "#2D2327",
+            color: colors.textPrimary,
           }}
         >
           Your Access Key
@@ -230,14 +231,12 @@ export function PartnerSyncScreen() {
             marginBottom: 16,
             backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
             borderWidth: 1,
-            borderColor: isDark
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(221,167,165,0.2)",
+            borderColor: colors.border,
           }}
         >
           {isInviteCodeLoading ? (
             <View style={{ alignItems: "center", gap: 8 }}>
-              <ActivityIndicator size="small" color="#DDA7A5" />
+              <ActivityIndicator size="small" color={colors.primary} />
               <Typography variant="helper">Preparing access key…</Typography>
             </View>
           ) : hasInviteCode ? (
@@ -260,9 +259,7 @@ export function PartnerSyncScreen() {
                 style={{
                   borderRadius: 999,
                   borderWidth: 1,
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(221,167,165,0.35)",
+                  borderColor: colors.border,
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                 }}
@@ -271,7 +268,7 @@ export function PartnerSyncScreen() {
                   style={{
                     fontSize: 12,
                     fontWeight: "600",
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                   }}
                 >
                   Retry
@@ -289,12 +286,10 @@ export function PartnerSyncScreen() {
               style={{
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: isDark
-                  ? "rgba(255,255,255,0.15)"
-                  : "rgba(221,167,165,0.3)",
+                borderColor: colors.border,
                 backgroundColor: isDark
                   ? "rgba(255,255,255,0.08)"
-                  : "rgba(255,255,255,0.9)",
+                  : colors.card,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
               }}
@@ -303,7 +298,7 @@ export function PartnerSyncScreen() {
                 style={{
                   fontSize: 18,
                   fontWeight: "600",
-                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  color: colors.textPrimary,
                   letterSpacing: 1,
                 }}
               >
@@ -325,7 +320,7 @@ export function PartnerSyncScreen() {
             style={{
               fontSize: 16,
               fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
+              color: colors.textPrimary,
               marginBottom: 12,
             }}
           >
@@ -355,13 +350,13 @@ export function PartnerSyncScreen() {
             style={{
               fontSize: 16,
               fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
+              color: colors.textPrimary,
             }}
           >
             Sharing Permissions
           </Typography>
           {isUpdatingPermissions && (
-            <ActivityIndicator size="small" color="#DDA7A5" />
+            <ActivityIndicator size="small" color={colors.primary} />
           )}
         </View>
         <PermissionRow
@@ -398,7 +393,7 @@ export function PartnerSyncScreen() {
               marginBottom: 8,
               fontSize: 16,
               fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
+              color: colors.textPrimary,
             }}
           >
             View a Partner's Data
@@ -412,16 +407,14 @@ export function PartnerSyncScreen() {
                 flex: 1,
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: isDark
-                  ? "rgba(255,255,255,0.15)"
-                  : "rgba(221,167,165,0.3)",
+                borderColor: colors.border,
                 backgroundColor: isDark
                   ? "rgba(255,255,255,0.08)"
-                  : "rgba(255,255,255,0.85)",
+                  : colors.card,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
                 fontSize: 16,
-                color: isDark ? "#F2F2F2" : "#2D2327",
+                color: colors.textPrimary,
               }}
               placeholder="A792B1"
               placeholderTextColor="#B0A8A4"
@@ -435,7 +428,7 @@ export function PartnerSyncScreen() {
               onPress={handleLinkPartner}
               style={{
                 borderRadius: 16,
-                backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+                backgroundColor: colors.primary,
                 paddingHorizontal: 20,
                 paddingVertical: 12,
                 alignItems: "center",
@@ -448,7 +441,7 @@ export function PartnerSyncScreen() {
                   linkPartner.isPending
                     ? 0.5
                     : 1,
-                shadowColor: "#DDA7A5",
+                shadowColor: colors.primary,
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.3,
                 shadowRadius: 16,
@@ -498,14 +491,16 @@ export function PartnerSyncScreen() {
             justifyContent: "center",
             backgroundColor: isDark
               ? "rgba(167,139,250,0.2)"
-              : "rgba(221,167,165,0.2)",
+              : theme === "lavender"
+                ? "rgba(155,138,196,0.2)"
+                : "rgba(221,167,165,0.2)",
           }}
         >
           <Typography
             style={{
               fontSize: 16,
               fontWeight: "600",
-              color: isDark ? "#A78BFA" : "#DDA7A5",
+              color: colors.primary,
             }}
           >
             ✓
@@ -516,7 +511,7 @@ export function PartnerSyncScreen() {
             style={{
               fontSize: 14,
               fontWeight: "600",
-              color: isDark ? "#F2F2F2" : "#2D2327",
+              color: colors.textPrimary,
             }}
           >
             End-to-End Encrypted

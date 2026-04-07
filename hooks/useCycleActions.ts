@@ -41,8 +41,17 @@ export async function logPeriodRangeAction({
     throw new Error("Start date must be in YYYY-MM-DD format.");
   }
 
+  const today = todayIso();
+  if (startDate > today) {
+    throw new Error("Start date cannot be in the future.");
+  }
+
   if (endDate && !isIsoDate(endDate)) {
     throw new Error("End date must be in YYYY-MM-DD format.");
+  }
+
+  if (endDate && endDate > today) {
+    throw new Error("End date cannot be in the future.");
   }
 
   if (endDate && endDate < startDate) {
@@ -353,13 +362,28 @@ export async function endCurrentPeriod({
   }
 
   if (resolvedEndDate < resolvedCycle.start_date) {
-    throw new Error(
-      `Cannot end period on ${resolvedEndDate} because it started on ${resolvedCycle.start_date}. End date must be on or after the start date.`,
-    );
+    if (!endDate) {
+      if (__DEV__) {
+        console.warn("[EndCycle] Repairing future start_date", {
+          cycleId: resolvedCycle.id,
+          startDate: resolvedCycle.start_date,
+          repairedTo: resolvedEndDate,
+        });
+      }
+    } else {
+      throw new Error(
+        `Cannot end period on ${resolvedEndDate} because it started on ${resolvedCycle.start_date}. End date must be on or after the start date.`,
+      );
+    }
   }
 
+  const normalizedStartDate =
+    resolvedCycle.start_date > resolvedEndDate
+      ? resolvedEndDate
+      : resolvedCycle.start_date;
+
   const cycleLength = diffDaysInclusive(
-    resolvedCycle.start_date,
+    normalizedStartDate,
     resolvedEndDate,
   );
 
@@ -376,6 +400,7 @@ export async function endCurrentPeriod({
   const { error: updateError } = await supabase
     .from("cycles")
     .update({
+      start_date: normalizedStartDate,
       end_date: resolvedEndDate,
       cycle_length: cycleLength,
     })
@@ -403,7 +428,7 @@ export async function endCurrentPeriod({
         JSON.stringify({
           id: resolvedCycle.id,
           user_id: userId,
-          start_date: resolvedCycle.start_date,
+          start_date: normalizedStartDate,
           end_date: resolvedEndDate,
           cycle_length: cycleLength,
           updated_at: new Date().toISOString(),
@@ -418,7 +443,7 @@ export async function endCurrentPeriod({
 
       return {
         cycleId: resolvedCycle.id,
-        startDate: resolvedCycle.start_date,
+        startDate: normalizedStartDate,
         endDate: resolvedEndDate,
         cycleLength,
         queued: true,
@@ -442,7 +467,7 @@ export async function endCurrentPeriod({
 
   return {
     cycleId: resolvedCycle.id,
-    startDate: resolvedCycle.start_date,
+    startDate: normalizedStartDate,
     endDate: resolvedEndDate,
     cycleLength,
     queued: false,
@@ -462,15 +487,16 @@ export function useStartNewCycle() {
         throw new Error("Not authenticated");
       }
 
-      const { data: activeCycle, error: activeError } = await supabase
+      const { data: activeCycles, error: activeError } = await supabase
         .from("cycles")
-        .select("id")
+        .select("id,start_date")
         .eq("user_id", user.id)
         .is("end_date", null)
-        .maybeSingle();
+        .order("start_date", { ascending: false })
+        .limit(2);
 
       if (activeError) throw activeError;
-      if (activeCycle) {
+      if ((activeCycles ?? []).length > 0) {
         throw new Error("You already have an active period. End it first.");
       }
 

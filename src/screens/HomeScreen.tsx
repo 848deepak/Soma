@@ -75,10 +75,16 @@ const CycleOrb = React.memo(function CycleOrb({
   day,
   phaseLabel,
   isDark,
+  primary,
+  primaryDark,
+  secondary,
 }: {
   day: number;
   phaseLabel: string;
   isDark: boolean;
+  primary: string;
+  primaryDark: string;
+  secondary: string;
 }) {
   return (
     <View style={{ alignItems: "center", paddingVertical: 8 }}>
@@ -89,9 +95,7 @@ const CycleOrb = React.memo(function CycleOrb({
           width: 280,
           height: 280,
           borderRadius: 140,
-          backgroundColor: isDark
-            ? "rgba(79,70,229,0.15)"
-            : "rgba(255,218,185,0.4)",
+          backgroundColor: secondary,
           opacity: 0.7,
         }}
       />
@@ -102,9 +106,7 @@ const CycleOrb = React.memo(function CycleOrb({
           width: 224,
           height: 224,
           borderRadius: 112,
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.25)"
-            : "rgba(221,167,165,0.5)",
+          backgroundColor: primary,
           opacity: 0.8,
         }}
       />
@@ -116,9 +118,8 @@ const CycleOrb = React.memo(function CycleOrb({
           width: 80,
           height: 80,
           borderRadius: 40,
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.25)"
-            : "rgba(155,126,140,0.28)",
+          backgroundColor: primary,
+          opacity: 0.25,
         }}
       />
       <View
@@ -129,9 +130,8 @@ const CycleOrb = React.memo(function CycleOrb({
           width: 64,
           height: 64,
           borderRadius: 32,
-          backgroundColor: isDark
-            ? "rgba(129,140,248,0.2)"
-            : "rgba(255,218,185,0.35)",
+          backgroundColor: secondary,
+          opacity: 0.35,
         }}
       />
       {/* Inner solid orb */}
@@ -140,10 +140,10 @@ const CycleOrb = React.memo(function CycleOrb({
           width: 224,
           height: 224,
           borderRadius: 112,
-          backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+          backgroundColor: primary,
           alignItems: "center",
           justifyContent: "center",
-          shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+          shadowColor: primaryDark,
           shadowOffset: { width: 0, height: 16 },
           shadowOpacity: 0.5,
           shadowRadius: 32,
@@ -207,7 +207,7 @@ const CycleOrb = React.memo(function CycleOrb({
 
 export function HomeScreen() {
   const router = useRouter();
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const hydrate = useCycleStore((s) => s.hydrate);
   const { user } = useAuthContext();
@@ -405,6 +405,20 @@ export function HomeScreen() {
     energy: todayLog?.energy_level,
   });
 
+  const isLavender = theme === "lavender";
+  const nonDarkWarmSurface = isLavender
+    ? "rgba(193,187,221,0.3)"
+    : "rgba(255,218,185,0.3)";
+  const nonDarkCardSurface = isLavender
+    ? "rgba(193,187,221,0.22)"
+    : "rgba(255,218,185,0.22)";
+  const nonDarkCardSurfaceSoft = isLavender
+    ? "rgba(193,187,221,0.14)"
+    : "rgba(255,218,185,0.14)";
+  const nonDarkChipSurface = isLavender
+    ? "rgba(193,187,221,0.35)"
+    : "rgba(255,218,185,0.35)";
+
   const homeWidgets = [
     {
       key: "hydration",
@@ -426,7 +440,7 @@ export function HomeScreen() {
         android: "nights_stay",
         web: "nights_stay",
       },
-      iconColor: "#9B7E8C",
+      iconColor: colors.accent,
       value: sleepValue,
       label: "Last night",
       bg: "rgba(155,126,140,0.16)",
@@ -435,19 +449,19 @@ export function HomeScreen() {
     {
       key: "mood",
       icon: { ios: "face.smiling.fill", android: "mood", web: "mood" },
-      iconColor: "#FFDAB9",
+      iconColor: colors.secondary,
       value: moodValue,
       label: "Current mood",
-      bg: "rgba(255,218,185,0.2)",
+      bg: isDark ? "rgba(99,102,241,0.2)" : nonDarkWarmSurface,
       isEnabled: true,
     },
     {
       key: "energy",
       icon: { ios: "bolt.fill", android: "bolt", web: "bolt" },
-      iconColor: "#DDA7A5",
+      iconColor: colors.primary,
       value: energyValue,
       label: "Readiness",
-      bg: "rgba(221,167,165,0.2)",
+      bg: isDark ? "rgba(167,139,250,0.2)" : nonDarkCardSurface,
       isEnabled: true,
     },
   ].filter((item) => item.isEnabled);
@@ -485,7 +499,7 @@ export function HomeScreen() {
                     fontFamily: "PlayfairDisplay-SemiBold",
                     fontSize: 32,
                     lineHeight: 38,
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                   }}
                 >
                   {`${greetingPrefix},\n${greetingName}`}
@@ -500,10 +514,10 @@ export function HomeScreen() {
                     justifyContent: "center",
                     backgroundColor: isDark
                       ? "rgba(167,139,250,0.2)"
-                      : "rgba(255, 218, 185, 0.3)",
+                      : nonDarkWarmSurface,
                     borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.6)",
-                    shadowColor: "#DDA7A5",
+                    borderColor: colors.borderLight,
+                    shadowColor: colors.primary,
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: 0.15,
                     shadowRadius: 16,
@@ -516,7 +530,7 @@ export function HomeScreen() {
                       android: "notifications",
                       web: "notifications",
                     }}
-                    tintColor="#9B7E8C"
+                    tintColor={colors.accent}
                     size={20}
                   />
                 </PressableScale>
@@ -528,7 +542,7 @@ export function HomeScreen() {
                     marginBottom: 24,
                     borderRadius: 20,
                     borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.6)",
+                    borderColor: colors.borderLight,
                     backgroundColor: isDark
                       ? "rgba(30,33,40,0.8)"
                       : "rgba(255,255,255,0.72)",
@@ -568,6 +582,9 @@ export function HomeScreen() {
                   day={cycleDay}
                   phaseLabel={phaseLabel}
                   isDark={isDark}
+                  primary={colors.primary}
+                  primaryDark={colors.primaryDark}
+                  secondary={colors.secondary}
                 />
               </View>
 
@@ -577,12 +594,12 @@ export function HomeScreen() {
                   marginBottom: 32,
                   borderRadius: 28,
                   borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.6)",
+                  borderColor: colors.borderLight,
                   backgroundColor: isDark
                     ? "rgba(30,33,40,0.85)"
-                    : "rgba(255, 218, 185, 0.22)",
+                    : nonDarkCardSurface,
                   padding: 24,
-                  shadowColor: "#DDA7A5",
+                  shadowColor: colors.primary,
                   shadowOffset: { width: 0, height: 8 },
                   shadowOpacity: 0.15,
                   shadowRadius: 32,
@@ -597,7 +614,7 @@ export function HomeScreen() {
                       borderRadius: 24,
                       alignItems: "center",
                       justifyContent: "center",
-                      backgroundColor: "rgba(255, 218, 185, 0.35)",
+                      backgroundColor: nonDarkChipSurface,
                       borderWidth: 1,
                       borderColor: "rgba(255,255,255,0.5)",
                     }}
@@ -608,7 +625,7 @@ export function HomeScreen() {
                         android: "auto_awesome",
                         web: "auto_awesome",
                       }}
-                      tintColor="#9B7E8C"
+                      tintColor={colors.accent}
                       size={20}
                     />
                   </View>
@@ -617,7 +634,7 @@ export function HomeScreen() {
                       style={{
                         fontSize: 15,
                         lineHeight: 24,
-                        color: isDark ? "#F2F2F2" : "#2D2327",
+                        color: colors.textPrimary,
                       }}
                     >
                       {insightText}
@@ -641,7 +658,7 @@ export function HomeScreen() {
                     width: 8,
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: "#FFDAB9",
+                    backgroundColor: colors.secondary,
                   }}
                 />
                 <View
@@ -649,7 +666,7 @@ export function HomeScreen() {
                     width: 8,
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: "#DDA7A5",
+                    backgroundColor: colors.primary,
                   }}
                 />
                 <View
@@ -657,7 +674,7 @@ export function HomeScreen() {
                     width: 8,
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: "#9B7E8C",
+                    backgroundColor: colors.accent,
                   }}
                 />
               </View>
@@ -674,7 +691,7 @@ export function HomeScreen() {
                       : "rgba(255,255,255,0.7)",
                     backgroundColor: isDark
                       ? "rgba(30,33,40,0.85)"
-                      : "rgba(255, 218, 185, 0.22)",
+                      : nonDarkCardSurface,
                     padding: 20,
                   }}
                 >
@@ -688,7 +705,7 @@ export function HomeScreen() {
                         justifyContent: "center",
                         backgroundColor: isDark
                           ? "rgba(167,139,250,0.2)"
-                          : "rgba(255, 218, 185, 0.35)",
+                          : nonDarkChipSurface,
                         borderWidth: 1,
                         borderColor: isDark
                           ? "rgba(255,255,255,0.1)"
@@ -701,7 +718,7 @@ export function HomeScreen() {
                           android: "people",
                           web: "people",
                         }}
-                        tintColor="#9B7E8C"
+                        tintColor={colors.accent}
                         size={20}
                       />
                     </View>
@@ -710,7 +727,7 @@ export function HomeScreen() {
                         style={{
                           fontSize: 15,
                           fontWeight: "600",
-                          color: isDark ? "#F2F2F2" : "#2D2327",
+                            color: colors.textPrimary,
                           marginBottom: 4,
                         }}
                       >
@@ -721,7 +738,7 @@ export function HomeScreen() {
                         style={{
                           color: isDark
                             ? "rgba(242,242,242,0.7)"
-                            : "rgba(157, 126, 140, 0.9)",
+                            : colors.textSecondary,
                           marginBottom: 8,
                         }}
                       >
@@ -738,7 +755,7 @@ export function HomeScreen() {
                           style={{
                             fontSize: 13,
                             fontWeight: "600",
-                            color: "#DDA7A5",
+                            color: colors.primary,
                           }}
                         >
                           Get Started →
@@ -755,12 +772,12 @@ export function HomeScreen() {
                   marginBottom: 32,
                   borderRadius: 24,
                   borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.6)",
+                  borderColor: colors.borderLight,
                   backgroundColor: isDark
                     ? "rgba(30,33,40,0.82)"
-                    : "rgba(255, 218, 185, 0.14)",
+                    : nonDarkCardSurfaceSoft,
                   padding: 16,
-                  shadowColor: "#DDA7A5",
+                  shadowColor: colors.primary,
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.08,
                   shadowRadius: 16,
@@ -781,7 +798,7 @@ export function HomeScreen() {
                     >
                       <Typography
                         variant="helper"
-                        style={{ marginBottom: 4, color: "#9B7E8C" }}
+                        style={{ marginBottom: 4, color: colors.textSecondary }}
                       >
                         {item.day}
                       </Typography>
@@ -793,10 +810,10 @@ export function HomeScreen() {
                           alignItems: "center",
                           justifyContent: "center",
                           backgroundColor: item.isCurrent
-                            ? "#DDA7A5"
+                            ? colors.primary
                             : "transparent",
                           shadowColor: item.isCurrent
-                            ? "#DDA7A5"
+                            ? colors.primary
                             : "transparent",
                           shadowOffset: { width: 0, height: 4 },
                           shadowOpacity: item.isCurrent ? 0.4 : 0,
@@ -809,8 +826,8 @@ export function HomeScreen() {
                             color: item.isCurrent
                               ? "#FFFFFF"
                               : isDark
-                                ? "#F2F2F2"
-                                : "#2D2327",
+                                ? colors.textPrimary
+                                : colors.textPrimary,
                             fontWeight: item.isCurrent ? "600" : "400",
                             fontSize: 15,
                           }}
@@ -825,7 +842,7 @@ export function HomeScreen() {
                             width: 5,
                             height: 5,
                             borderRadius: 2.5,
-                            backgroundColor: "#DDA7A5",
+                            backgroundColor: colors.primary,
                           }}
                         />
                       ) : null}
@@ -851,7 +868,7 @@ export function HomeScreen() {
                       width: "48.3%",
                       borderRadius: 24,
                       borderWidth: 1,
-                      borderColor: "rgba(255,255,255,0.6)",
+                      borderColor: colors.borderLight,
                       backgroundColor: item.bg,
                       padding: 20,
                       aspectRatio: 1,
@@ -880,7 +897,7 @@ export function HomeScreen() {
                           fontFamily: "PlayfairDisplay-SemiBold",
                           fontSize: item.key === "energy" ? 18 : 28,
                           lineHeight: item.key === "energy" ? 24 : 30,
-                          color: isDark ? "#F2F2F2" : "#2D2327",
+                          color: colors.textPrimary,
                         }}
                       >
                         {item.value}
@@ -914,11 +931,11 @@ export function HomeScreen() {
                       borderRadius: 999,
                       borderWidth: 1,
                       borderColor: isDark
-                        ? "rgba(167,139,250,0.5)"
-                        : "rgba(155,126,140,0.45)",
+                        ? "rgba(167,139,250,0.45)"
+                        : colors.border,
                       backgroundColor: isDark
                         ? "rgba(167,139,250,0.12)"
-                        : "rgba(255,218,185,0.35)",
+                        : nonDarkChipSurface,
                       paddingVertical: 10,
                     }}
                   >
@@ -926,7 +943,7 @@ export function HomeScreen() {
                       variant="helper"
                       style={{
                         fontWeight: "600",
-                        color: isDark ? "#F2F2F2" : "#2D2327",
+                        color: colors.textPrimary,
                       }}
                     >
                       {isSyncing
@@ -946,7 +963,7 @@ export function HomeScreen() {
                     borderWidth: 1,
                     borderColor: isDark
                       ? "rgba(255,255,255,0.18)"
-                      : "rgba(221,167,165,0.45)",
+                      : colors.border,
                     paddingVertical: 14,
                   }}
                 >
@@ -954,7 +971,7 @@ export function HomeScreen() {
                     style={{
                       fontSize: 15,
                       fontWeight: "600",
-                      color: isDark ? "#F2F2F2" : "#2D2327",
+                      color: colors.textPrimary,
                     }}
                   >
                     Log Period
@@ -969,9 +986,9 @@ export function HomeScreen() {
                       alignItems: "center",
                       justifyContent: "center",
                       borderRadius: 999,
-                      backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+                      backgroundColor: colors.primary,
                       paddingVertical: 20,
-                      shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+                      shadowColor: colors.primaryDark,
                       shadowOffset: { width: 0, height: 12 },
                       shadowOpacity: 0.4,
                       shadowRadius: 40,
@@ -994,7 +1011,7 @@ export function HomeScreen() {
                     variant="helper"
                     style={{
                       textAlign: "center",
-                      color: "#9B7E8C",
+                      color: colors.textSecondary,
                       paddingVertical: 8,
                     }}
                   >
@@ -1017,8 +1034,8 @@ export function HomeScreen() {
             borderRadius: 32,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
-            shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+            backgroundColor: colors.primary,
+            shadowColor: colors.primaryDark,
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.5,
             shadowRadius: 24,

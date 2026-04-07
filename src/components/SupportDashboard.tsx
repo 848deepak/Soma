@@ -62,7 +62,7 @@ export function SupportDashboard({
   partnerId: string;
   partnerName?: string;
 }) {
-  const { isDark, colors } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
   const sharedQuery = useSharedData(partnerId, true, 1);
   const logs = sharedQuery?.data ?? [];
   const isLoading = sharedQuery?.isLoading ?? false;
@@ -74,6 +74,11 @@ export function SupportDashboard({
     CYCLE_PHASE_LABELS[cyclePhase] || CYCLE_PHASE_LABELS.follicular;
   const suggestions =
     SUPPORT_SUGGESTIONS[cyclePhase] || SUPPORT_SUGGESTIONS.follicular;
+  const softAlertBackground = isDark
+    ? "rgba(167,139,250,0.14)"
+    : theme === "lavender"
+      ? "rgba(193,187,221,0.22)"
+      : "rgba(221,167,165,0.12)";
 
   if (isLoading) {
     return (
@@ -113,7 +118,7 @@ export function SupportDashboard({
               android: "info",
               web: "info",
             }}
-            tintColor="#DDA7A5"
+            tintColor={colors.primary}
             size={32}
           />
         </View>
@@ -148,9 +153,7 @@ export function SupportDashboard({
             borderRadius: 20,
             borderWidth: 1,
             borderColor: colors.primary,
-            backgroundColor: isDark
-              ? "rgba(167,139,250,0.14)"
-              : "rgba(221,167,165,0.12)",
+            backgroundColor: softAlertBackground,
             padding: 16,
           }}
         >

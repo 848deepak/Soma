@@ -12,10 +12,31 @@ type ScreenProps = {
    * Defaults to true for most screens per Figma design.
    */
   showAurora?: boolean;
+  horizontalPadding?: number;
 };
 
 /** Soft ambient background blobs matching Figma's aurora glow effect */
-function AuroraBlobs({ isDark }: { isDark: boolean }) {
+function AuroraBlobs({
+  isDark,
+  theme,
+}: {
+  isDark: boolean;
+  theme: "cream" | "midnight" | "lavender";
+}) {
+  const topGlow =
+    theme === "lavender"
+      ? "rgba(193,187,221,0.42)"
+      : isDark
+        ? "rgba(79,70,229,0.12)"
+        : "rgba(255,218,185,0.35)";
+
+  const bottomGlow =
+    theme === "lavender"
+      ? "rgba(155,138,196,0.3)"
+      : isDark
+        ? "rgba(167,139,250,0.1)"
+        : "rgba(221,167,165,0.25)";
+
   return (
     <>
       {/* Top-right warm peach glow */}
@@ -28,9 +49,7 @@ function AuroraBlobs({ isDark }: { isDark: boolean }) {
           width: 280,
           height: 280,
           borderRadius: 140,
-          backgroundColor: isDark
-            ? "rgba(79,70,229,0.12)"
-            : "rgba(255,218,185,0.35)",
+          backgroundColor: topGlow,
           // React Native doesn't support CSS blur, so we approximate with opacity layers
           opacity: 0.6,
         }}
@@ -45,9 +64,7 @@ function AuroraBlobs({ isDark }: { isDark: boolean }) {
           width: 240,
           height: 240,
           borderRadius: 120,
-          backgroundColor: isDark
-            ? "rgba(167,139,250,0.1)"
-            : "rgba(221,167,165,0.25)",
+          backgroundColor: bottomGlow,
           opacity: 0.5,
         }}
       />
@@ -59,20 +76,24 @@ export function Screen({
   children,
   scrollable = true,
   showAurora = true,
+  horizontalPadding = 28,
 }: ScreenProps) {
-  const { isDark, colors } = useAppTheme();
+  const { isDark, colors, theme } = useAppTheme();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Aurora background — absolutely positioned so it goes behind content */}
-      {showAurora && <AuroraBlobs isDark={isDark} />}
+      {showAurora && <AuroraBlobs isDark={isDark} theme={theme} />}
 
       {scrollable ? (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: 40 }}
+          contentContainerStyle={{
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: 40,
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -80,7 +101,13 @@ export function Screen({
           {children}
         </ScrollView>
       ) : (
-        <View style={{ flex: 1, paddingHorizontal: 28, paddingBottom: 32 }}>
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: 32,
+          }}
+        >
           {children}
         </View>
       )}

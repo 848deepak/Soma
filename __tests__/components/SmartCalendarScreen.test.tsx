@@ -63,7 +63,6 @@ describe("SmartCalendarScreen", () => {
   it("renders cycle calendar heading and legend", () => {
     renderScreen();
 
-    expect(screen.getByText("Your Cycle Calendar")).toBeTruthy();
     expect(screen.getByText("Period")).toBeTruthy();
     expect(screen.getByText("Fertile")).toBeTruthy();
     expect(screen.getByText("Ovulation")).toBeTruthy();
@@ -74,7 +73,7 @@ describe("SmartCalendarScreen", () => {
     renderScreen();
 
     fireEvent.press(screen.getByText("April 2026"));
-    fireEvent.press(screen.getAllByText("Jan")[0]!);
+    fireEvent.press(screen.getAllByText("JAN")[0]!);
 
     expect(screen.getByText("January 2026")).toBeTruthy();
   });

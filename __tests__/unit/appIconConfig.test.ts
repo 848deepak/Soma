@@ -9,8 +9,8 @@ describe("app icon configuration", () => {
     const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf8"));
     const expo = appJson.expo;
 
-    expect(expo?.icon).toBe("./assets/images/icon.png");
-    expect(expo?.ios?.icon).toBe("./assets/images/icon.png");
+    expect(expo?.icon).toBe("./assets/images/2.png");
+    expect(expo?.ios?.icon).toBe("./assets/images/2.png");
 
     expect(expo?.android?.adaptiveIcon?.foregroundImage).toBe(
       "./assets/images/android-icon-foreground.png",

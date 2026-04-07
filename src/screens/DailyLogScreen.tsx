@@ -66,7 +66,7 @@ function Teardrop({
 
 export function DailyLogScreen() {
   const router = useRouter();
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
   const saveLog = useSaveLog();
   const endCurrentCycle = useEndCurrentCycle();
 
@@ -84,8 +84,8 @@ export function DailyLogScreen() {
     todayLog?.symptoms ?? [],
   );
   const [notes, setNotes] = useState(todayLog?.notes ?? "");
-  const accentPrimary = isDark ? "#A78BFA" : "#DDA7A5";
-  const accentPrimaryDark = isDark ? "#7C6BE8" : "#DDA7A5";
+  const accentPrimary = colors.primary;
+  const accentPrimaryDark = colors.primaryDark;
   const hasActivePeriod = Boolean(cycleData?.cycle);
 
   const subtitle = useMemo(
@@ -207,9 +207,7 @@ export function DailyLogScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: isDark ? "#0F1115" : "#FFFDFB" }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -226,7 +224,9 @@ export function DailyLogScreen() {
             borderRadius: 160,
             backgroundColor: isDark
               ? "rgba(167,139,250,0.12)"
-              : "rgba(255,218,185,0.25)",
+              : theme === "lavender"
+                ? "rgba(193,187,221,0.25)"
+                : "rgba(255,218,185,0.25)",
             opacity: 0.8,
           }}
         />
@@ -266,7 +266,7 @@ export function DailyLogScreen() {
                   fontFamily: "PlayfairDisplay-SemiBold",
                   fontSize: 28,
                   lineHeight: 34,
-                  color: isDark ? "#F2F2F2" : "#2D2327",
+                  color: colors.textPrimary,
                 }}
               >
                 {"How are you\nfeeling today?"}
@@ -275,7 +275,7 @@ export function DailyLogScreen() {
                 style={{
                   marginTop: 8,
                   fontSize: 14,
-                  color: "#9B7E8C",
+                  color: colors.textSecondary,
                 }}
               >
                 {subtitle}
@@ -288,9 +288,12 @@ export function DailyLogScreen() {
                     marginTop: 12,
                     alignSelf: "flex-start",
                     borderRadius: 999,
-                    backgroundColor: "rgba(221, 167, 165, 0.2)",
+                    backgroundColor:
+                      theme === "lavender"
+                        ? "rgba(155,138,196,0.2)"
+                        : "rgba(221, 167, 165, 0.2)",
                     borderWidth: 1,
-                    borderColor: "rgba(221, 167, 165, 0.45)",
+                    borderColor: colors.border,
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     opacity: endCurrentCycle.isPending ? 0.7 : 1,
@@ -300,7 +303,7 @@ export function DailyLogScreen() {
                     style={{
                       fontSize: 12,
                       fontWeight: "600",
-                      color: isDark ? "#F2F2F2" : "#2D2327",
+                      color: colors.textPrimary,
                     }}
                   >
                     {endCurrentCycle.isPending ? "Ending…" : "End Period"}
@@ -319,10 +322,10 @@ export function DailyLogScreen() {
                 justifyContent: "center",
                 backgroundColor: isDark
                   ? "rgba(30,33,40,0.85)"
-                  : "rgba(255,255,255,0.7)",
+                  : colors.card,
                 borderWidth: 1,
-                borderColor: "rgba(221,167,165,0.2)",
-                shadowColor: "#DDA7A5",
+                borderColor: colors.border,
+                shadowColor: colors.primary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.1,
                 shadowRadius: 16,
@@ -331,7 +334,7 @@ export function DailyLogScreen() {
             >
               <SymbolView
                 name={{ ios: "xmark", android: "close", web: "close" }}
-                tintColor="#9B7E8C"
+                tintColor={colors.textSecondary}
                 size={20}
               />
             </PressableScale>
@@ -389,9 +392,9 @@ export function DailyLogScreen() {
                           fontWeight: isSelected ? "600" : "400",
                           color: isSelected
                             ? isDark
-                              ? "#F2F2F2"
-                              : "#2D2327"
-                            : "#9B7E8C",
+                              ? colors.textPrimary
+                              : colors.textPrimary
+                            : colors.textSecondary,
                         }}
                       >
                         {level.label}
@@ -425,10 +428,12 @@ export function DailyLogScreen() {
                         paddingHorizontal: 20,
                         paddingVertical: 12,
                         borderRadius: 999,
-                        backgroundColor: isSelected ? "#9B7E8C" : "transparent",
+                        backgroundColor: isSelected
+                          ? colors.accent
+                          : "transparent",
                         borderWidth: isSelected ? 0 : 1,
-                        borderColor: "rgba(155, 126, 140, 0.3)",
-                        shadowColor: "#9B7E8C",
+                        borderColor: colors.border,
+                        shadowColor: colors.accent,
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: isSelected ? 0.3 : 0,
                         shadowRadius: 16,
@@ -438,7 +443,7 @@ export function DailyLogScreen() {
                       <Typography
                         style={{
                           fontSize: 14,
-                          color: isSelected ? "#FFFFFF" : "#9B7E8C",
+                          color: isSelected ? "#FFFFFF" : colors.textSecondary,
                           fontWeight: isSelected ? "500" : "400",
                         }}
                       >
@@ -461,18 +466,18 @@ export function DailyLogScreen() {
               }}
             >
               <View
-                style={{ flex: 1, height: 1, backgroundColor: "#DDA7A5" }}
+                style={{ flex: 1, height: 1, backgroundColor: colors.primary }}
               />
               <View
                 style={{
                   width: 6,
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: "#DDA7A5",
+                  backgroundColor: colors.primary,
                 }}
               />
               <View
-                style={{ flex: 1, height: 1, backgroundColor: "#DDA7A5" }}
+                style={{ flex: 1, height: 1, backgroundColor: colors.primary }}
               />
             </View>
 
@@ -492,12 +497,14 @@ export function DailyLogScreen() {
                 style={{
                   borderRadius: 24,
                   borderWidth: 1,
-                  borderColor: "rgba(221, 167, 165, 0.2)",
+                  borderColor: colors.border,
                   backgroundColor: isDark
                     ? "rgba(30,33,40,0.9)"
-                    : "rgba(255, 218, 185, 0.15)",
+                    : theme === "lavender"
+                      ? "rgba(193,187,221,0.15)"
+                      : "rgba(255, 218, 185, 0.15)",
                   padding: 18,
-                  shadowColor: "#DDA7A5",
+                  shadowColor: colors.primary,
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.08,
                   shadowRadius: 20,
@@ -509,13 +516,13 @@ export function DailyLogScreen() {
                   onChangeText={setNotes}
                   multiline
                   placeholder="How are you feeling? Any observations?"
-                  placeholderTextColor="#9B7E8C"
+                  placeholderTextColor={colors.textSecondary}
                   textAlignVertical="top"
                   style={{
                     minHeight: 80,
                     fontSize: 14,
                     lineHeight: 20,
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                   }}
                 />
               </View>
@@ -535,9 +542,9 @@ export function DailyLogScreen() {
             paddingBottom: 28,
             backgroundColor: isDark
               ? "rgba(15,17,21,0.95)"
-              : "rgba(255, 253, 251, 0.95)",
+              : colors.background,
             borderTopWidth: 1,
-            borderTopColor: "rgba(221, 167, 165, 0.1)",
+            borderTopColor: colors.border,
           }}
         >
           <PressableScale
@@ -566,7 +573,7 @@ export function DailyLogScreen() {
           {!hasActivePeriod ? (
             <Typography
               variant="helper"
-              style={{ marginTop: 8, textAlign: "center", color: "#9B7E8C" }}
+              style={{ marginTop: 8, textAlign: "center", color: colors.textSecondary }}
             >
               Start your period to enable logging.
             </Typography>

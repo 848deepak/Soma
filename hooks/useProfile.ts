@@ -4,6 +4,7 @@
  * The row is auto-created by the handle_new_user DB trigger on sign-up,
  * so it always exists after ensureAnonymousSession() completes.
  */
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
@@ -34,7 +35,9 @@ const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
 };
 
 export function useProfile() {
-  return useQuery<ProfileRow | null>({
+  const queryClient = useQueryClient();
+
+  const query = useQuery<ProfileRow | null>({
     queryKey: PROFILE_QUERY_KEY,
     queryFn: async () => {
       const {
@@ -46,32 +49,101 @@ export function useProfile() {
         .from("profiles")
         .select("*")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.warn("[Profile] Query error:", error);
-        // Return null instead of throwing to prevent app crashes
+        console.warn("[Profile] Query error:", {
+          userId: user.id,
+          message: error.message,
+        });
+        throw new Error(error.message || "Profile lookup failed");
+      }
+
+      if (!data) {
+        console.log("[Profile] Profile row missing for user:", user.id);
         return null;
       }
-      return data as unknown as ProfileRow;
+
+      return data as ProfileRow;
     },
     // Profile rarely changes – 5 minute stale time
     staleTime: 5 * 60 * 1000,
-    // Simplified retry logic - only retry network errors
+    // Retry only transient failures; missing rows are returned as null.
     retry: (failureCount, error) => {
-      // Only retry actual network failures, not data issues
-      if (error.message.includes("network") && failureCount < 2) {
+      const normalized = error.message.toLowerCase();
+      if (
+        failureCount < 2 &&
+        (normalized.includes("network") ||
+          normalized.includes("fetch") ||
+          normalized.includes("timeout"))
+      ) {
         return true;
       }
       return false;
     },
-    // Never throw errors - return null for graceful degradation
     throwOnError: false,
     // Add timeout through query options (3 seconds)
     meta: {
       timeout: 3000,
     },
   });
+
+  useEffect(() => {
+    let channelName: string | null = null;
+    let cancelled = false;
+
+    async function subscribeToProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || cancelled) return;
+
+      channelName = `profile:${user.id}`;
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            const next = payload.new as ProfileRow | undefined;
+            if (next) {
+              queryClient.setQueryData(PROFILE_QUERY_KEY, next);
+            } else if (payload.eventType === "DELETE") {
+              queryClient.setQueryData(PROFILE_QUERY_KEY, null);
+            }
+          },
+        )
+        .subscribe();
+
+      return channel;
+    }
+
+    let activeChannel: ReturnType<typeof supabase.channel> | undefined;
+
+    void subscribeToProfile().then((channel) => {
+      activeChannel = channel;
+    });
+
+    return () => {
+      cancelled = true;
+      if (activeChannel) {
+        void supabase.removeChannel(activeChannel);
+      } else if (channelName) {
+        const channel = supabase.getChannels().find((item) => item.topic === channelName);
+        if (channel) {
+          void supabase.removeChannel(channel);
+        }
+      }
+    };
+  }, [queryClient]);
+
+  return query;
 }
 
 export function useNotificationPreferences() {

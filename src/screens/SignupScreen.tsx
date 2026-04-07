@@ -33,7 +33,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function SignupScreen() {
   const router = useRouter();
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
+
+  const nonDarkSurface =
+    theme === "lavender" ? "rgba(232,224,248,0.72)" : "rgba(255,255,255,0.85)";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -106,12 +109,12 @@ export function SignupScreen() {
   const inputContainerStyle = {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(221,167,165,0.25)",
-    backgroundColor: isDark ? "rgba(30,33,40,0.9)" : "rgba(255,255,255,0.85)",
+    borderColor: colors.border,
+    backgroundColor: isDark ? "rgba(30,33,40,0.9)" : nonDarkSurface,
     paddingHorizontal: 20,
     paddingVertical: 14,
     marginBottom: 12,
-    shadowColor: "#DDA7A5",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -130,11 +133,11 @@ export function SignupScreen() {
               width: 80,
               height: 80,
               borderRadius: 40,
-              backgroundColor: isDark ? "#A78BFA" : "#DDA7A5",
+              backgroundColor: colors.primary,
               alignItems: "center",
               justifyContent: "center",
               marginBottom: 32,
-              shadowColor: isDark ? "#7C6BE8" : "#DDA7A5",
+              shadowColor: colors.primaryDark,
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.4,
               shadowRadius: 24,
@@ -155,7 +158,8 @@ export function SignupScreen() {
             onPress={() => router.push("/auth/login" as never)}
             className="items-center rounded-full bg-somaBlush px-10 py-[18px] dark:bg-darkPrimary"
             style={{
-              shadowColor: "#DDA7A5",
+              backgroundColor: colors.primary,
+              shadowColor: colors.primary,
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.4,
               shadowRadius: 40,
@@ -184,7 +188,7 @@ export function SignupScreen() {
             fontSize: 14,
             letterSpacing: 4,
             textTransform: "uppercase",
-            color: isDark ? "rgba(242,242,242,0.5)" : "#9B7E8C",
+            color: colors.textSecondary,
             textAlign: "center",
             marginBottom: 8,
           }}
@@ -211,8 +215,8 @@ export function SignupScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="you@example.com"
-            placeholderTextColor="#9B7E8C"
-            style={{ fontSize: 16, color: isDark ? "#F2F2F2" : "#2D2327" }}
+            placeholderTextColor={colors.textSecondary}
+            style={{ fontSize: 16, color: colors.textPrimary }}
             testID="email-input"
           />
         </View>
@@ -227,8 +231,8 @@ export function SignupScreen() {
             onChangeText={setPassword}
             secureTextEntry
             placeholder="At least 6 characters"
-            placeholderTextColor="#9B7E8C"
-            style={{ fontSize: 16, color: isDark ? "#F2F2F2" : "#2D2327" }}
+            placeholderTextColor={colors.textSecondary}
+            style={{ fontSize: 16, color: colors.textPrimary }}
             testID="password-input"
           />
         </View>
@@ -243,8 +247,8 @@ export function SignupScreen() {
             onChangeText={setConfirmPassword}
             secureTextEntry
             placeholder="Repeat your password"
-            placeholderTextColor="#9B7E8C"
-            style={{ fontSize: 16, color: isDark ? "#F2F2F2" : "#2D2327" }}
+            placeholderTextColor={colors.textSecondary}
+            style={{ fontSize: 16, color: colors.textPrimary }}
             testID="confirm-password-input"
           />
         </View>
@@ -266,14 +270,10 @@ export function SignupScreen() {
                 marginTop: 2,
                 borderRadius: 5,
                 borderWidth: 1.5,
-                borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+                borderColor: colors.primary,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: acceptedLegal
-                  ? isDark
-                    ? "#A78BFA"
-                    : "#DDA7A5"
-                  : "transparent",
+                backgroundColor: acceptedLegal ? colors.primary : "transparent",
               }}
             >
               {acceptedLegal ? (
@@ -325,14 +325,10 @@ export function SignupScreen() {
                 marginTop: 2,
                 borderRadius: 5,
                 borderWidth: 1.5,
-                borderColor: isDark ? "#A78BFA" : "#DDA7A5",
+                borderColor: colors.primary,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: analyticsOptIn
-                  ? isDark
-                    ? "#A78BFA"
-                    : "#DDA7A5"
-                  : "transparent",
+                backgroundColor: analyticsOptIn ? colors.primary : "transparent",
               }}
             >
               {analyticsOptIn ? (
@@ -353,7 +349,8 @@ export function SignupScreen() {
           className="mb-4 items-center rounded-full bg-somaBlush py-[18px] dark:bg-darkPrimary"
           style={{
             opacity: isLoading ? 0.6 : 1,
-            shadowColor: "#DDA7A5",
+            backgroundColor: colors.primary,
+            shadowColor: colors.primary,
             shadowOffset: { width: 0, height: 12 },
             shadowOpacity: 0.4,
             shadowRadius: 40,

@@ -13,7 +13,13 @@ import { logDataAccess } from "@/src/services/auditService";
 import type { DailyLogRow } from "@/types/database";
 
 export const DAILY_LOGS_KEY = (limit: number) => ["daily-logs", limit] as const;
-export const todayIso = () => new Date().toISOString().split("T")[0]!;
+export const todayIso = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 export const TODAY_LOG_KEY = () => ["daily-log", todayIso()] as const;
 
 /**

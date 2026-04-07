@@ -17,10 +17,11 @@ import { getStatusPaint } from "./calendarUtils";
 type DayCellProps = {
   day: number;
   iso: string;
+  isSunday: boolean;
   status: CycleStatus;
   isToday: boolean;
   isSelected: boolean;
-  isDark: boolean;
+  themeVariant: "cream" | "midnight" | "lavender";
   onPress: (iso: string) => void;
   todayScale: { value: number };
 };
@@ -28,14 +29,15 @@ type DayCellProps = {
 export function DayCell({
   day,
   iso,
+  isSunday,
   status,
   isToday,
   isSelected,
-  isDark,
+  themeVariant,
   onPress,
   todayScale,
 }: DayCellProps) {
-  const theme = isDark ? cycleCalendarTheme.dark : cycleCalendarTheme.light;
+  const theme = cycleCalendarTheme[themeVariant];
   const cellScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(1);
 
@@ -51,7 +53,7 @@ export function DayCell({
     transform: [{ scale: todayScale.value }],
   }));
 
-  const paint = getStatusPaint(status, isDark);
+  const paint = getStatusPaint(status, themeVariant);
 
   return (
     <Pressable
@@ -122,7 +124,14 @@ export function DayCell({
         ) : null}
 
         <Typography
-          className={`text-[16px] ${status === "period" ? "font-semibold text-white" : "text-somaCharcoal dark:text-darkTextPrimary"}`}
+          className={`text-[16px] ${
+            status === "period"
+              ? "font-semibold text-white"
+              : isSunday
+                ? "font-semibold"
+                : "text-somaCharcoal dark:text-darkTextPrimary"
+          }`}
+          style={isSunday && status !== "period" ? { color: "#D70015" } : undefined}
         >
           {day}
         </Typography>

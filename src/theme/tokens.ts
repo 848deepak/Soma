@@ -7,8 +7,8 @@ export const lightTheme = {
   surface: "#FFFFFF",
   card: "#FFFFFF",
   // Brand colors
-  primary: "#DDA7A5", // Dusty rose — main CTA
-  primaryDark: "#C89896", // Gradient end
+  primary: "#DDA7A5", // Dusty rose
+  primaryDark: "#C89896",
   secondary: "#FFDAB9", // Peach
   accent: "#9B7E8C", // Mauve
   // Text
@@ -29,8 +29,8 @@ export const darkTheme = {
   // Brand colors (Figma Midnight theme accents)
   primary: "#A78BFA", // Soft purple
   primaryDark: "#7C6BE8",
-  secondary: "#818CF8", // Periwinkle
-  accent: "#F2F2F2",
+  secondary: "#6366F1", // Indigo
+  accent: "#4F46E5",
   // Text
   textPrimary: "#F2F2F2",
   textSecondary: "rgba(242,242,242,0.6)",
@@ -72,8 +72,7 @@ export const themeByType = {
 export const isDarkThemeType = (theme: ThemeType): boolean =>
   theme === "midnight";
 
-export const cycleCalendarTheme = {
-  light: {
+const cycleCalendarCream = {
     screenBackground: "#FAF7F4",
     panelBackground: "rgba(255,255,255,0.88)",
     legendBackground: "rgba(248,237,230,0.7)",
@@ -87,8 +86,9 @@ export const cycleCalendarTheme = {
     ovulationBorder: "#D9A35D",
     todayRing: "#D94D57",
     selectedRing: "#B58A95",
-  },
-  dark: {
+  };
+
+const cycleCalendarMidnight = {
     screenBackground: "#0F1115",
     panelBackground: "rgba(24,27,32,0.84)",
     legendBackground: "rgba(31,35,40,0.8)",
@@ -102,7 +102,31 @@ export const cycleCalendarTheme = {
     ovulationBorder: "#E6B76F",
     todayRing: "#E9868E",
     selectedRing: "#B48B96",
-  },
+};
+
+const cycleCalendarLavender = {
+  screenBackground: "#F3F0FF",
+  panelBackground: "rgba(255,255,255,0.84)",
+  legendBackground: "rgba(232,224,248,0.72)",
+  detailBackground: "rgba(232,224,248,0.56)",
+  periodFill: "rgba(155,138,196,0.72)",
+  predictedPeriodFill: "rgba(155,138,196,0.42)",
+  predictedPeriodBorder: "rgba(124,107,158,0.45)",
+  fertileFill: "rgba(193,187,221,0.72)",
+  predictedFertileFill: "rgba(193,187,221,0.46)",
+  ovulationFill: "rgba(193,187,221,0.38)",
+  ovulationBorder: "#7C6B9E",
+  todayRing: "#C084FC",
+  selectedRing: "#9B8AC4",
+};
+
+export const cycleCalendarTheme = {
+  cream: cycleCalendarCream,
+  midnight: cycleCalendarMidnight,
+  lavender: cycleCalendarLavender,
+  // Backward-compatible aliases for existing callers.
+  light: cycleCalendarCream,
+  dark: cycleCalendarMidnight,
 };
 
 export const cycleCalendarMotion = {

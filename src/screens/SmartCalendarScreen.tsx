@@ -1,5 +1,6 @@
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { PanResponder, View } from "react-native";
+import { Alert, PanResponder, ScrollView, View } from "react-native";
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -14,6 +15,13 @@ import {
     type CycleDataMap,
     type CycleStatus,
 } from "@/hooks/useCycleCalendar";
+import {
+  useEndCurrentCycle,
+  useStartNewCycle,
+} from "@/hooks/useCycleActions";
+import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useQueryClient } from "@tanstack/react-query";
+import { CURRENT_CYCLE_KEY } from "@/hooks/useCurrentCycle";
 import { CalendarHeader } from "@/src/components/calendar/CalendarHeader";
 import {
     dayIso,
@@ -28,6 +36,7 @@ import {
 import { CycleLegend } from "@/src/components/calendar/CycleLegend";
 import { DayRow } from "@/src/components/calendar/DayRow";
 import { MiniMonth } from "@/src/components/calendar/MiniMonth";
+import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Screen } from "@/src/components/ui/Screen";
 import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
@@ -45,7 +54,10 @@ type CalendarScreenProps = {
 };
 
 export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
-  const { isDark } = useAppTheme();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { theme, isDark, colors } = useAppTheme();
+  const currentYear = new Date().getFullYear();
   const [isYearOverview, setIsYearOverview] = useState(false);
   const [selectedDateIso, setSelectedDateIso] = useState<string | null>(null);
   const [visibleMonth, setVisibleMonth] = useState(new Date().getMonth());
@@ -54,9 +66,7 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
     1 | -1
   >(1);
   const monthAnimationSeed = `${visibleYear}-${visibleMonth}`;
-  const calendarTheme = isDark
-    ? cycleCalendarTheme.dark
-    : cycleCalendarTheme.light;
+  const calendarTheme = cycleCalendarTheme[theme];
 
   const today = new Date();
   const todayIso = dayIso(
@@ -73,6 +83,10 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
   const yearScale = useSharedValue(0.98);
 
   const resolvedCycleData = useCycleCalendar(cycleData);
+  const { data: currentCycle } = useCurrentCycle();
+  const startCycleMutation = useStartNewCycle();
+  const endCycleMutation = useEndCurrentCycle();
+  const hasActivePeriod = Boolean(currentCycle?.cycle?.id);
 
   const monthContainerStyle = useAnimatedStyle(() => ({
     opacity: monthOpacity.value,
@@ -89,6 +103,14 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
     const firstWeekDay = new Date(visibleYear, visibleMonth, 1).getDay();
     return buildMonthGrid(daysInMonth, firstWeekDay);
   }, [visibleYear, visibleMonth]);
+
+  const overviewYears = useMemo(() => {
+    const startYear = visibleYear - 8;
+    const endYear = visibleYear + 8;
+    return Array.from({ length: endYear - startYear + 1 }, (_, index) =>
+      startYear + index,
+    );
+  }, [visibleYear]);
 
   useEffect(() => {
     todayScale.value = withDelay(
@@ -206,16 +228,60 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
     ? resolvedCycleData[selectedDateIso]
     : null;
 
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    if (typeof error === "object" && error !== null && "message" in error) {
+      const message = String((error as { message?: string }).message ?? "").trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallback;
+  };
+
+  const handleStartPeriod = async () => {
+    try {
+      await startCycleMutation.mutateAsync();
+      Alert.alert("Period started", "Your period has been started for today.");
+    } catch (error) {
+      const message = getErrorMessage(error, "Could not start period.");
+
+      if (message.toLowerCase().includes("active period")) {
+        await queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
+        await queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+      }
+
+      Alert.alert("Could not start period", message);
+    }
+  };
+
+  const handleEndPeriod = async () => {
+    try {
+      await endCycleMutation.mutateAsync();
+      Alert.alert("Period ended", "Your active period has been ended.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not end period.";
+      Alert.alert("Could not end period", message);
+    }
+  };
+
+  const handleLogFlow = () => {
+    router.push("/log" as never);
+  };
+
   return (
     <Screen scrollable={false} showAurora={false}>
-      <View
-        className="flex-1"
-        style={{ backgroundColor: calendarTheme.screenBackground }}
-      >
+      <View className="flex-1">
         <CalendarHeader
-          title="Your Cycle Calendar"
           monthLabel={formatMonthYear(visibleMonth, visibleYear)}
-          isDark={isDark}
+          yearLabel={String(visibleYear)}
+          isYearOverview={isYearOverview}
+          themeVariant={theme}
           onPrev={goPrevMonth}
           onNext={goNextMonth}
           onToggleView={() => {
@@ -225,15 +291,24 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
         />
 
         <View
-          className="mt-4 flex-1 rounded-[30px] px-4 pb-4 pt-4"
-          style={{
-            backgroundColor: calendarTheme.panelBackground,
-            shadowColor: "#000000",
-            shadowOpacity: 0.06,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 8 },
-            elevation: 3,
-          }}
+          className={
+            isYearOverview
+              ? "mt-4 flex-1"
+              : "mt-4 rounded-[30px] px-4 pb-3 pt-3"
+          }
+          style={
+            isYearOverview
+              ? undefined
+              : {
+                  backgroundColor: calendarTheme.panelBackground,
+                  shadowColor: "#000000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 14,
+                  shadowOffset: { width: 0, height: 8 },
+                  elevation: 3,
+                  overflow: "hidden",
+                }
+          }
         >
           <Animated.View
             style={monthContainerStyle}
@@ -248,7 +323,8 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
                 >
                   <Typography
                     variant="helper"
-                    className="text-[12px] tracking-[1px] text-somaMauve"
+                    className={`text-[12px] tracking-[1px] ${index === 0 ? "font-semibold text-[#D70015]" : "text-somaMauve"}`}
+                    style={index === 0 ? { color: "#D70015" } : undefined}
                   >
                     {day}
                   </Typography>
@@ -266,7 +342,7 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
                 selectedDateIso={selectedDateIso}
                 todayIso={todayIso}
                 cycleDataMap={resolvedCycleData}
-                isDark={isDark}
+                themeVariant={theme}
                 onPressDate={setSelectedDateIso}
                 todayScale={todayScale}
                 monthAnimationSeed={monthAnimationSeed}
@@ -274,37 +350,75 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
             ))}
           </Animated.View>
 
-          <Animated.View
-            style={[yearContainerStyle, { position: "absolute", inset: 12 }]}
-            pointerEvents={isYearOverview ? "auto" : "none"}
-          >
-            <View className="flex-row flex-wrap justify-between pt-2">
-              {Array.from({ length: 12 }).map((_, monthIndex) => (
-                <MiniMonth
-                  key={`mini-month-${monthIndex}`}
-                  monthIndex={monthIndex}
-                  year={visibleYear}
-                  isSelected={visibleMonth === monthIndex}
-                  cycleDataMap={resolvedCycleData}
-                  isDark={isDark}
-                  onPress={(month) => {
-                    setMonthTransitionDirection(
-                      resolveMonthSelectionDirection(visibleMonth, month),
-                    );
-                    setVisibleMonth(month);
-                    setIsYearOverview(false);
-                  }}
-                />
-              ))}
-            </View>
-          </Animated.View>
+          {isYearOverview ? (
+            <Animated.View
+              style={[
+                yearContainerStyle,
+                {
+                  position: "absolute",
+                  inset: 0,
+                },
+              ]}
+              pointerEvents="auto"
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingTop: 2, paddingBottom: 2 }}
+              >
+                {overviewYears.map((yearItem) => (
+                  <View
+                    key={`overview-year-${yearItem}`}
+                    className="mb-1.5"
+                  >
+                    <Typography
+                      variant="serifSm"
+                      className="mb-2 px-1 text-[48px] leading-[52px]"
+                      style={{
+                        color:
+                          yearItem === currentYear
+                            ? "#D70015"
+                            : isDark
+                              ? "#F2F2F2"
+                              : "#2D2327",
+                      }}
+                    >
+                      {yearItem}
+                    </Typography>
+
+                    <View className="flex-row flex-wrap justify-between">
+                      {Array.from({ length: 12 }).map((_, monthIndex) => (
+                        <MiniMonth
+                          key={`mini-month-${yearItem}-${monthIndex}`}
+                          monthIndex={monthIndex}
+                          year={yearItem}
+                          isSelected={
+                            visibleYear === yearItem && visibleMonth === monthIndex
+                          }
+                          cycleDataMap={resolvedCycleData}
+                          themeVariant={theme}
+                          onPress={(month) => {
+                            setMonthTransitionDirection(
+                              resolveMonthSelectionDirection(visibleMonth, month),
+                            );
+                            setVisibleMonth(month);
+                            setVisibleYear(yearItem);
+                            setIsYearOverview(false);
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          ) : null}
         </View>
 
-        <CycleLegend isDark={isDark} />
+        {!isYearOverview ? <CycleLegend themeVariant={theme} /> : null}
 
-        {selectedDateIso ? (
+        {!isYearOverview && selectedDateIso ? (
           <View
-            className="mt-4 rounded-[26px] px-5 py-4"
+            className="mt-3 rounded-[26px] px-5 py-4"
             style={{
               backgroundColor: calendarTheme.detailBackground,
             }}
@@ -320,6 +434,83 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
                 ? `${selectedDayStatus.replace("_", " ")} day`
                 : "No cycle marker for this date"}
             </Typography>
+          </View>
+        ) : null}
+
+        {!isYearOverview ? (
+          <View
+            className="mt-3 rounded-[26px] p-3"
+            style={{
+              backgroundColor: calendarTheme.detailBackground,
+            }}
+          >
+            {!hasActivePeriod ? (
+              <PressableScale
+                onPress={handleStartPeriod}
+                disabled={startCycleMutation.isPending}
+                style={{
+                  borderRadius: 999,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.primary,
+                  opacity: startCycleMutation.isPending ? 0.7 : 1,
+                }}
+              >
+                <Typography style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  {startCycleMutation.isPending
+                    ? "Starting..."
+                    : "Start Period"}
+                </Typography>
+              </PressableScale>
+            ) : (
+              <View className="flex-row gap-3">
+                <PressableScale
+                  onPress={handleLogFlow}
+                  style={{
+                    flex: 1,
+                    borderRadius: 999,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1,
+                    borderColor: isDark
+                      ? "rgba(255,255,255,0.24)"
+                      : "rgba(199,150,150,0.45)",
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.05)"
+                      : "rgba(255,255,255,0.72)",
+                  }}
+                >
+                  <Typography
+                    style={{
+                      color: isDark ? "#F2F2F2" : colors.textPrimary,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Log Flow
+                  </Typography>
+                </PressableScale>
+
+                <PressableScale
+                  onPress={handleEndPeriod}
+                  disabled={endCycleMutation.isPending}
+                  style={{
+                    flex: 1,
+                    borderRadius: 999,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.primary,
+                    opacity: endCycleMutation.isPending ? 0.7 : 1,
+                  }}
+                >
+                  <Typography style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    {endCycleMutation.isPending ? "Ending..." : "End Period"}
+                  </Typography>
+                </PressableScale>
+              </View>
+            )}
           </View>
         ) : null}
       </View>

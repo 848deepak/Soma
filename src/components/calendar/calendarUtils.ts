@@ -45,9 +45,9 @@ export function formatMonthYear(month: number, year: number): string {
 
 export function getStatusPaint(
   status: CycleStatus,
-  isDark: boolean,
+  themeVariant: "cream" | "midnight" | "lavender",
 ): StatusPaint {
-  const theme = isDark ? cycleCalendarTheme.dark : cycleCalendarTheme.light;
+  const theme = cycleCalendarTheme[themeVariant];
 
   if (!status) {
     return {

@@ -37,7 +37,7 @@ type TabMode = "enter-code" | "select-role";
 export function CareCircleScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isDark } = useAppTheme();
+  const { theme, isDark, colors } = useAppTheme();
 
   const [tab, setTab] = useState<TabMode>("enter-code");
   const [code, setCode] = useState("");
@@ -121,10 +121,10 @@ export function CareCircleScreen() {
     marginTop: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
-    backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 20,
-    shadowColor: "#DDA7A5",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
@@ -176,7 +176,9 @@ export function CareCircleScreen() {
                   justifyContent: "center",
                   backgroundColor: isDark
                     ? "rgba(167,139,250,0.15)"
-                    : "rgba(255,218,185,0.3)",
+                    : theme === "lavender"
+                      ? "rgba(193,187,221,0.3)"
+                      : "rgba(255,218,185,0.3)",
                   marginBottom: 16,
                 }}
               >
@@ -186,7 +188,7 @@ export function CareCircleScreen() {
                     android: "qr_code_scanner",
                     web: "qr_code_scanner",
                   }}
-                  tintColor="#9B7E8C"
+                  tintColor={colors.textSecondary}
                   size={48}
                 />
               </View>
@@ -206,9 +208,7 @@ export function CareCircleScreen() {
                 style={{
                   borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(221,167,165,0.3)",
+                  borderColor: colors.border,
                   paddingHorizontal: 16,
                   paddingVertical: 10,
                   opacity: 0.5,
@@ -218,7 +218,7 @@ export function CareCircleScreen() {
                   style={{
                     fontSize: 14,
                     fontWeight: "600",
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                   }}
                 >
                   Scanner
@@ -250,7 +250,7 @@ export function CareCircleScreen() {
                 variant="helper"
                 style={{
                   marginBottom: 12,
-                  color: isDark ? "rgba(242,242,242,0.7)" : "#9B7E8C",
+                  color: colors.textSecondary,
                 }}
               >
                 6-character code like AB-12-CD (with or without dashes)
@@ -260,12 +260,10 @@ export function CareCircleScreen() {
                 style={{
                   borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(221,167,165,0.2)",
+                  borderColor: colors.border,
                   backgroundColor: isDark
                     ? "rgba(255,255,255,0.04)"
-                    : "rgba(255,255,255,0.5)",
+                    : colors.card,
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   marginBottom: 16,
@@ -282,7 +280,7 @@ export function CareCircleScreen() {
                     fontSize: 16,
                     fontWeight: "600",
                     letterSpacing: 2,
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                     textTransform: "uppercase",
                   }}
                 />
@@ -298,9 +296,7 @@ export function CareCircleScreen() {
                     justifyContent: "center",
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: isDark
-                      ? "rgba(255,255,255,0.2)"
-                      : "rgba(221,167,165,0.35)",
+                    borderColor: colors.border,
                     paddingVertical: 12,
                   }}
                 >
@@ -308,7 +304,7 @@ export function CareCircleScreen() {
                     style={{
                       fontSize: 14,
                       fontWeight: "600",
-                      color: isDark ? "#F2F2F2" : "#2D2327",
+                      color: colors.textPrimary,
                     }}
                   >
                     Cancel
@@ -323,7 +319,7 @@ export function CareCircleScreen() {
                     alignItems: "center",
                     justifyContent: "center",
                     borderRadius: 999,
-                    backgroundColor: code.trim() ? "#DDA7A5" : "#DDA7A5",
+                    backgroundColor: colors.primary,
                     paddingVertical: 12,
                     opacity: code.trim() ? 1 : 0.5,
                   }}
@@ -361,10 +357,10 @@ export function CareCircleScreen() {
                   borderWidth: 2,
                   borderColor:
                     selectedRole === role
-                      ? "#DDA7A5"
+                      ? colors.primary
                       : isDark
                         ? "rgba(255,255,255,0.1)"
-                        : "rgba(255,255,255,0.7)",
+                        : colors.border,
                 }}
               >
                 <View
@@ -381,9 +377,11 @@ export function CareCircleScreen() {
                       borderRadius: 12,
                       borderWidth: 2,
                       borderColor:
-                        selectedRole === role ? "#DDA7A5" : "#9B7E8C",
+                        selectedRole === role
+                          ? colors.primary
+                          : colors.textSecondary,
                       backgroundColor:
-                        selectedRole === role ? "#DDA7A5" : "transparent",
+                        selectedRole === role ? colors.primary : "transparent",
                       alignItems: "center",
                       justifyContent: "center",
                       marginTop: 2,
@@ -403,7 +401,7 @@ export function CareCircleScreen() {
                       style={{
                         fontSize: 16,
                         fontWeight: "600",
-                        color: isDark ? "#F2F2F2" : "#2D2327",
+                        color: colors.textPrimary,
                         marginBottom: 6,
                       }}
                     >
@@ -412,7 +410,7 @@ export function CareCircleScreen() {
                     <Typography
                       variant="helper"
                       style={{
-                        color: isDark ? "rgba(242,242,242,0.7)" : "#9B7E8C",
+                        color: colors.textSecondary,
                         lineHeight: 18,
                       }}
                     >
@@ -433,9 +431,7 @@ export function CareCircleScreen() {
                   justifyContent: "center",
                   borderRadius: 999,
                   borderWidth: 1,
-                  borderColor: isDark
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(221,167,165,0.35)",
+                  borderColor: colors.border,
                   paddingVertical: 12,
                 }}
               >
@@ -443,7 +439,7 @@ export function CareCircleScreen() {
                   style={{
                     fontSize: 14,
                     fontWeight: "600",
-                    color: isDark ? "#F2F2F2" : "#2D2327",
+                    color: colors.textPrimary,
                   }}
                 >
                   Back
@@ -458,7 +454,7 @@ export function CareCircleScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: 999,
-                  backgroundColor: "#DDA7A5",
+                  backgroundColor: colors.primary,
                   paddingVertical: 12,
                   opacity: createConnectionMutation.isPending ? 0.7 : 1,
                 }}
