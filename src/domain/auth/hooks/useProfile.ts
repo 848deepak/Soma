@@ -333,11 +333,15 @@ export function useUpdateProfile() {
       if (!context?.previous) return;
 
       // Re-fetch current user to get the proper key
-      supabase.auth.getUser().then(({ data: { user } }) => {
+      void supabase.auth.getUser().then(({ data: { user } }) => {
         if (user) {
           const profileKey = QUERY_KEYS.profile(user.id);
           queryClient.setQueryData(profileKey, context.previous);
         }
+      }).catch((err) => {
+        logWarn("auth", "profile_error_rollback_failed", {
+          message: err instanceof Error ? err.message : String(err),
+        });
       });
     },
 

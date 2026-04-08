@@ -214,6 +214,10 @@ export function useSaveLog() {
 
     // ─── Optimistic update ─────────────────────────────────────────────────
     onMutate: async (payload) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       const todayKey = TODAY_LOG_KEY();
       await queryClient.cancelQueries({ queryKey: todayKey });
 
@@ -228,7 +232,7 @@ export function useSaveLog() {
           ({
             ...(old ?? {
               id: "optimistic",
-              user_id: "",
+              user_id: user?.id ?? "",
               date: todayIso(),
               cycle_day: null,
               cycle_id: null,
