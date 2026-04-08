@@ -218,6 +218,7 @@ export function AuthBootstrap({
   const previousUserIdRef = useRef<string | null>(null);
   const currentSegmentRef = useRef<string | undefined>(segments[0]);
   const bootstrapRunIdRef = useRef(0);
+  const navigationLockRef = useRef(false);
 
   // Flush offline queue whenever connectivity is restored
   useNetworkSync();
@@ -290,6 +291,34 @@ export function AuthBootstrap({
     let isMounted = true;
     const bootstrapRunId = ++bootstrapRunIdRef.current;
 
+    /**
+     * Safely navigate to a route while holding a lock to prevent double navigation.
+     * Navigation is guarded: only the first router.replace() call succeeds.
+     * CRITICAL: Set lock BEFORE router.replace() to prevent race conditions.
+     */
+    const safeNavigate = (destination: string, reason: string) => {
+      if (navigationLockRef.current) {
+        if (__DEV__) {
+          console.warn('[Bootstrap] Navigation blocked — lock active', {
+            destination,
+            reason,
+            currentLock: navigationLockRef.current,
+          });
+        }
+        return;
+      }
+      // CRITICAL: Set lock IMMEDIATELY before any side effects
+      navigationLockRef.current = true;
+      if (__DEV__) {
+        console.log('[Bootstrap] Navigation locked and proceeding to:', {
+          destination,
+          reason,
+        });
+      }
+      // Now safe to call router.replace - lock is already held
+      router.replace(destination as never);
+    };
+
     async function bootstrap() {
       try {
         const hasLaunched = await AsyncStorage.getItem(HAS_LAUNCHED_KEY);
@@ -320,7 +349,7 @@ export function AuthBootstrap({
           // No session at all — first-time user → show auth
           if (isMounted) {
             if (!inAuth) {
-              router.replace("/auth/login" as never);
+              safeNavigate("/auth/login", "no_session");
             }
             setHasBootstrapped(true);
           }
@@ -349,7 +378,7 @@ export function AuthBootstrap({
           // (Anonymous session created as fallback by the "Continue without account" path)
           if (isMounted) {
             if (!inAuth) {
-              router.replace("/auth/login" as never);
+              safeNavigate("/auth/login", "anonymous_first_launch");
             }
             setHasBootstrapped(true);
           }
@@ -375,7 +404,7 @@ export function AuthBootstrap({
               route: "/welcome",
             });
             if (!inOnboarding) {
-              router.replace("/welcome" as never);
+              safeNavigate("/welcome", "profile_found_not_onboarded");
             }
             setHasBootstrapped(true);
             return;
@@ -397,7 +426,7 @@ export function AuthBootstrap({
               reason: "onboarded",
               route: "/(tabs)",
             });
-            router.replace("/(tabs)" as never);
+            safeNavigate("/(tabs)", "profile_found_onboarded");
           }
           setHasBootstrapped(true);
           return;
@@ -405,14 +434,14 @@ export function AuthBootstrap({
 
         if (profileResult.status === "missing") {
           // User has valid session with email but profile lookup returned null.
-          // Do NOT force re-onboarding. Route to tabs and trigger background repair.
+          // Attempt repair with retries before routing decision.
           if (user.email) {
-            console.log("[Auth] Profile missing but user has email. Routing to tabs and triggering repair:", {
+            console.log("[Auth] Profile missing but user has email. Attempting repair:", {
               userId: user.id,
               email: user.email,
             });
 
-            // Background repair with retries
+            // Repair with retries - AWAIT before routing
             const performRepairWithRetry = async () => {
               for (let i = 0; i < 3; i++) {
                 try {
@@ -424,33 +453,48 @@ export function AuthBootstrap({
               }
             };
 
-            performRepairWithRetry().catch((repairError) => {
+            try {
+              await performRepairWithRetry();
+              // Repair succeeded - proceed to tabs
+              console.log("[Auth] Profile repair succeeded", { userId: user.id });
+              logAuthEvent({
+                type: "bootstrap_routing",
+                userId: user.id,
+                reason: "profile_repair_success",
+                route: "/(tabs)",
+              });
+
+              if (!inAuth && !inOnboarding && currentSegmentRef.current === "(tabs)") {
+                setHasBootstrapped(true);
+                return;
+              }
+              safeNavigate("/(tabs)", "profile_repair_success");
+              setHasBootstrapped(true);
+              return;
+            } catch (repairError) {
+              // Repair failed permanently - route to welcome with error
               console.error("[Auth] Profile repair failed after retries:", repairError);
               logAuthEvent({
                 type: "profile_repair_failure",
                 userId: user.id,
                 error: repairError instanceof Error ? repairError.message : String(repairError),
               });
-              // Route to welcome on profile repair failure
-              if (isMounted && !inOnboarding) {
-                router.replace("/welcome" as never);
+
+              // Capture in Sentry for monitoring
+              if (typeof Sentry !== "undefined" && Sentry.captureException) {
+                Sentry.captureException(repairError, {
+                  tags: { source: "profile_repair" },
+                  contexts: { auth: { userId: user.id, email: user.email } },
+                });
               }
-            });
 
-            logAuthEvent({
-              type: "bootstrap_routing",
-              userId: user.id,
-              reason: "profile_repair",
-              route: "/(tabs)",
-            });
-
-            if (!inAuth && !inOnboarding && currentSegmentRef.current === "(tabs)") {
+              // Route to welcome with error state
+              if (isMounted && !inOnboarding && !navigationLockRef.current) {
+                safeNavigate("/welcome", "profile_repair_failed");
+              }
               setHasBootstrapped(true);
               return;
             }
-            router.replace("/(tabs)" as never);
-            setHasBootstrapped(true);
-            return;
           }
 
           // No email - user is anonymous. Route to onboarding.
@@ -466,7 +510,7 @@ export function AuthBootstrap({
             route: "/welcome",
           });
           if (!inOnboarding) {
-            router.replace("/welcome" as never);
+            safeNavigate("/welcome", "profile_missing_anonymous");
           }
           setHasBootstrapped(true);
           return;
@@ -484,10 +528,10 @@ export function AuthBootstrap({
 
           if (cachedProfile.is_onboarded) {
             if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
-              router.replace("/(tabs)" as never);
+              safeNavigate("/(tabs)", "cached_profile_onboarded");
             }
           } else if (!inOnboarding) {
-            router.replace("/welcome" as never);
+            safeNavigate("/welcome", "cached_profile_not_onboarded");
           }
 
           setHasBootstrapped(true);
@@ -501,14 +545,14 @@ export function AuthBootstrap({
 
         // Avoid misclassifying existing users as new users on transient DB failures.
         if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
-          router.replace("/(tabs)" as never);
+          safeNavigate("/(tabs)", "profile_lookup_error_fallback");
         }
         setHasBootstrapped(true);
       } catch (error) {
         console.warn("[Auth] Bootstrap critical error:", error);
         // Last resort: route to login when route resolution fails.
         if (isMounted) {
-          router.replace("/auth/login" as never);
+          safeNavigate("/auth/login", "bootstrap_critical_error");
           setHasBootstrapped(true);
         }
       }
@@ -518,6 +562,7 @@ export function AuthBootstrap({
 
     return () => {
       isMounted = false;
+      navigationLockRef.current = false;
     };
     // We intentionally run this during bootstrap transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps

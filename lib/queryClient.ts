@@ -91,6 +91,14 @@ export const queryClient = new QueryClient({
 /**
  * Persist query cache for fast cold start.
  * Keep profile + currentCycle + dailyLogs hot, skip expensive queries.
+ *
+ * IMPORTANT: Query keys must match the registry in src/lib/queryKeys.ts
+ * to ensure cache hits during hydration. Dehydration checks only the first key element,
+ * so we persist:
+ *   - 'profile' (any userId variant)
+ *   - 'current-cycle'
+ *   - 'daily-log' (any date)
+ *   - 'daily-logs' (any limit)
  */
 persistQueryClient({
   queryClient,
@@ -98,9 +106,16 @@ persistQueryClient({
   maxAge: 1000 * 60 * 60 * 24, // 24 hours
   dehydrateOptions: {
     // Only persist small, frequently-accessed queries
+    // Check first element of queryKey (e.g., 'profile', 'current-cycle')
     shouldDehydrateQuery: (query: any): boolean => {
       const key = query.queryKey[0];
-      const persistedKeys = ['profile', 'current-cycle', 'daily-logs', 'daily-log'];
+      const persistedKeys = [
+        'profile',
+        'current-cycle',
+        'daily-logs',
+        'daily-logs-range',
+        'daily-log',
+      ];
       return persistedKeys.includes(String(key));
     },
   },

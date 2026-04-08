@@ -17,16 +17,47 @@
  * each channel is uniquely named and cleaned up on unmount.
  */
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { supabase } from "@/lib/supabase";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import { todayLocal } from "@/src/domain/utils/dateUtils";
 
 export function useRealtimeSync(userId: string | undefined) {
   const queryClient = useQueryClient();
+  const channelsRef = useRef<{
+    logs: ReturnType<typeof supabase.channel>;
+    cycles: ReturnType<typeof supabase.channel>;
+  } | null>(null);
 
   useEffect(() => {
     if (!userId) return;
+
+    // Always clean up previous subscriptions first before resubscribing.
+    // This is critical for handling anonymous → email upgrade transitions
+    // where userId changes and we need to subscribe to a different user's channel.
+    const cleanup = () => {
+      if (channelsRef.current) {
+        const { logs, cycles } = channelsRef.current;
+
+        if (logs) {
+          supabase.removeChannel(logs).catch((e) => {
+            console.warn('[RealtimeSync] Failed to remove logsChannel:', e);
+          });
+        }
+
+        if (cycles) {
+          supabase.removeChannel(cycles).catch((e) => {
+            console.warn('[RealtimeSync] Failed to remove cyclesChannel:', e);
+          });
+        }
+
+        channelsRef.current = null;
+      }
+    };
+
+    // Remove old channels before subscribing to new ones
+    cleanup();
 
     // ─── Subscribe to daily_logs changes ───────────────────────────────────
     // When a log is inserted/updated, only invalidate that specific date's cache
@@ -49,18 +80,19 @@ export function useRealtimeSync(userId: string | undefined) {
             // Invalidate today's log specifically
             if (changedDate === todayLocal()) {
               void queryClient.invalidateQueries({
-                queryKey: ["daily-log", changedDate],
+                queryKey: QUERY_KEYS.dailyLog(changedDate),
                 exact: true,
               });
             }
 
             // Invalidate date-range queries that contain this date
             void queryClient.invalidateQueries({
-              queryKey: ["daily-logs-range"],
+              queryKey: ["daily-logs-range"], // Matches all range queries
               predicate: (query) => {
                 // Only invalidate range queries that could contain this date
-                const [, fromDate, toDate] = query.queryKey as any[];
+                const [key, fromDate, toDate] = query.queryKey as any[];
                 return (
+                  key === "daily-logs-range" &&
                   typeof fromDate === "string" &&
                   typeof toDate === "string" &&
                   changedDate >= fromDate &&
@@ -72,7 +104,6 @@ export function useRealtimeSync(userId: string | undefined) {
 
           // Always invalidate the generic daily-logs list (used by insights)
           void queryClient.invalidateQueries({
-            queryKey: ["daily-logs"],
             predicate: (query) => {
               // Match all daily-logs queries (e.g., ['daily-logs', 90])
               return (
@@ -100,15 +131,14 @@ export function useRealtimeSync(userId: string | undefined) {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          // Invalidate current cycle (matches ['current-cycle'])
+          // Invalidate current cycle
           void queryClient.invalidateQueries({
-            queryKey: ["current-cycle"],
+            queryKey: QUERY_KEYS.currentCycle(),
             exact: true,
           });
 
-          // Invalidate cycle history list (matches ['cycle-history', limit])
+          // Invalidate cycle history list
           void queryClient.invalidateQueries({
-            queryKey: ["cycle-history"],
             predicate: (query) => {
               return (
                 Array.isArray(query.queryKey) &&
@@ -124,10 +154,15 @@ export function useRealtimeSync(userId: string | undefined) {
       )
       .subscribe();
 
-    return () => {
-      void supabase.removeChannel(logsChannel);
-      void supabase.removeChannel(cyclesChannel);
-    };
+    // Store channels for cleanup
+    channelsRef.current = { logs: logsChannel, cycles: cyclesChannel };
+
+    if (__DEV__) {
+      console.log('[RealtimeSync] Subscribed for userId:', userId);
+    }
+
+    // ─── Cleanup: remove channels on unmount or userId change ────────────────
+    return cleanup;
   }, [userId, queryClient]);
 }
 

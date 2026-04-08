@@ -166,7 +166,7 @@ export function SetupScreen() {
 
         if (consentProfileError) throw consentProfileError;
         if (consentProfile) {
-          queryClient.setQueryData(PROFILE_QUERY_KEY, consentProfile);
+          queryClient.setQueryData(PROFILE_QUERY_KEY(user.id), consentProfile);
         }
 
         if (consentRequest.emailSent) {
@@ -229,8 +229,8 @@ export function SetupScreen() {
         .single();
       if (profileError) throw profileError;
       if (updatedProfile) {
-        queryClient.setQueryData(PROFILE_QUERY_KEY, updatedProfile);
-        await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+        queryClient.setQueryData(PROFILE_QUERY_KEY(user.id), updatedProfile);
+        await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY(user.id) });
       }
 
       await ensureNotificationPreferencesRow(user.id, false);

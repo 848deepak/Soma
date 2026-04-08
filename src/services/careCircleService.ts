@@ -116,14 +116,54 @@ export async function getConnections() {
 /**
  * Fetch role-filtered shared data for a connection.
  * Queries the shared_data view with the connection's role and permission settings.
+ *
+ * SECURITY: Re-checks permissions before returning data to prevent stale cache attacks
+ * where a partner views data after their access was revoked by the primary.
+ *
  * @param partnerId – the data owner's user ID
  * @param limit – max rows to fetch (default: 7 for recent activity)
  * @returns Array of SharedDataLog rows with fields filtered by role + permissions
+ * @throws if connection not found, access denied, or permissions have been revoked
  */
 export async function getSharedData(
   partnerId: string,
   limit: number = 7,
 ): Promise<SharedDataLog[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  // SECURITY FIX: Force re-check permissions before returning data
+  // This prevents viewing stale cached data after access revocation
+  const { data: permissionCheck, error: permError } = await supabase
+    .from('partners')
+    .select('status')
+    .eq('user_id', partnerId)
+    .eq('viewer_user_id', user.id)
+    .maybeSingle();
+
+  if (permError && permError.code !== 'PGRST116') {
+    throw permError;
+  }
+
+  // Check if connection exists and is active
+  if (!permissionCheck) {
+    throw new Error(
+      'Connection not found. It may have been revoked or does not exist.',
+    );
+  }
+
+  if (permissionCheck.status !== 'active') {
+    throw new Error(
+      `Access denied. Connection status: ${permissionCheck.status}. Tap to refresh.`,
+    );
+  }
+
+  // Proceed to fetch shared data
   const { data, error } = await supabase
     .from('shared_data')
     .select('*')
@@ -134,7 +174,7 @@ export async function getSharedData(
   if (error) {
     // RLS or permission errors are expected if connection doesn't exist or is revoked
     if (error.code === 'PGRST116') {
-      throw new Error('Connection not found or access denied.');
+      throw new Error('Access denied. You may no longer have permission to view this data.');
     }
     throw error;
   }

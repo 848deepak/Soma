@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { QUERY_KEYS } from '@/src/lib/queryKeys';
 import type { ProfileRow, CycleRow, DailyLogRow } from '@/types/database';
 import { todayLocal } from '@/src/domain/utils/dateUtils';
 
@@ -63,25 +64,39 @@ export async function bootstrapRPC(userId: string): Promise<BootstrapData> {
         .maybeSingle(),
     ]);
 
-    const [profileResult, cycleResult, logResult] = await Promise.race([
-      bootstrapPromise,
-      timeoutPromise,
-    ]);
+    // ✅ FIX: Properly handle Promise.race with timeout
+    // Promise.race() returns the settled value of the first promise.
+    // bootstrapPromise resolves to [result1, result2, result3]
+    // timeoutPromise rejects with an error
+    let results: any[] | null = null;
+    try {
+      results = await Promise.race([
+        bootstrapPromise,
+        timeoutPromise,
+      ]);
+    } catch (raceError) {
+      console.warn('[Bootstrap] RPC timeout or error:', raceError);
+      // Timeout or failure — set null results so downstream handles gracefully
+      results = [null, null, null];
+    }
 
-    // Extract data from results, handling errors
+    const [profileResult, cycleResult, logResult] = results || [null, null, null];
+
+    // Extract data from results, handling both success (Supabase result) and null (timeout/error)
     let profile: ProfileRow | null = null;
     let currentCycle: CycleRow | null = null;
     let todayLog: DailyLogRow | null = null;
 
-    if (!profileResult.error && profileResult.data) {
+    // profileResult is either { data, error } or null
+    if (profileResult && !profileResult.error && profileResult.data) {
       profile = profileResult.data as unknown as ProfileRow;
     }
 
-    if (!cycleResult.error && cycleResult.data) {
+    if (cycleResult && !cycleResult.error && cycleResult.data) {
       currentCycle = cycleResult.data as unknown as CycleRow;
     }
 
-    if (!logResult.error && logResult.data) {
+    if (logResult && !logResult.error && logResult.data) {
       todayLog = logResult.data as unknown as DailyLogRow;
     }
 
@@ -102,25 +117,25 @@ export async function bootstrapRPC(userId: string): Promise<BootstrapData> {
  *
  * @param queryClient TanStack QueryClient instance
  * @param bootstrapData Data returned from bootstrapRPC()
- * @param userId Authenticated user ID (optional, used for profile key)
+ * @param userId Authenticated user ID (required for profile key)
  */
 export function primeBootstrapCache(
   queryClient: any, // Avoid circular import: just use any
   bootstrapData: BootstrapData,
-  userId?: string,
+  userId: string,
 ): void {
-  // Prime profile cache
+  // Prime profile cache with userId in key
   if (bootstrapData.profile) {
-    queryClient.setQueryData(['profile', userId], bootstrapData.profile);
+    queryClient.setQueryData(QUERY_KEYS.profile(userId), bootstrapData.profile);
   }
 
   // Prime current cycle cache
   if (bootstrapData.currentCycle) {
-    queryClient.setQueryData(['current-cycle'], bootstrapData.currentCycle);
+    queryClient.setQueryData(QUERY_KEYS.currentCycle(), bootstrapData.currentCycle);
   }
 
   // Prime today's log cache
   if (bootstrapData.todayLog) {
-    queryClient.setQueryData(['daily-log', todayLocal()], bootstrapData.todayLog);
+    queryClient.setQueryData(QUERY_KEYS.dailyLog(todayLocal()), bootstrapData.todayLog);
   }
 }

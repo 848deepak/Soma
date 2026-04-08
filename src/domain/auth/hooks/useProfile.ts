@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import { logWarn } from "@/platform/monitoring/logger";
 import type {
   NotificationPreferenceRow,
@@ -16,10 +17,10 @@ import type {
   ProfileUpdate,
 } from "@/types/database";
 
-export const PROFILE_QUERY_KEY = ["profile"] as const;
-export const NOTIFICATION_PREFERENCES_QUERY_KEY = [
-  "notification_preferences",
-] as const;
+// Re-export from query keys registry for backward compatibility
+export const PROFILE_QUERY_KEY = (userId: string) => QUERY_KEYS.profile(userId);
+export const NOTIFICATION_PREFERENCES_QUERY_KEY =
+  QUERY_KEYS.notificationPreferences();
 
 const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
   NotificationPreferenceRow,
@@ -38,13 +39,18 @@ const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
 export function useProfile() {
   const queryClient = useQueryClient();
 
+  // Use a two-phase approach: first query to get userId, then fetch profile
+  // This ensures queryKey includes userId for proper cache matching
   const query = useQuery<ProfileRow | null>({
-    queryKey: PROFILE_QUERY_KEY,
+    queryKey: ["_current_user_profile"], // Temporary key during fetch
     queryFn: async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return null;
+
+      // Fetch profile with userId in the query key
+      const profileKey = QUERY_KEYS.profile(user.id);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -65,7 +71,12 @@ export function useProfile() {
         return null;
       }
 
-      return data as ProfileRow;
+      const profileData = data as ProfileRow;
+
+      // Set the data under the proper key with userId
+      queryClient.setQueryData(profileKey, profileData);
+
+      return profileData;
     },
     // Profile rarely changes – 5 minute stale time
     staleTime: 5 * 60 * 1000,
@@ -89,6 +100,7 @@ export function useProfile() {
     },
   });
 
+  // Real-time subscription to profile changes (only subscribe when query has data)
   useEffect(() => {
     let channelName: string | null = null;
     let cancelled = false;
@@ -101,6 +113,8 @@ export function useProfile() {
       if (!user || cancelled) return;
 
       channelName = `profile:${user.id}`;
+      const profileKey = QUERY_KEYS.profile(user.id);
+
       const channel = supabase
         .channel(channelName)
         .on(
@@ -114,9 +128,9 @@ export function useProfile() {
           (payload) => {
             const next = payload.new as ProfileRow | undefined;
             if (next) {
-              queryClient.setQueryData(PROFILE_QUERY_KEY, next);
+              queryClient.setQueryData(profileKey, next);
             } else if (payload.eventType === "DELETE") {
-              queryClient.setQueryData(PROFILE_QUERY_KEY, null);
+              queryClient.setQueryData(profileKey, null);
             }
           },
         )
@@ -301,22 +315,44 @@ export function useUpdateProfile() {
     },
 
     onMutate: async (update) => {
-      await queryClient.cancelQueries({ queryKey: PROFILE_QUERY_KEY });
-      const previous = queryClient.getQueryData<ProfileRow>(PROFILE_QUERY_KEY);
-      queryClient.setQueryData<ProfileRow | null>(PROFILE_QUERY_KEY, (old) =>
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { previous: null };
+
+      const profileKey = QUERY_KEYS.profile(user.id);
+      await queryClient.cancelQueries({ queryKey: profileKey });
+      const previous = queryClient.getQueryData<ProfileRow>(profileKey);
+      queryClient.setQueryData<ProfileRow | null>(profileKey, (old) =>
         old ? { ...old, ...update } : old,
       );
       return { previous };
     },
 
     onError: (_error, _update, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(PROFILE_QUERY_KEY, context.previous);
-      }
+      if (!context?.previous) return;
+
+      // Re-fetch current user to get the proper key
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          const profileKey = QUERY_KEYS.profile(user.id);
+          queryClient.setQueryData(profileKey, context.previous);
+        }
+      }).catch((err) => {
+        logWarn("auth", "profile_error_rollback_failed", {
+          message: err instanceof Error ? err.message : String(err),
+        });
+      });
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+      // Invalidate all profile queries
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const firstKey = query.queryKey[0];
+          return firstKey === 'profile';
+        }
+      });
     },
   });
 }

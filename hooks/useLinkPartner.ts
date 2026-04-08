@@ -127,8 +127,11 @@ export function useEnsurePartnerInviteCode() {
 
   return useMutation<string, Error, string | null | undefined>({
     mutationFn: ensurePartnerInviteCodeAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+    onSuccess: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY(user.id) });
+      }
     },
   });
 }

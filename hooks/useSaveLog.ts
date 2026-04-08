@@ -94,38 +94,45 @@ export function useSaveLog() {
 
       const today = todayIso();
 
-      // Prefer server cycle context to reduce stale cache races when users log
-      // quickly after period start/end actions.
+      // **Why cache-first here?** Use TanStack Query cache as authoritative cycle context.
+      // Cache is kept fresh by bootstrap RPC and real-time subscriptions, so it's more recent
+      // than a fresh query. This minimizes the race condition window: if we query fresh, the user
+      // could end their period between the query and the upsert, causing the log to record a stale
+      // cycle_id. Cache avoids that race by reading from an already-synchronized source.
       const cachedCycleData = queryClient.getQueryData<DerivedCycleData | null>(
         CURRENT_CYCLE_KEY,
       );
 
-      const { data: activeCycle, error: activeCycleError } = await supabase
-        .from("cycles")
-        .select("id,start_date")
-        .eq("user_id", user.id)
-        .is("end_date", null)
-        .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      let resolvedCycle: { id: string; start_date: string } | null = null;
 
-      if (activeCycleError && !isLikelyNetworkError(activeCycleError)) {
-        throw activeCycleError;
-      }
+      if (cachedCycleData?.cycle) {
+        // Use cache first (authoritative, already fresh)
+        resolvedCycle = {
+          id: cachedCycleData.cycle.id,
+          start_date: cachedCycleData.cycle.start_date,
+        };
+      } else {
+        // Fallback to fresh server query only if cache is empty (bootstrap not yet complete, or invalidated)
+        const { data: activeCycle, error: activeCycleError } = await supabase
+          .from("cycles")
+          .select("id,start_date")
+          .eq("user_id", user.id)
+          .is("end_date", null)
+          .order("start_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      const resolvedCycle = activeCycle
-        ? {
+        if (activeCycleError && !isLikelyNetworkError(activeCycleError)) {
+          throw activeCycleError;
+        }
+
+        if (activeCycle) {
+          resolvedCycle = {
             id: activeCycle.id,
             start_date: activeCycle.start_date,
-          }
-        : activeCycleError && isLikelyNetworkError(activeCycleError)
-          ? (cachedCycleData?.cycle
-              ? {
-                  id: cachedCycleData.cycle.id,
-                  start_date: cachedCycleData.cycle.start_date,
-                }
-              : null)
-          : null;
+          };
+        }
+      }
 
       const cycleId = resolvedCycle?.id ?? null;
       const cycleDay = resolvedCycle?.start_date
@@ -207,6 +214,10 @@ export function useSaveLog() {
 
     // ─── Optimistic update ─────────────────────────────────────────────────
     onMutate: async (payload) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       const todayKey = TODAY_LOG_KEY();
       await queryClient.cancelQueries({ queryKey: todayKey });
 
@@ -221,7 +232,7 @@ export function useSaveLog() {
           ({
             ...(old ?? {
               id: "optimistic",
-              user_id: "",
+              user_id: user?.id ?? "",
               date: todayIso(),
               cycle_day: null,
               cycle_id: null,
