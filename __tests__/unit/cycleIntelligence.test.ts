@@ -8,11 +8,13 @@
  *  - buildSymptomStats:     frequency calculation, top-8 limiting, size scaling
  *  - buildTrendInsight:     all 5 outcome branches with math verification
  *  - stdDev (implicitly via buildTrendInsight)
- */
+‌ */
 import {
   buildCycleHistoryBars,
   buildSymptomStats,
   buildTrendInsight,
+  predictFertileWindow,
+  estimateOvulation,
 } from '@/services/CycleIntelligence';
 import type { CompletedCycle, DailyLogRow, SymptomOption } from '@/types/database';
 
@@ -351,5 +353,247 @@ describe('buildTrendInsight', () => {
     // Should not throw
     const insight = buildTrendInsight(cycles, moodLogs);
     expect(insight.title).toBeTruthy();
+  });
+});
+
+// ─── predictFertileWindow ─────────────────────────────────────────────────────
+
+describe('predictFertileWindow (defensive checks for new users)', () => {
+  it('returns null when cycles array is empty (brand-new user)', () => {
+    const result = predictFertileWindow([], '2026-04-08');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when cycles is undefined', () => {
+    const result = predictFertileWindow(undefined as any, '2026-04-08');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when currentCycleStartDate is undefined', () => {
+    const cycles = [makeCycle('2026-03-01', 28)];
+    const result = predictFertileWindow(cycles, undefined as any);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when currentCycleStartDate is empty string', () => {
+    const cycles = [makeCycle('2026-03-01', 28)];
+    const result = predictFertileWindow(cycles, '');
+    expect(result).toBeNull();
+  });
+
+  it('returns prediction when cycles have valid data', () => {
+    const cycles = [
+      makeCycle('2026-03-01', 28),
+      makeCycle('2026-04-01', 29),
+    ];
+    const result = predictFertileWindow(cycles, '2026-04-01');
+
+    expect(result).not.toBeNull();
+    expect(result?.windowStart).toBeDefined();
+    expect(result?.ovulationDate).toBeDefined();
+    expect(result?.windowEnd).toBeDefined();
+    expect(result?.averageCycleLength).toBeGreaterThan(0);
+    expect(result?.cyclesUsed).toBeGreaterThan(0);
+  });
+
+  it('handles single completed cycle gracefully', () => {
+    const cycles = [makeCycle('2026-03-01', 26)];
+    const result = predictFertileWindow(cycles, '2026-04-01');
+
+    expect(result).not.toBeNull();
+    expect(result?.cyclesUsed).toBe(1);
+    expect(result?.averageCycleLength).toBe(26);
+  });
+
+  it('calculates fertile window: 5 days before + ovulation day + 1 day after', () => {
+    const cycles = [
+      makeCycle('2026-03-01', 28),
+      makeCycle('2026-04-01', 28),
+    ];
+    // Start date 2026-04-01, avg cycle 28 days
+    // Ovulation cycle day = 28 - 14 = 14
+    // Window start = addDays(2026-04-01, 14-6-1) = addDays(2026-04-01, 7) = 2026-04-08 (8 days after)
+    // Actually the function calculates: ovulationCycleDay - 6 = 14 - 6 = 8
+    // addDays(start, 8) = 2026-04-09
+    const result = predictFertileWindow(cycles, '2026-04-01');
+
+    expect(result).not.toBeNull();
+    expect(result?.windowStart).toBe('2026-04-09'); // 8 days after start (1-indexed calculation)
+    expect(result?.ovulationDate).toBe('2026-04-14');
+    expect(result?.windowEnd).toBe('2026-04-15');
+  });
+});
+
+// ─── estimateOvulation ────────────────────────────────────────────────────────
+
+describe('estimateOvulation (defensive checks for new users)', () => {
+  it('returns null when cycles array is empty (brand-new user)', () => {
+    const result = estimateOvulation([], '2026-04-08');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when cycles is undefined', () => {
+    const result = estimateOvulation(undefined as any, '2026-04-08');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when currentCycleStartDate is undefined', () => {
+    const cycles = [makeCycle('2026-03-01', 28)];
+    const result = estimateOvulation(cycles, undefined as any);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when currentCycleStartDate is empty string', () => {
+    const cycles = [makeCycle('2026-03-01', 28)];
+    const result = estimateOvulation(cycles, '');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when cycles have no completed entries with end_date', () => {
+    // Create cycles with null end_date and cycle_length
+    const invalidCycles = [
+      {
+        ...makeCycle('2026-03-01', 28),
+        end_date: null,
+        cycle_length: null,
+      },
+    ] as any;
+    const result = estimateOvulation(invalidCycles, '2026-04-08');
+    expect(result).toBeNull();
+  });
+
+  it('returns ovulation estimate with low confidence for single cycle', () => {
+    const cycles = [makeCycle('2026-03-01', 28)];
+    const result = estimateOvulation(cycles, '2026-04-01');
+
+    expect(result).not.toBeNull();
+    expect(result?.estimatedDate).toBeDefined();
+    expect(result?.dayNumber).toBeGreaterThan(0);
+    expect(result?.confidence).toBe('low');
+    expect(result?.cyclesUsed).toBe(1);
+    expect(result?.variabilityDays).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns ovulation estimate with high confidence for 6+ consistent cycles', () => {
+    const cycles = [
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+      makeCycle('2026-03-01', 28),
+      makeCycle('2026-04-01', 28),
+      makeCycle('2026-05-01', 28),
+      makeCycle('2026-06-01', 28),
+    ];
+    const result = estimateOvulation(cycles, '2026-07-01');
+
+    expect(result).not.toBeNull();
+    expect(result?.confidence).toBe('high');
+    expect(result?.cyclesUsed).toBe(6);
+    expect(result?.variabilityDays).toBeLessThanOrEqual(1);
+    expect(result?.confidenceScore).toBeGreaterThan(75);
+  });
+
+  it('calculates lower confidence score for erratic cycles', () => {
+    // Cycles with large variation
+    const erraticCycles = [
+      makeCycle('2026-01-01', 20),
+      makeCycle('2026-02-20', 35),
+      makeCycle('2026-04-24', 28),
+    ];
+    const result = estimateOvulation(erraticCycles, '2026-05-24');
+
+    expect(result).not.toBeNull();
+    expect(result?.confidence).toBe('low');
+    expect(result?.variabilityDays).toBeGreaterThan(5);
+  });
+
+  it('calculates confidence: high ≥80, medium ≥55, low <55', () => {
+    // 2 consistent cycles → always low (< 3 required for medium/high)
+    const twoConsistent = [
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+    ];
+    const result1 = estimateOvulation(twoConsistent, '2026-03-01');
+    expect(result1?.confidence).toBe('low'); // less than 3 cycles = always low
+
+    // 3 consistent cycles → medium (score should be ≥ 55)
+    const threeConsistent = [
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+      makeCycle('2026-03-01', 28),
+    ];
+    const result2 = estimateOvulation(threeConsistent, '2026-04-01');
+    expect(result2?.confidence).toBe('medium');
+
+    // 6 consistent cycles → high (score should be ≥ 80)
+    const sixConsistent = [
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+      makeCycle('2026-03-01', 28),
+      makeCycle('2026-04-01', 28),
+      makeCycle('2026-05-01', 28),
+      makeCycle('2026-06-01', 28),
+    ];
+    const result3 = estimateOvulation(sixConsistent, '2026-07-01');
+    expect(result3?.confidence).toBe('high');
+  });
+});
+
+// ─── Integration: Brand-new user flow ──────────────────────────────────────────
+
+describe('CycleIntelligence: brand-new user flow', () => {
+  it('handles complete new-user scenario without crashes', () => {
+    const emptyHistory: CompletedCycle[] = [];
+    const emptyLogs: DailyLogRow[] = [];
+    const currentCycleStart = '2026-04-08';
+
+    // All should return safe null/empty values WITHOUT CRASHING
+    const fertilePrediction = predictFertileWindow(emptyHistory, currentCycleStart);
+    const ovulationEst = estimateOvulation(emptyHistory, currentCycleStart);
+    const symptomStats = buildSymptomStats(emptyLogs);
+    const trendInsight = buildTrendInsight(emptyHistory, emptyLogs);
+    const historyBars = buildCycleHistoryBars(emptyHistory);
+
+    expect(fertilePrediction).toBeNull();
+    expect(ovulationEst).toBeNull();
+    expect(symptomStats).toEqual([]);
+    expect(trendInsight.title).toBe('Keep Logging');
+    expect(historyBars).toEqual([]);
+  });
+
+  it('gracefully transitions from new user to data available', () => {
+    const currentCycleStart = '2026-04-01';
+
+    // Phase 1: Brand new, no history
+    let result1 = estimateOvulation([], currentCycleStart);
+    expect(result1).toBeNull();
+
+    // Phase 2: First cycle completed
+    const cycle1 = [makeCycle('2026-03-01', 28)];
+    let result2 = estimateOvulation(cycle1, currentCycleStart);
+    expect(result2).not.toBeNull();
+    expect(result2?.confidence).toBe('low');
+
+    // Phase 3: More cycles accumulated (medium confidence)
+    const threeCycles = [
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+      makeCycle('2026-03-01', 28),
+    ];
+    let result3 = estimateOvulation(threeCycles, currentCycleStart);
+    expect(result3).not.toBeNull();
+    expect(result3?.confidence).toBe('medium');
+
+    // Phase 4: Six cycles completed (high confidence)
+    const sixCycles = [
+      makeCycle('2025-12-01', 28),
+      makeCycle('2026-01-01', 28),
+      makeCycle('2026-02-01', 28),
+      makeCycle('2026-03-01', 28),
+      makeCycle('2026-04-01', 28),
+      makeCycle('2026-05-01', 28),
+    ];
+    let result4 = estimateOvulation(sixCycles, currentCycleStart);
+    expect(result4).not.toBeNull();
+    expect(result4?.confidence).toBe('high');
   });
 });

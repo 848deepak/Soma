@@ -201,7 +201,12 @@ function movingAverage(cycles: CompletedCycle[], n: number): number {
 
 /** Adds `days` to a "YYYY-MM-DD" string and returns a new "YYYY-MM-DD" string. */
 function addDays(dateStr: string, days: number): string {
+  // Defensive check: ensure dateStr is a valid date string
   const date = new Date(`${dateStr}T00:00:00Z`);
+  if (isNaN(date.getTime())) {
+    // Return original date string if invalid rather than crashing
+    return dateStr;
+  }
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().split('T')[0]!;
 }
@@ -295,6 +300,9 @@ export function predictFertileWindow(
   cycles: CompletedCycle[],
   currentCycleStartDate: string,
 ): FertileWindowPrediction | null {
+  // Defensive checks: ensure we have data to work with
+  if (!cycles || cycles.length === 0 || !currentCycleStartDate) return null;
+
   const recent = lastNCycles(cycles, 6);
   if (recent.length === 0) return null;
 
@@ -362,6 +370,9 @@ export function estimateOvulation(
   cycles: CompletedCycle[],
   currentCycleStartDate: string,
 ): OvulationEstimate | null {
+  // Defensive checks: ensure we have data to work with
+  if (!cycles || cycles.length === 0 || !currentCycleStartDate) return null;
+
   const valid = cycles.filter((c) => c.cycle_length != null && c.end_date != null);
   if (valid.length === 0) return null;
 

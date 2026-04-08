@@ -10,6 +10,7 @@ import { useCycleHistory } from "@/src/domain/cycle";
 import { useTodayLog } from "@/src/domain/calendar";
 import { useProfile } from "@/src/domain/auth";
 import { useRealtimeSync } from "@/src/domain/logging";
+import { useCareCircleSync } from "@/src/domain/careCircle/hooks/useCareCircleSync";
 import {
     estimateOvulation,
     predictFertileWindow,
@@ -213,6 +214,11 @@ export function HomeScreen() {
   const { theme, isDark, colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuthContext();
+
+  // Dev-only render counter to verify memoization of expensive calculations
+  if (__DEV__) {
+    console.log(`[HomeScreen] render ${Date.now()}`);
+  }
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [isLoggingPeriod, setIsLoggingPeriod] = useState(false);
   const [forceShow, setForceShow] = useState(false);
@@ -220,6 +226,7 @@ export function HomeScreen() {
 
   // ─── Real-time Supabase sync ─────────────────────────────────────────────
   useRealtimeSync(user?.id);
+  useCareCircleSync(user?.id);
 
   // ─── Live data hooks ─────────────────────────────────────────────────────
   const {
@@ -325,12 +332,28 @@ export function HomeScreen() {
     [refetchCurrentCycle],
   );
 
-  const fertileWindowPrediction = cycleData?.cycle?.start_date
-    ? predictFertileWindow(cycleHistory, cycleData.cycle.start_date)
-    : null;
-  const ovulationEstimate = cycleData?.cycle?.start_date
-    ? estimateOvulation(cycleHistory, cycleData.cycle.start_date)
-    : null;
+  // Memoize expensive cycle predictions (array iteration + statistical calculations).
+  // Dependencies:
+  //   - cycleData?.cycle?.start_date: scalar string (not entire cycleData object)
+  //   - cycleHistory: reference stable from useCycleHistory hook
+  // This prevents recalculation on unrelated state changes (e.g., theme toggle, modal open).
+  // Console log appears on every render; if predictions stay cached, you'll see renders
+  // without new predictions being calculated.
+  const fertileWindowPrediction = useMemo(
+    () =>
+      cycleData?.cycle?.start_date && cycleHistory?.length
+        ? predictFertileWindow(cycleHistory, cycleData.cycle.start_date)
+        : null,
+    [cycleData?.cycle?.start_date, cycleHistory]
+  );
+
+  const ovulationEstimate = useMemo(
+    () =>
+      cycleData?.cycle?.start_date && cycleHistory?.length
+        ? estimateOvulation(cycleHistory, cycleData.cycle.start_date)
+        : null,
+    [cycleData?.cycle?.start_date, cycleHistory]
+  );
 
   useEffect(() => {
     if (!ovulationEstimate) return;

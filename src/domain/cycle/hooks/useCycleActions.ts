@@ -108,7 +108,10 @@ export async function logPeriodRangeAction({
         }),
       );
 
-      await enqueueSync("cycles", resolvedActiveCycle.id, "upsert", encryptedPayload);
+      const clientWrittenAt = new Date().toISOString();
+      await enqueueSync("cycles", resolvedActiveCycle.id, "upsert", encryptedPayload, {
+        clientWrittenAt,
+      });
       queuedForSync = true;
     }
   } else {
@@ -404,6 +407,7 @@ export async function endCurrentPeriod({
 
     // FALLBACK: Queue for offline sync if network error
     try {
+      const clientWrittenAt = new Date().toISOString();
       await OfflineQueueManager.enqueue(
         "cycles",
         "upsert",
@@ -417,6 +421,7 @@ export async function endCurrentPeriod({
         },
         {
           rowId: resolvedCycle.id,
+          clientWrittenAt,
         },
       );
 

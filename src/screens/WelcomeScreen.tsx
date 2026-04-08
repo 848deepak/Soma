@@ -171,6 +171,20 @@ export function WelcomeScreen() {
   const { user, isAnonymous } = useAuthContext();
   const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useProfile();
 
+  // Detect if user has email but no profile (profile repair failure scenario)
+  const hasRepairFailure = user?.email && !profile && !isProfileLoading;
+
+  // Show error alert if profile repair failed
+  useEffect(() => {
+    if (hasRepairFailure) {
+      Alert.alert(
+        "Account Setup",
+        "We had trouble completing your account setup. Please try again or contact support if the issue persists.",
+        [{ text: "OK", onPress: () => {} }]
+      );
+    }
+  }, [hasRepairFailure]);
+
   const displayName =
     profile?.first_name?.trim() || (isAnonymous ? "Guest User" : "there");
   const username =
@@ -194,7 +208,7 @@ export function WelcomeScreen() {
 
     await AsyncStorage.setItem(HAS_LAUNCHED_KEY, "true");
 
-    if (isProfileError) {
+    if (isProfileError || hasRepairFailure) {
       // Keep users unblocked during transient DB issues without classifying them as new.
       router.replace("/(tabs)" as never);
       return;

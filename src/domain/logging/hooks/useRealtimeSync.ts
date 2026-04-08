@@ -33,13 +33,31 @@ export function useRealtimeSync(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
-    // Guard: prevent duplicate subscriptions if already mounted
-    if (channelsRef.current) {
-      if (__DEV__) {
-        console.warn('[RealtimeSync] Already subscribed for userId:', userId);
+    // Always clean up previous subscriptions first before resubscribing.
+    // This is critical for handling anonymous → email upgrade transitions
+    // where userId changes and we need to subscribe to a different user's channel.
+    const cleanup = () => {
+      if (channelsRef.current) {
+        const { logs, cycles } = channelsRef.current;
+
+        if (logs) {
+          supabase.removeChannel(logs).catch((e) => {
+            console.warn('[RealtimeSync] Failed to remove logsChannel:', e);
+          });
+        }
+
+        if (cycles) {
+          supabase.removeChannel(cycles).catch((e) => {
+            console.warn('[RealtimeSync] Failed to remove cyclesChannel:', e);
+          });
+        }
+
+        channelsRef.current = null;
       }
-      return;
-    }
+    };
+
+    // Remove old channels before subscribing to new ones
+    cleanup();
 
     // ─── Subscribe to daily_logs changes ───────────────────────────────────
     // When a log is inserted/updated, only invalidate that specific date's cache
@@ -144,28 +162,7 @@ export function useRealtimeSync(userId: string | undefined) {
     }
 
     // ─── Cleanup: remove channels on unmount or userId change ────────────────
-    return () => {
-      const { logs, cycles } = channelsRef.current ?? {};
-
-      if (logs) {
-        supabase.removeChannel(logs).catch((e) => {
-          console.warn('[RealtimeSync] Failed to remove logsChannel:', e);
-        });
-      }
-
-      if (cycles) {
-        supabase.removeChannel(cycles).catch((e) => {
-          console.warn('[RealtimeSync] Failed to remove cyclesChannel:', e);
-        });
-      }
-
-      // Clear ref to allow re-subscription on remount
-      channelsRef.current = null;
-
-      if (__DEV__) {
-        console.log('[RealtimeSync] Unsubscribed for userId:', userId);
-      }
-    };
+    return cleanup;
   }, [userId, queryClient]);
 }
 

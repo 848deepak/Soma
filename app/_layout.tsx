@@ -294,6 +294,7 @@ export function AuthBootstrap({
     /**
      * Safely navigate to a route while holding a lock to prevent double navigation.
      * Navigation is guarded: only the first router.replace() call succeeds.
+     * CRITICAL: Set lock BEFORE router.replace() to prevent race conditions.
      */
     const safeNavigate = (destination: string, reason: string) => {
       if (navigationLockRef.current) {
@@ -306,6 +307,7 @@ export function AuthBootstrap({
         }
         return;
       }
+      // CRITICAL: Set lock IMMEDIATELY before any side effects
       navigationLockRef.current = true;
       if (__DEV__) {
         console.log('[Bootstrap] Navigation locked and proceeding to:', {
@@ -313,6 +315,7 @@ export function AuthBootstrap({
           reason,
         });
       }
+      // Now safe to call router.replace - lock is already held
       router.replace(destination as never);
     };
 
@@ -431,14 +434,14 @@ export function AuthBootstrap({
 
         if (profileResult.status === "missing") {
           // User has valid session with email but profile lookup returned null.
-          // Do NOT force re-onboarding. Route to tabs and trigger background repair.
+          // Attempt repair with retries before routing decision.
           if (user.email) {
-            console.log("[Auth] Profile missing but user has email. Routing to tabs and triggering repair:", {
+            console.log("[Auth] Profile missing but user has email. Attempting repair:", {
               userId: user.id,
               email: user.email,
             });
 
-            // Background repair with retries
+            // Repair with retries - AWAIT before routing
             const performRepairWithRetry = async () => {
               for (let i = 0; i < 3; i++) {
                 try {
@@ -450,33 +453,48 @@ export function AuthBootstrap({
               }
             };
 
-            performRepairWithRetry().catch((repairError) => {
+            try {
+              await performRepairWithRetry();
+              // Repair succeeded - proceed to tabs
+              console.log("[Auth] Profile repair succeeded", { userId: user.id });
+              logAuthEvent({
+                type: "bootstrap_routing",
+                userId: user.id,
+                reason: "profile_repair_success",
+                route: "/(tabs)",
+              });
+
+              if (!inAuth && !inOnboarding && currentSegmentRef.current === "(tabs)") {
+                setHasBootstrapped(true);
+                return;
+              }
+              safeNavigate("/(tabs)", "profile_repair_success");
+              setHasBootstrapped(true);
+              return;
+            } catch (repairError) {
+              // Repair failed permanently - route to welcome with error
               console.error("[Auth] Profile repair failed after retries:", repairError);
               logAuthEvent({
                 type: "profile_repair_failure",
                 userId: user.id,
                 error: repairError instanceof Error ? repairError.message : String(repairError),
               });
-              // Route to welcome on profile repair failure, respecting navigation lock
-              if (isMounted && !inOnboarding && !navigationLockRef.current) {
-                safeNavigate("/welcome", "profile_repair_failure");
+
+              // Capture in Sentry for monitoring
+              if (typeof Sentry !== "undefined" && Sentry.captureException) {
+                Sentry.captureException(repairError, {
+                  tags: { source: "profile_repair" },
+                  contexts: { auth: { userId: user.id, email: user.email } },
+                });
               }
-            });
 
-            logAuthEvent({
-              type: "bootstrap_routing",
-              userId: user.id,
-              reason: "profile_repair",
-              route: "/(tabs)",
-            });
-
-            if (!inAuth && !inOnboarding && currentSegmentRef.current === "(tabs)") {
+              // Route to welcome with error state
+              if (isMounted && !inOnboarding && !navigationLockRef.current) {
+                safeNavigate("/welcome", "profile_repair_failed");
+              }
               setHasBootstrapped(true);
               return;
             }
-            safeNavigate("/(tabs)", "profile_repair");
-            setHasBootstrapped(true);
-            return;
           }
 
           // No email - user is anonymous. Route to onboarding.

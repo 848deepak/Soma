@@ -41,7 +41,7 @@ export function useProfile() {
 
   // Use a two-phase approach: first query to get userId, then fetch profile
   // This ensures queryKey includes userId for proper cache matching
-  return useQuery<ProfileRow | null>({
+  const query = useQuery<ProfileRow | null>({
     queryKey: ["_current_user_profile"], // Temporary key during fetch
     queryFn: async () => {
       const {
@@ -99,8 +99,8 @@ export function useProfile() {
       timeout: 3000,
     },
   });
-}
 
+  // Real-time subscription to profile changes (only subscribe when query has data)
   useEffect(() => {
     let channelName: string | null = null;
     let cancelled = false;

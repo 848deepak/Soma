@@ -28,42 +28,57 @@ function isConflictSensitiveTable(table: string): boolean {
   return table === 'daily_logs' || table === 'cycles';
 }
 
-async function hasNewerServerRecord(
+async function fetchServerRecord(
   table: string,
   payload: Record<string, unknown>,
-): Promise<{ stale: boolean; error?: string }> {
-  const incomingUpdatedAt = parseIsoTimestamp(payload.updated_at);
-  if (!incomingUpdatedAt) return { stale: false };
-
-  let query = supabase.from(table).select('updated_at').limit(1);
+): Promise<{ data: Record<string, unknown> | null; error?: string }> {
+  let query = supabase.from(table).select('*').limit(1);
 
   if (table === 'daily_logs') {
     const userId = payload.user_id;
     const date = payload.date;
     if (typeof userId !== 'string' || typeof date !== 'string') {
-      return { stale: false };
+      return { data: null };
     }
     query = query.eq('user_id', userId).eq('date', date);
   } else if (table === 'cycles') {
     const userId = payload.user_id;
     const startDate = payload.start_date;
     if (typeof userId !== 'string' || typeof startDate !== 'string') {
-      return { stale: false };
+      return { data: null };
     }
     query = query.eq('user_id', userId).eq('start_date', startDate);
   } else {
-    return { stale: false };
+    return { data: null };
   }
 
   const { data, error } = await query.maybeSingle();
   if (error) {
-    return { stale: false, error: error.message };
+    return { data: null, error: error.message };
   }
 
-  const serverUpdatedAt = parseIsoTimestamp((data as { updated_at?: unknown } | null)?.updated_at);
+  return { data: (data as Record<string, unknown>) ?? null };
+}
+
+async function hasNewerServerRecord(
+  table: string,
+  payload: Record<string, unknown>,
+): Promise<{ stale: boolean; error?: string; serverData?: Record<string, unknown> }> {
+  const incomingUpdatedAt = parseIsoTimestamp(payload.updated_at);
+  if (!incomingUpdatedAt) return { stale: false };
+
+  const { data: serverRecord, error: fetchError } = await fetchServerRecord(table, payload);
+  if (fetchError) {
+    return { stale: false, error: fetchError };
+  }
+
+  if (!serverRecord) return { stale: false };
+
+  const serverUpdatedAt = parseIsoTimestamp((serverRecord as any)?.updated_at);
   if (!serverUpdatedAt) return { stale: false };
 
-  return { stale: serverUpdatedAt > incomingUpdatedAt };
+  const isStale = serverUpdatedAt > incomingUpdatedAt;
+  return { stale: isStale, serverData: isStale ? serverRecord : undefined };
 }
 
 export type SupabaseSyncPayload = {
@@ -79,6 +94,8 @@ export type SupabaseSyncPayload = {
 export type PushResult = {
   ok: boolean;
   error?: string;
+  conflict?: boolean; // True if server had newer data (409 Conflict scenario)
+  serverData?: Record<string, unknown>; // Server's newer data if conflict detected
 };
 
 export const supabaseService = {
@@ -90,7 +107,9 @@ export const supabaseService = {
         if (conflictCheck.stale) {
           return {
             ok: false,
+            conflict: true,
             error: 'Stale payload rejected: server already has newer data',
+            serverData: conflictCheck.serverData,
           };
         }
       }

@@ -42,6 +42,8 @@ export interface QueuedOperation {
   requestId: string;
   /** Timestamp operation was enqueued (ISO string) */
   enqueuedAt: string;
+  /** Timestamp when this data was originally written by the client (ISO string) */
+  clientWrittenAt?: string;
   /** Table name (e.g., 'daily_logs', 'profiles', 'cycles') */
   table: string;
   /** Operation type: 'insert', 'update', 'upsert', 'delete' */
@@ -58,6 +60,10 @@ export interface QueuedOperation {
   lastError?: string;
   /** Timestamp of last retry (ISO string) */
   lastAttemptAt?: string;
+  /** True if server had newer data when this operation was attempted (conflict) */
+  serverConflict?: boolean;
+  /** Server data that overwrote this operation (for conflict resolution) */
+  serverConflictData?: Record<string, unknown>;
 }
 
 export interface DeadLetterEntry {
@@ -84,6 +90,13 @@ export interface FlushResult {
   skipped: boolean;
   /** Errors encountered during flush */
   errors: Array<{ requestId: string; reason: string }>;
+  /** Conflicts where server data overwrote local changes */
+  conflicts: Array<{
+    requestId: string;
+    table: string;
+    clientWrittenAt?: string;
+    serverData: Record<string, unknown>;
+  }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +123,7 @@ export class OfflineQueueManager {
     options?: {
       rowId?: string;
       maxAttempts?: number;
+      clientWrittenAt?: string;
     },
   ): Promise<string> {
     const requestId = uuid();
@@ -118,6 +132,7 @@ export class OfflineQueueManager {
     const queued: QueuedOperation = {
       requestId,
       enqueuedAt: now,
+      clientWrittenAt: options?.clientWrittenAt ?? now,
       table,
       operation,
       payload,
@@ -182,11 +197,11 @@ export class OfflineQueueManager {
    * Process the queue (called when network is restored).
    *
    * @param syncFn - Async function that performs the actual sync.
-   *                 Should throw on network error, return { ok: true/false } on result.
+   *                 Should throw on network error, return { ok: true/false, conflict?: true, serverData?: ... } on result.
    * @returns FlushResult with counts and any errors that occurred.
    */
   static async flushQueue(
-    syncFn: (op: QueuedOperation) => Promise<{ ok: boolean; error?: string }>,
+    syncFn: (op: QueuedOperation) => Promise<{ ok: boolean; error?: string; conflict?: boolean; serverData?: Record<string, unknown> }>,
   ): Promise<FlushResult> {
     const result: FlushResult = {
       synced: 0,
@@ -194,6 +209,7 @@ export class OfflineQueueManager {
       deadLettered: 0,
       skipped: false,
       errors: [],
+      conflicts: [],
     };
 
     try {
@@ -235,6 +251,26 @@ export class OfflineQueueManager {
             logDataEvent('offline_queue_operation_synced', { requestId: op.requestId });
             result.synced++;
             // Do NOT add to updatedQueue (effectively dequeuing)
+          } else if (syncResult.conflict) {
+            // CONFLICT: server had newer data - capture it and mark as success (no retry)
+            logWarn('offline_queue', 'offline_queue_operation_conflict_detected', {
+              requestId: op.requestId,
+              table: op.table,
+              clientWrittenAt: op.clientWrittenAt,
+              serverUpdatedAt: (syncResult.serverData as any)?.updated_at,
+            });
+
+            result.conflicts.push({
+              requestId: op.requestId,
+              table: op.table,
+              clientWrittenAt: op.clientWrittenAt,
+              serverData: syncResult.serverData || {},
+            });
+
+            op.serverConflict = true;
+            op.serverConflictData = syncResult.serverData;
+            result.synced++; // Count as success (data was saved)
+            // Do NOT add to updatedQueue (dequeue and don't retry)
           } else if (syncResult.error?.includes('409') || syncResult.error?.includes('duplicate')) {
             // 409 Conflict: operation was already applied (idempotent success)
             logDataEvent('offline_queue_operation_idempotent_success', {
@@ -323,6 +359,7 @@ export class OfflineQueueManager {
         synced: result.synced,
         failed: result.failed,
         deadLettered: result.deadLettered,
+        conflicts: result.conflicts.length,
       });
       return result;
     } catch (err) {
@@ -405,7 +442,7 @@ export class OfflineQueueManager {
   }
 
   private static async processDeadLetterQueue(
-    syncFn: (op: QueuedOperation) => Promise<{ ok: boolean; error?: string }>,
+    syncFn: (op: QueuedOperation) => Promise<{ ok: boolean; error?: string; conflict?: boolean; serverData?: Record<string, unknown> }>,
     result: FlushResult,
   ): Promise<FlushResult> {
     const deadLetters = await this.getDeadLetterQueue();
@@ -424,6 +461,19 @@ export class OfflineQueueManager {
           logDataEvent('offline_queue_deadletter_recovered', { requestId: entry.requestId });
           result.synced++;
           // Dequeue from dead-letter
+        } else if (syncResult.conflict) {
+          // Conflict detected during dead-letter recovery
+          logWarn('offline_queue', 'offline_queue_deadletter_conflict', {
+            requestId: entry.requestId,
+            table: entry.operation.table,
+          });
+          result.conflicts.push({
+            requestId: entry.requestId,
+            table: entry.operation.table,
+            clientWrittenAt: entry.operation.clientWrittenAt,
+            serverData: syncResult.serverData || {},
+          });
+          result.synced++; // Don't keep in dead-letter
         } else {
           // Still failing; keep in dead-letter
           remainingDeadLetters.push(entry);
