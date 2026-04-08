@@ -1,3 +1,50 @@
-# Minimal config to keep Labeler workflow healthy.
-# Add path-to-label mappings here as needed.
-{}
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/domain/validators/**'
+          - 'src/services/OfflineSyncService.ts'
+          - 'src/services/OfflineQueueManager.ts'
+          - 'scripts/security-*.sh'
+          - 'docs/SECURITY_*.md'
+          - 'docs/RLS_*.md'
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '__tests__/**'
+          - '*.test.ts'
+          - '*.test.tsx'
+
+performance:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'lib/queryClient.ts'
+          - 'lib/bootstrapRPC.ts'
+          - 'src/domain/logging/hooks/useRealtimeSync.ts'
+          - 'hooks/useDailyLogs.ts'
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/domain/**'
+          - 'src/services/**'
+          - 'types/database.ts'
+
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/screens/**'
+          - 'src/components/**'
+          - 'src/context/ThemeContext.tsx'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'scripts/**'
