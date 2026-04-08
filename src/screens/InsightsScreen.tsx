@@ -16,13 +16,24 @@ import { Typography } from "@/src/components/ui/Typography";
 import { useAppTheme } from "@/src/context/ThemeContext";
 import { logDataAccess } from "@/src/services/auditService";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
+import { ScreenError } from "@/src/components/ScreenError";
 
 export function InsightsScreen() {
   const { theme, isDark, colors } = useAppTheme();
   const nonDarkBarSurface =
     theme === "lavender" ? "rgba(193,187,221,0.25)" : "rgba(255,218,185,0.25)";
-  const { data: cycles = [], isLoading: cyclesLoading } = useCycleHistory(6);
-  const { data: logs = [], isLoading: logsLoading } = useDailyLogs(90);
+  const {
+    data: cycles = [],
+    isLoading: cyclesLoading,
+    error: cyclesError,
+    refetch: refetchCycles,
+  } = useCycleHistory(6);
+  const {
+    data: logs = [],
+    isLoading: logsLoading,
+    error: logsError,
+    refetch: refetchLogs,
+  } = useDailyLogs(90);
 
   const bars = useMemo(() => buildCycleHistoryBars(cycles), [cycles]);
   const symptomStats = useMemo(() => buildSymptomStats(logs), [logs]);
@@ -32,6 +43,28 @@ export function InsightsScreen() {
   );
 
   const isLoading = cyclesLoading || logsLoading;
+  const insightsError =
+    cyclesError instanceof Error
+      ? cyclesError
+      : logsError instanceof Error
+        ? logsError
+        : null;
+
+  if (insightsError) {
+    return (
+      <Screen>
+        <HeaderBar title={"Body\nTrends"} />
+        <ScreenError
+          screenName="InsightsScreen"
+          error={insightsError}
+          onRetry={() => {
+            void refetchCycles();
+            void refetchLogs();
+          }}
+        />
+      </Screen>
+    );
+  }
 
   useEffect(() => {
     if (isLoading) return;

@@ -536,6 +536,7 @@ function RootAppShell() {
   const { isHydrated: isThemeHydrated, navigationTheme } = useAppTheme();
   const [appReady, setAppReady] = useState(false);
   const [authBootstrapped, setAuthBootstrapped] = useState(false);
+  const [showSlowNetworkHint, setShowSlowNetworkHint] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     "PlayfairDisplay-Regular": PlayfairDisplay_400Regular,
@@ -556,9 +557,24 @@ function RootAppShell() {
   // Enhanced app readiness check - wait for fonts AND auth bootstrap.
   useEffect(() => {
     if ((fontsLoaded || fontError) && authBootstrapped && isThemeHydrated) {
+      setShowSlowNetworkHint(false);
       setAppReady(true);
     }
   }, [fontsLoaded, fontError, authBootstrapped, isThemeHydrated]);
+
+  // Show a subtle connectivity hint if initial bootstrap takes >5s.
+  useEffect(() => {
+    if (appReady || authBootstrapped) {
+      setShowSlowNetworkHint(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowSlowNetworkHint(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [appReady, authBootstrapped]);
 
   // Fail-safe so startup never hangs if auth/network is slow.
   useEffect(() => {
@@ -574,9 +590,15 @@ function RootAppShell() {
     return (
       <SomaLoadingSplash
         subtitle="SOMA"
+        hintText={
+          showSlowNetworkHint
+            ? "Taking longer than usual. Check your connection."
+            : undefined
+        }
         timeout={9000}
         onTimeout={() => {
           setAuthBootstrapped(true);
+          setShowSlowNetworkHint(false);
           setAppReady(true);
         }}
       />
@@ -591,7 +613,10 @@ function RootAppShell() {
             <QueryClientProvider client={queryClient}>
               <AuthProvider>
                 <AuthBootstrap
-                  onBootstrapComplete={() => setAuthBootstrapped(true)}
+                    onBootstrapComplete={() => {
+                      setShowSlowNetworkHint(false);
+                      setAuthBootstrapped(true);
+                    }}
                 >
                   <NavigationThemeProvider value={navigationTheme}>
                     <Stack>

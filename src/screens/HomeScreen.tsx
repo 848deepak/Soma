@@ -26,6 +26,7 @@ import { logDataAccess } from "@/src/services/auditService";
 import { logWarn } from "@/platform/monitoring/logger";
 import { useOfflineQueue } from "@/src/store/useOfflineQueue";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
+import { ScreenError } from "@/src/components/ScreenError";
 import { SymbolView } from "expo-symbols";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -392,6 +393,29 @@ export function HomeScreen() {
         onTimeout={() => setForceShow(true)}
         subtitle="Preparing your personal cycle insights..."
       />
+    );
+  }
+
+  const homeQueryError =
+    profileError instanceof Error
+      ? profileError
+      : todayError instanceof Error
+        ? todayError
+        : cycleError instanceof Error
+          ? cycleError
+          : null;
+
+  if (homeQueryError) {
+    return (
+      <Screen>
+        <ScreenError
+          screenName="HomeScreen"
+          error={homeQueryError}
+          onRetry={() => {
+            void refetchCurrentCycle();
+          }}
+        />
+      </Screen>
     );
   }
 

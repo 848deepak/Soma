@@ -189,10 +189,10 @@ export function SettingsScreen() {
 
   async function handleLogout() {
     void HapticsService.impactMedium();
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Sign Out",
+        text: "Log Out",
         style: "destructive",
         onPress: async () => {
           setIsLoggingOut(true);

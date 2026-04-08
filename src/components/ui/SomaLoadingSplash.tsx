@@ -15,12 +15,15 @@ interface SomaLoadingSplashProps {
   onTimeout?: () => void;
   /** Optional subtitle text */
   subtitle?: string;
+  /** Optional secondary hint shown under subtitle */
+  hintText?: string;
 }
 
 export function SomaLoadingSplash({
   timeout = 20000,
   onTimeout,
   subtitle = "cycle intelligence",
+  hintText,
 }: SomaLoadingSplashProps) {
   const { isDark, theme } = useAppTheme();
   const [opacity] = useState(new Animated.Value(0));
@@ -168,6 +171,21 @@ export function SomaLoadingSplash({
       >
         {subtitle}
       </Text>
+
+      {hintText ? (
+        <Text
+          style={{
+            marginTop: 8,
+            fontSize: 13,
+            color: palette.subtitle,
+            opacity: 0.85,
+            textAlign: "center",
+            paddingHorizontal: 32,
+          }}
+        >
+          {hintText}
+        </Text>
+      ) : null}
     </Animated.View>
   );
 }

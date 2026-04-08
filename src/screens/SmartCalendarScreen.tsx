@@ -23,6 +23,7 @@ import { useCurrentCycle } from "@/src/domain/cycle";
 import { useQueryClient } from "@tanstack/react-query";
 import { CURRENT_CYCLE_KEY } from "@/src/domain/cycle";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
+import { ScreenError } from "@/src/components/ScreenError";
 import { CalendarHeader } from "@/src/components/calendar/CalendarHeader";
 import {
     dayIso,
@@ -47,6 +48,8 @@ import {
 } from "@/src/features/cycle/uiCycleData";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import { cycleCalendarMotion, cycleCalendarTheme } from "@/src/theme/tokens";
+import { DAILY_LOGS_DATE_RANGE_KEY } from "@/src/domain/calendar/hooks/useDailyLogs";
+import { CYCLE_HISTORY_KEY } from "@/src/domain/cycle/hooks/useCycleHistory";
 
 export type { CycleDataMap, CycleStatus };
 
@@ -88,10 +91,56 @@ export function SmartCalendarScreen({ cycleData }: CalendarScreenProps) {
     visibleMonth,
     visibleYear,
   });
-  const { data: currentCycle } = useCurrentCycle();
+  const { data: currentCycle, error: currentCycleError } = useCurrentCycle();
   const startCycleMutation = useStartNewCycle();
   const endCycleMutation = useEndCurrentCycle();
   const hasActivePeriod = Boolean(currentCycle?.cycle?.id);
+
+  const getVisibleDateRange = (month: number, year: number): [string, string] => {
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const fromDate = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-01`;
+
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    const lastDayOfNext = new Date(nextYear, nextMonth + 1, 0).getDate();
+    const toDate = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(lastDayOfNext).padStart(2, "0")}`;
+
+    return [fromDate, toDate];
+  };
+
+  const [fromDate, toDate] = getVisibleDateRange(visibleMonth, visibleYear);
+  const calendarHistoryState = queryClient.getQueryState(CYCLE_HISTORY_KEY(8));
+  const calendarDailyLogsState = queryClient.getQueryState(
+    DAILY_LOGS_DATE_RANGE_KEY(fromDate, toDate),
+  );
+
+  const calendarError =
+    currentCycleError instanceof Error
+      ? currentCycleError
+      : calendarHistoryState?.error instanceof Error
+        ? calendarHistoryState.error
+        : calendarDailyLogsState?.error instanceof Error
+          ? calendarDailyLogsState.error
+          : null;
+
+  if (calendarError) {
+    return (
+      <Screen scrollable={false} showAurora={false}>
+        <ScreenError
+          screenName="SmartCalendarScreen"
+          error={calendarError}
+          onRetry={() => {
+            void queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
+            void queryClient.invalidateQueries({ queryKey: CYCLE_HISTORY_KEY(8) });
+            void queryClient.invalidateQueries({
+              queryKey: DAILY_LOGS_DATE_RANGE_KEY(fromDate, toDate),
+            });
+          }}
+        />
+      </Screen>
+    );
+  }
 
   const monthContainerStyle = useAnimatedStyle(() => ({
     opacity: monthOpacity.value,
