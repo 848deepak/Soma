@@ -20,7 +20,11 @@ const mockEmailUser = {
 
 export const getCurrentUser = jest.fn().mockResolvedValue(mockUser);
 
+export const ensureProfileRow = jest.fn().mockResolvedValue(undefined);
+
 export const ensureAnonymousSession = jest.fn().mockResolvedValue(mockUser);
+
+export const getProfile = jest.fn().mockResolvedValue(null);
 
 export const signUpWithEmail = jest.fn().mockResolvedValue(mockEmailUser);
 

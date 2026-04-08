@@ -39,6 +39,7 @@ import {
 } from "@/src/services/notificationService/pushTokenService";
 import { logAuthEvent } from "@/lib/logAuthEvent";
 import { ensureProfileRow } from "@/lib/auth";
+import { RootErrorBoundaryWithRouterContext } from "@/app/components/SomaRootErrorBoundary";
 
 // ─── Observability bootstrap ────────────────────────────────────────────────
 // Both services are opt-in: they only activate when the corresponding
@@ -203,7 +204,7 @@ async function fetchProfileForBootstrap(userId: string): Promise<BootstrapProfil
  *  Returning email:   (already has session)  onboarding check → Tabs
  *  Returning anon:    Tabs directly (skip login prompt)
  */
-function AuthBootstrap({
+export function AuthBootstrap({
   children,
   onBootstrapComplete,
 }: {
@@ -250,8 +251,28 @@ function AuthBootstrap({
     let unsubscribe: () => void = () => {
       return;
     };
+
+    // Whitelist of allowed deep link routes to prevent unauthorized navigation
+    const ALLOWED_DEEP_LINK_ROUTES = [
+      '/(tabs)',
+      '/(tabs)/home',
+      '/log',
+      '/quick-checkin',
+      '/partner',
+      '/insights',
+      '/calendar',
+    ];
+
     void startNotificationListeners((data) => {
       if (typeof data.route === "string" && data.route.length > 0) {
+        // Validate route against whitelist before navigation
+        if (!ALLOWED_DEEP_LINK_ROUTES.includes(data.route)) {
+          console.warn('[DeepLink] Blocked invalid deep link route:', {
+            route: data.route,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        }
         router.push(data.route as never);
       }
     }).then((cleanup) => {
@@ -391,14 +412,29 @@ function AuthBootstrap({
               email: user.email,
             });
 
-            // Background repair - don't block routing
-            ensureProfileRow(user.id).catch((repairError) => {
-              console.error("[Auth] Profile repair failed:", repairError);
+            // Background repair with retries
+            const performRepairWithRetry = async () => {
+              for (let i = 0; i < 3; i++) {
+                try {
+                  return await ensureProfileRow(user.id);
+                } catch (e) {
+                  if (i === 2) throw e;
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+              }
+            };
+
+            performRepairWithRetry().catch((repairError) => {
+              console.error("[Auth] Profile repair failed after retries:", repairError);
               logAuthEvent({
                 type: "profile_repair_failure",
                 userId: user.id,
                 error: repairError instanceof Error ? repairError.message : String(repairError),
               });
+              // Route to welcome on profile repair failure
+              if (isMounted && !inOnboarding) {
+                router.replace("/welcome" as never);
+              }
             });
 
             logAuthEvent({
@@ -671,9 +707,12 @@ function RootAppShell() {
 }
 
 export default function RootLayout() {
+  const router = useRouter();
   return (
-    <ThemeProvider>
-      <RootAppShell />
-    </ThemeProvider>
+    <RootErrorBoundaryWithRouterContext router={router}>
+      <ThemeProvider>
+        <RootAppShell />
+      </ThemeProvider>
+    </RootErrorBoundaryWithRouterContext>
   );
 }

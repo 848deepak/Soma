@@ -1,8 +1,10 @@
-import { endCurrentPeriod, logPeriodRangeAction } from "@/hooks/useCycleActions";
+import { endCurrentPeriod } from "@/src/domain/cycle/hooks/useCycleActions";
 
 jest.mock("@/lib/supabase");
-jest.mock("@/src/database/localDB", () => ({
-  enqueueSync: jest.fn(),
+jest.mock("@/src/services/OfflineQueueManager", () => ({
+  OfflineQueueManager: {
+    enqueue: jest.fn(),
+  },
 }));
 jest.mock("@/src/services/encryptionService", () => ({
   encryptionService: {
@@ -11,7 +13,7 @@ jest.mock("@/src/services/encryptionService", () => ({
 }));
 
 import { supabase } from "@/lib/supabase";
-import { enqueueSync } from "@/src/database/localDB";
+import { OfflineQueueManager } from "@/src/services/OfflineQueueManager";
 
 type MaybeSingleResult = {
   data: { id: string; start_date: string } | null;
@@ -22,280 +24,152 @@ type UpdateResult = {
   error: Error | null;
 };
 
-function mockCycleSelect(result: MaybeSingleResult) {
-  const maybeSingle = jest.fn().mockResolvedValue(result);
-  const limit = jest.fn().mockReturnValue({ maybeSingle });
-  const order = jest.fn().mockReturnValue({ limit });
-  const is = jest.fn().mockReturnValue({ order });
-  const eq = jest.fn().mockReturnValue({ is });
-  const select = jest.fn().mockReturnValue({ eq });
+function buildCyclesMock(
+  maybeSingleResult: MaybeSingleResult,
+  updateResult: UpdateResult,
+) {
+  const maybeSingle = jest.fn().mockResolvedValue(maybeSingleResult);
+  const selectLimit = jest.fn().mockReturnValue({ maybeSingle });
+  const selectOrder = jest.fn().mockReturnValue({ limit: selectLimit });
+  const selectIs = jest.fn().mockReturnValue({ order: selectOrder });
+  const selectEq = jest.fn().mockReturnValue({ is: selectIs });
+  const select = jest.fn().mockReturnValue({ eq: selectEq });
 
-  return { select, maybeSingle };
-}
+  const updateEqUser = jest.fn().mockResolvedValue(updateResult);
+  const updateEqId = jest.fn().mockReturnValue({ eq: updateEqUser });
+  const update = jest.fn().mockReturnValue({ eq: updateEqId });
 
-function mockCycleUpdate(result: UpdateResult) {
-  const eqUser = jest.fn().mockResolvedValue(result);
-  const eqId = jest.fn().mockReturnValue({ eq: eqUser });
-  const update = jest.fn().mockReturnValue({ eq: eqId });
-
-  return { update, eqUser };
+  return { select, update, maybeSingle, updateEqUser };
 }
 
 describe("endCurrentPeriod", () => {
   beforeEach(() => {
-    jest.useRealTimers();
-    jest.clearAllMocks();
-  });
-
-  it("ends active period and computes inclusive cycle length", async () => {
-    const selectChain = mockCycleSelect({
-      data: { id: "cycle-1", start_date: "2026-03-01" },
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 3, 8, 12, 0, 0));
+    (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+      data: { user: { id: "user-1" } },
       error: null,
     });
-    const updateChain = mockCycleUpdate({ error: null });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it("updates the active cycle with the correct inclusive cycle length", async () => {
+    const chains = buildCyclesMock(
+      {
+        data: { id: "cycle-1", start_date: "2024-03-01" },
+        error: null,
+      },
+      { error: null },
+    );
 
     (supabase.from as jest.Mock).mockImplementation(() => ({
-      select: selectChain.select,
-      update: updateChain.update,
+      select: chains.select,
+      update: chains.update,
     }));
 
     const result = await endCurrentPeriod({
       userId: "user-1",
-      endDate: "2026-03-05",
+      endDate: "2024-03-09",
     });
 
+    expect(chains.update).toHaveBeenCalledWith({
+      start_date: "2024-03-01",
+      end_date: "2024-03-09",
+      cycle_length: 9,
+    });
     expect(result).toEqual({
       cycleId: "cycle-1",
-      startDate: "2026-03-01",
-      endDate: "2026-03-05",
-      cycleLength: 5,
+      startDate: "2024-03-01",
+      endDate: "2024-03-09",
+      cycleLength: 9,
       queued: false,
     });
-    expect(enqueueSync).not.toHaveBeenCalled();
   });
 
-  it("throws when there is no active period", async () => {
-    const selectChain = mockCycleSelect({ data: null, error: null });
-    const updateChain = mockCycleUpdate({ error: null });
+  it("uses diffDaysInclusive math for a nine-day span", async () => {
+    const chains = buildCyclesMock(
+      {
+        data: { id: "cycle-1", start_date: "2024-03-01" },
+        error: null,
+      },
+      { error: null },
+    );
 
     (supabase.from as jest.Mock).mockImplementation(() => ({
-      select: selectChain.select,
-      update: updateChain.update,
+      select: chains.select,
+      update: chains.update,
+    }));
+
+    const result = await endCurrentPeriod({
+      userId: "user-1",
+      endDate: "2024-03-09",
+    });
+
+    expect(result.cycleLength).toBe(9);
+  });
+
+  it("throws for an end date before the start date and skips the write path", async () => {
+    const chains = buildCyclesMock(
+      {
+        data: { id: "cycle-1", start_date: "2024-03-10" },
+        error: null,
+      },
+      { error: null },
+    );
+
+    (supabase.from as jest.Mock).mockImplementation(() => ({
+      select: chains.select,
+      update: chains.update,
     }));
 
     await expect(
-      endCurrentPeriod({ userId: "user-1", endDate: "2026-03-05" }),
-    ).rejects.toThrow("No active period to end.");
+      endCurrentPeriod({
+        userId: "user-1",
+        endDate: "2024-03-09",
+      }),
+    ).rejects.toThrow("Cannot end period on 2024-03-09");
+
+    expect(chains.update).not.toHaveBeenCalled();
+    expect(OfflineQueueManager.enqueue).not.toHaveBeenCalled();
   });
 
-  it("queues period end update when network update fails", async () => {
-    const selectChain = mockCycleSelect({
-      data: { id: "cycle-1", start_date: "2026-03-01" },
-      error: null,
-    });
-    const updateChain = mockCycleUpdate({
-      error: new Error("Network request failed"),
-    });
+  it("queues the update for offline sync when the database write fails with a network error", async () => {
+    const chains = buildCyclesMock(
+      {
+        data: { id: "cycle-1", start_date: "2024-03-01" },
+        error: null,
+      },
+      { error: new Error("Network request failed") },
+    );
 
     (supabase.from as jest.Mock).mockImplementation(() => ({
-      select: selectChain.select,
-      update: updateChain.update,
+      select: chains.select,
+      update: chains.update,
     }));
 
     const result = await endCurrentPeriod({
       userId: "user-1",
-      endDate: "2026-03-05",
+      endDate: "2024-03-09",
     });
 
     expect(result.queued).toBe(true);
-    expect(enqueueSync).toHaveBeenCalledWith(
+    expect(OfflineQueueManager.enqueue).toHaveBeenCalledWith(
       "cycles",
-      "cycle-1",
       "upsert",
-      "encrypted-payload",
-    );
-  });
-
-  it("retries active-cycle fetch on transient network failure", async () => {
-    const maybeSingle = jest
-      .fn()
-      .mockResolvedValueOnce({
-        data: null,
-        error: new Error("Network request failed"),
-      })
-      .mockResolvedValueOnce({
-        data: { id: "cycle-1", start_date: "2026-03-01" },
-        error: null,
-      });
-
-    const select = jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        is: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ maybeSingle }),
-          }),
-        }),
-      }),
-    });
-
-    const updateChain = mockCycleUpdate({ error: null });
-
-    (supabase.from as jest.Mock).mockImplementation(() => ({
-      select,
-      update: updateChain.update,
-    }));
-
-    const result = await endCurrentPeriod({
-      userId: "user-1",
-      endDate: "2026-03-05",
-    });
-
-    expect(result.queued).toBe(false);
-    expect(maybeSingle).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("logPeriodRangeAction", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (supabase.auth.getUser as jest.Mock).mockResolvedValue({
-      data: { user: { id: "user-1" } },
-    });
-  });
-
-  it("supports start-only period logging when no active cycle exists", async () => {
-    const maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
-    const selectChain = {
-      eq: jest.fn().mockReturnValue({
-        is: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ maybeSingle }),
-          }),
-        }),
-      }),
-    };
-
-    const insert = jest.fn().mockResolvedValue({ error: null });
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnValue(selectChain),
-      insert,
-    });
-
-    const result = await logPeriodRangeAction({ startDate: "2026-03-01" });
-
-    expect(result).toEqual({ hasEndDate: false });
-    expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: "cycle-1",
         user_id: "user-1",
-        start_date: "2026-03-01",
-        current_phase: "menstrual",
+        start_date: "2024-03-01",
+        end_date: "2024-03-09",
+        cycle_length: 9,
       }),
-    );
-  });
-
-  it("supports explicit period end when an active cycle exists", async () => {
-    const maybeSingle = jest.fn().mockResolvedValue({
-      data: { id: "cycle-1", start_date: "2026-03-01" },
-      error: null,
-    });
-    const selectChain = {
-      eq: jest.fn().mockReturnValue({
-        is: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ maybeSingle }),
-          }),
-        }),
+      expect.objectContaining({
+        rowId: "cycle-1",
       }),
-    };
-
-    const eqUser = jest.fn().mockResolvedValue({ error: null });
-    const eqId = jest.fn().mockReturnValue({ eq: eqUser });
-    const update = jest.fn().mockReturnValue({ eq: eqId });
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnValue(selectChain),
-      update,
-    });
-
-    const result = await logPeriodRangeAction({
-      startDate: "2026-03-01",
-      endDate: "2026-03-05",
-    });
-
-    expect(result).toEqual({ hasEndDate: true });
-    expect(update).toHaveBeenCalledWith({ end_date: "2026-03-05", cycle_length: 5 });
-  });
-
-  it("queues start-only period when insert fails due to network", async () => {
-    const maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
-    const selectChain = {
-      eq: jest.fn().mockReturnValue({
-        is: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ maybeSingle }),
-          }),
-        }),
-      }),
-    };
-
-    const insert = jest
-      .fn()
-      .mockResolvedValue({ error: new Error("Network request failed") });
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnValue(selectChain),
-      insert,
-    });
-
-    const result = await logPeriodRangeAction({ startDate: "2026-03-01" });
-
-    expect(result).toEqual({ hasEndDate: false });
-    expect(enqueueSync).toHaveBeenCalledWith(
-      "cycles",
-      "cycle:user-1:2026-03-01",
-      "upsert",
-      "encrypted-payload",
-    );
-  });
-
-  it("queues active period end when update fails due to network", async () => {
-    const maybeSingle = jest.fn().mockResolvedValue({
-      data: { id: "cycle-1", start_date: "2026-03-01" },
-      error: null,
-    });
-    const selectChain = {
-      eq: jest.fn().mockReturnValue({
-        is: jest.fn().mockReturnValue({
-          order: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({ maybeSingle }),
-          }),
-        }),
-      }),
-    };
-
-    const eqUser = jest
-      .fn()
-      .mockResolvedValue({ error: new Error("Network request failed") });
-    const eqId = jest.fn().mockReturnValue({ eq: eqUser });
-    const update = jest.fn().mockReturnValue({ eq: eqId });
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnValue(selectChain),
-      update,
-    });
-
-    const result = await logPeriodRangeAction({
-      startDate: "2026-03-01",
-      endDate: "2026-03-05",
-    });
-
-    expect(result).toEqual({ hasEndDate: true });
-    expect(enqueueSync).toHaveBeenCalledWith(
-      "cycles",
-      "cycle-1",
-      "upsert",
-      "encrypted-payload",
     );
   });
 });

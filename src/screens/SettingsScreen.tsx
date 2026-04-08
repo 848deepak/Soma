@@ -24,6 +24,7 @@ import {
   useProfile,
   useUpdateNotificationPreferences,
 } from "@/src/domain/auth";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
@@ -84,8 +85,8 @@ export function SettingsScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const { data: currentCycleData } = useCurrentCycle(
-    profile?.cycle_length_average ?? 28,
-    profile?.period_duration_average ?? 5,
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH,
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
   );
 
   useEffect(() => {
@@ -324,8 +325,10 @@ export function SettingsScreen() {
   }
 
   function handleResetPredictions() {
-    const cycleLengthValue = profile?.cycle_length_average ?? 28;
-    const periodDurationValue = profile?.period_duration_average ?? 5;
+    const cycleLengthValue =
+      profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH;
+    const periodDurationValue =
+      profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION;
 
     Alert.alert(
       "Reset predictions?",
@@ -519,8 +522,8 @@ export function SettingsScreen() {
       <PreferencesSection
         isDark={isDark}
         sectionStyle={primarySectionStyle}
-        cycleLength={String(profile?.cycle_length_average ?? 28)}
-        periodDuration={String(profile?.period_duration_average ?? 5)}
+        cycleLength={String(profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH)}
+        periodDuration={String(profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION)}
         openCycleLength={() => router.push("/settings/cycle-length" as never)}
         openPeriodDuration={() => router.push("/settings/period-duration" as never)}
       />

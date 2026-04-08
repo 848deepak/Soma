@@ -1,3 +1,4 @@
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
@@ -236,8 +237,8 @@ export function HomeScreen() {
     error: cycleError,
     refetch: refetchCurrentCycle,
   } = useCurrentCycle(
-    profile?.cycle_length_average ?? 28,
-    profile?.period_duration_average ?? 5,
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH,
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
   );
   const { data: cycleHistory = [] } = useCycleHistory(6);
 
@@ -282,7 +283,7 @@ export function HomeScreen() {
     () =>
       buildMiniCalendar(
         cycleData?.cycle ?? null,
-        profile?.period_duration_average ?? 5,
+        profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
       ),
     [cycleData?.cycle, profile?.period_duration_average],
   );

@@ -10,7 +10,14 @@ import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import type { CyclePhase, CycleRow } from "@/types/database";
-import { diffDaysExclusive, parseLocalDate, dateRange as computeDateRange, addDays } from "@/src/domain/utils/dateUtils";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
+import {
+  diffDaysExclusive,
+  parseLocalDate,
+  dateRange as computeDateRange,
+  addDays,
+  todayLocal,
+} from "@/src/domain/utils/dateUtils";
 
 export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
@@ -18,13 +25,7 @@ export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
 
 /** Returns the 1-based day number within the cycle (Day 1 = start_date). */
 export function computeCycleDay(startDateIso: string): number {
-  // Get today's date in local timezone
-  const today = new Date();
-  const todayStr = [
-    today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    String(today.getDate()).padStart(2, "0"),
-  ].join("-");
+  const todayStr = todayLocal();
 
   // diffDaysExclusive: 0 = same day, 1 = next day, etc.
   // We want cycleDay: 1 = start_date, 2 = next day, etc.
@@ -44,10 +45,13 @@ export function computeCycleDay(startDateIso: string): number {
  */
 export function computePhase(
   cycleDay: number,
-  cycleLength: number = 28,
-  periodLen: number = 5,
+  cycleLength: number = CYCLE_DEFAULTS.CYCLE_LENGTH,
+  periodLen: number = CYCLE_DEFAULTS.PERIOD_DURATION,
 ): CyclePhase {
-  const ovulationDay = Math.max(periodLen + 2, cycleLength - 14);
+  const ovulationDay = Math.max(
+    periodLen + 2,
+    cycleLength - CYCLE_DEFAULTS.LUTEAL_PHASE_LENGTH,
+  );
   if (cycleDay <= periodLen) return "menstrual";
   if (cycleDay < ovulationDay) return "follicular";
   if (cycleDay <= ovulationDay + 1) return "ovulation";
@@ -57,7 +61,7 @@ export function computePhase(
 /** Progress ratio 0–1 clamped to the cycle length. */
 export function computeProgress(
   cycleDay: number,
-  cycleLength: number = 28,
+  cycleLength: number = CYCLE_DEFAULTS.CYCLE_LENGTH,
 ): number {
   return Math.min(1, cycleDay / cycleLength);
 }
@@ -83,7 +87,10 @@ export interface DerivedCycleData {
   progress: number;
 }
 
-export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
+export function useCurrentCycle(
+  cycleLength = CYCLE_DEFAULTS.CYCLE_LENGTH,
+  periodLen = CYCLE_DEFAULTS.PERIOD_DURATION,
+) {
   return useQuery<DerivedCycleData | null>({
     queryKey: CURRENT_CYCLE_KEY,
     queryFn: async () => {
@@ -155,7 +162,7 @@ export function useCurrentCycle(cycleLength = 28, periodLen = 5) {
  */
 export function buildMiniCalendar(
   cycle: CycleRow | null,
-  periodLen: number = 5,
+  periodLen: number = CYCLE_DEFAULTS.PERIOD_DURATION,
 ): Array<{
   day: string;
   date: number;
@@ -163,12 +170,10 @@ export function buildMiniCalendar(
   hasPeriod: boolean;
 }> {
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const toLocalStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = new Date();
-  const todayStr = [
-    today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    String(today.getDate()).padStart(2, "0"),
-  ].join("-");
+  const todayStr = toLocalStr(today);
 
   const periodDates = new Set<string>();
 
@@ -179,11 +184,7 @@ export function buildMiniCalendar(
       // Infer end date from period length
       const inferredEnd = parseLocalDate(cycle.start_date);
       inferredEnd.setDate(inferredEnd.getDate() + Math.max(0, periodLen - 1));
-      endDateStr = [
-        inferredEnd.getFullYear(),
-        String(inferredEnd.getMonth() + 1).padStart(2, "0"),
-        String(inferredEnd.getDate()).padStart(2, "0"),
-      ].join("-");
+      endDateStr = toLocalStr(inferredEnd);
     }
 
     // Add all period dates
@@ -202,11 +203,7 @@ export function buildMiniCalendar(
   return [-3, -2, -1, 0, 1, 2, 3].map((offset) => {
     const d = new Date(today);
     d.setDate(today.getDate() + offset);
-    const dateStr = [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, "0"),
-      String(d.getDate()).padStart(2, "0"),
-    ].join("-");
+    const dateStr = toLocalStr(d);
     return {
       day: DAY_NAMES[d.getDay()],
       date: d.getDate(),

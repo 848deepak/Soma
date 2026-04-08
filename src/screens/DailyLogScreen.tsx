@@ -16,6 +16,7 @@ import { useCurrentCycle } from "@/src/domain/cycle";
 import { useEndCurrentCycle } from "@/src/domain/cycle";
 import { useTodayLog } from "@/src/domain/calendar";
 import { useProfile } from "@/src/domain/auth";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
@@ -74,8 +75,8 @@ export function DailyLogScreen() {
   const { data: todayLog } = useTodayLog();
   const { data: profile } = useProfile();
   const { data: cycleData } = useCurrentCycle(
-    profile?.cycle_length_average ?? 28,
-    profile?.period_duration_average ?? 5,
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH,
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
   );
 
   const [flowLevel, setFlowLevel] = useState<number>(

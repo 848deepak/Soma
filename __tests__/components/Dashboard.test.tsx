@@ -29,51 +29,32 @@ jest.mock("@/src/context/AuthProvider", () => ({
   })),
 }));
 
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth", () => ({
   useProfile: jest.fn(),
   useUpdateProfile: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => {
-  const original = jest.requireActual("@/hooks/useCurrentCycle");
+jest.mock("@/src/domain/cycle", () => {
+  const original = jest.requireActual("@/src/domain/cycle");
   return {
     ...original,
     useCurrentCycle: jest.fn(),
+    useCycleHistory: jest.fn(() => ({ data: [] })),
   };
 });
 
-jest.mock("@/hooks/useDailyLogs", () => ({
+jest.mock("@/src/domain/calendar", () => ({
   useDailyLogs: jest.fn(() => ({ data: [], isLoading: false })),
   useTodayLog: jest.fn(),
-}));
-
-jest.mock("@/hooks/useCycleHistory", () => ({
-  useCycleHistory: jest.fn(() => ({ data: [] })),
 }));
 
 jest.mock("@/hooks/useCareCircle", () => ({
   useCareCircle: jest.fn(() => ({ data: { asPrimary: [], asViewer: [] } })),
 }));
 
-jest.mock("@/src/store/useCycleStore", () => ({
-  useCycleStore: jest.fn(
-    (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        cycleDay: 14,
-        cycleLength: 28,
-        phaseLabel: "Ovulation Phase",
-        progress: 0.5,
-        insightTitle: "Your estrogen is peaking.",
-        insightDescription: "Great day for connections.",
-        hydrate: jest.fn(),
-        isSaving: false,
-      }),
-  ),
-}));
-
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
+import { useCurrentCycle } from "@/src/domain/cycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
 import { HomeScreen } from "@/src/screens/HomeScreen";
 import { useRouter } from "expo-router";
 

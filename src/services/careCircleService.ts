@@ -19,6 +19,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logDataAccess } from '@/src/services/auditService';
+import { validatePartnerUpdate } from '@/src/domain/validators';
 import type { PartnerRow, CareCircleRole, SharedDataLog, PartnerPermissions } from '@/types/database';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -160,6 +161,12 @@ export async function updatePermissions(
   connectionId: string,
   updates: Partial<PartnerPermissions>,
 ): Promise<PartnerRow> {
+  // Validate before mutation
+  const validation = validatePartnerUpdate({ partner_id: connectionId });
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.partner_update_invalid');
+  }
+
   // Fetch the current permissions
   const { data: current, error: fetchError } = await supabase
     .from('partners')
@@ -203,6 +210,12 @@ export async function updatePermissions(
  * @param connectionId – the partners row id
  */
 export async function revokeConnection(connectionId: string): Promise<void> {
+  // Validate before mutation
+  const validation = validatePartnerUpdate({ partner_id: connectionId });
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.partner_update_invalid');
+  }
+
   const { error } = await supabase
     .from('partners')
     .update({ status: 'revoked' })
@@ -260,6 +273,12 @@ export async function getPendingConnections() {
  * @param connectionId – the partners row id
  */
 export async function acceptConnection(connectionId: string): Promise<PartnerRow> {
+  // Validate before mutation
+  const validation = validatePartnerUpdate({ partner_id: connectionId });
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.partner_update_invalid');
+  }
+
   const { data, error } = await supabase
     .from('partners')
     .update({ status: 'active' })

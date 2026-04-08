@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
+import { logWarn } from "@/platform/monitoring/logger";
 import type {
   NotificationPreferenceRow,
   NotificationPreferenceUpdate,
@@ -52,7 +53,7 @@ export function useProfile() {
         .maybeSingle();
 
       if (error) {
-        console.warn("[Profile] Query error:", {
+        logWarn("auth", "profile_query_error", {
           userId: user.id,
           message: error.message,
         });
@@ -60,7 +61,7 @@ export function useProfile() {
       }
 
       if (!data) {
-        console.log("[Profile] Profile row missing for user:", user.id);
+        logWarn("auth", "profile_row_missing", { userId: user.id });
         return null;
       }
 
@@ -178,7 +179,10 @@ export function useNotificationPreferences() {
         .single();
 
       if (insertError) {
-        console.warn("[NotificationPreferences] Query/seed error:", insertError);
+        logWarn("auth", "notification_preferences_seed_error", {
+          message: insertError.message,
+          code: (insertError as { code?: string }).code,
+        });
         return null;
       }
 

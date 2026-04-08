@@ -4,7 +4,9 @@ import type { DerivedCycleData } from "@/src/domain/cycle";
 import { CURRENT_CYCLE_KEY } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
 import { enqueueSync } from "@/src/database/localDB";
+import { OfflineQueueManager } from "@/src/services/OfflineQueueManager";
 import { trackEvent } from "@/src/services/analytics";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { encryptionService } from "@/src/services/encryptionService";
 import {
   todayLocal,
@@ -263,7 +265,10 @@ function computePredictions(
   cycleLength: number,
   periodLength: number,
 ): { predicted_ovulation: string; predicted_next_cycle: string } {
-  const ovulationDay = Math.max(periodLength + 2, cycleLength - 14);
+  const ovulationDay = Math.max(
+    periodLength + 2,
+    cycleLength - CYCLE_DEFAULTS.LUTEAL_PHASE_LENGTH,
+  );
   return {
     predicted_ovulation: addDays(startDateIso, ovulationDay - 1),
     predicted_next_cycle: addDays(startDateIso, cycleLength),
@@ -396,20 +401,23 @@ export async function endCurrentPeriod({
       );
     }
 
-    // FALLBACK: Queue for sync if network error
+    // FALLBACK: Queue for offline sync if network error
     try {
-      const encryptedPayload = await encryptionService.encrypt(
-        JSON.stringify({
+      await OfflineQueueManager.enqueue(
+        "cycles",
+        "upsert",
+        {
           id: resolvedCycle.id,
           user_id: userId,
           start_date: normalizedStartDate,
           end_date: resolvedEndDate,
           cycle_length: cycleLength,
           updated_at: new Date().toISOString(),
-        }),
+        },
+        {
+          rowId: resolvedCycle.id,
+        },
       );
-
-      await enqueueSync("cycles", resolvedCycle.id, "upsert", encryptedPayload);
 
       if (__DEV__) {
         console.log("[EndCycle] Queued for sync due to network error");
@@ -576,8 +584,8 @@ export function useDeleteAllData() {
         .from("profiles")
         .update({
           is_onboarded: false,
-          cycle_length_average: 28,
-          period_duration_average: 5,
+          cycle_length_average: CYCLE_DEFAULTS.CYCLE_LENGTH,
+          period_duration_average: CYCLE_DEFAULTS.PERIOD_DURATION,
         })
         .eq("id", user.id);
       if (profileError) throw profileError;

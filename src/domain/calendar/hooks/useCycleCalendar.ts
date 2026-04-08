@@ -4,6 +4,7 @@ import { useCurrentCycle } from "@/src/domain/cycle";
 import { useCycleHistory } from "@/src/domain/cycle";
 import { useDailyLogs, useDailyLogsByDateRange } from "@/src/domain/calendar";
 import { useProfile } from "@/src/domain/auth";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { predictFertileWindow } from "@/services/CycleIntelligence";
 import type { CompletedCycle, CycleRow, DailyLogRow } from "@/types/database";
 import { addDays as utilAddDays, dateRange as computeDateRange, todayLocal } from "@/src/domain/utils/dateUtils";
@@ -175,8 +176,8 @@ export interface UseCycleCalendarOptions {
 export function useCycleCalendar(options?: UseCycleCalendarOptions): CycleDataMap {
   const { data: profile } = useProfile();
   const { data: cycleDataRaw } = useCurrentCycle(
-    profile?.cycle_length_average ?? 28,
-    profile?.period_duration_average ?? 5,
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH,
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
   );
   const { data: completedCycles = [] } = useCycleHistory(8);
 
@@ -190,8 +191,10 @@ export function useCycleCalendar(options?: UseCycleCalendarOptions): CycleDataMa
 
   const dailyLogs = dateRange ? dailyLogsByRange : dailyLogsLegacy;
 
-  const periodLength = profile?.period_duration_average ?? 5;
-  const cycleLength = profile?.cycle_length_average ?? 28;
+  const periodLength =
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION;
+  const cycleLength =
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH;
 
   return useMemo(() => {
     if (options?.cycleData) {

@@ -19,6 +19,10 @@ import type {
   MoodOption,
   EnergyLevel,
   SymptomOption,
+  SmartEventInsert,
+  SmartEventType,
+  NotificationPreferenceInsert,
+  PartnerPermissions,
 } from '@/types/database';
 
 import {
@@ -28,6 +32,7 @@ import {
   SYMPTOM_OPTIONS,
   CYCLE_PHASES,
 } from '@/src/domain/constants/logOptions';
+import { todayLocal } from '@/src/domain/utils/dateUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation Result Types
@@ -50,9 +55,9 @@ function isValidDateFormat(dateStr: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
-/** Validate date is not in the future (relative to today, UTC) */
-function isNotFutureDate(dateStr: string, todayUtc: string): boolean {
-  return dateStr <= todayUtc;
+/** Validate date is not in the future (relative to today, local date) */
+function isNotFutureDate(dateStr: string, todayDate: string): boolean {
+  return dateStr <= todayDate;
 }
 
 /** Parse date safely to detect invalid dates like 2024-02-30 */
@@ -63,10 +68,10 @@ function isValidDateValue(dateStr: string): boolean {
   return date.toISOString().startsWith(dateStr);
 }
 
-/** Get today's date in UTC as YYYY-MM-DD */
-function getTodayUtc(): string {
-  const now = new Date();
-  return now.toISOString().split('T')[0];
+/** Get today's local date as YYYY-MM-DD */
+function getTodayLocal(): string {
+  // Uses local date to match how dates are stored in the app
+  return todayLocal();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,7 +82,7 @@ export function validateDailyLog(
   log: Partial<DailyLogInsert> & { user_id?: string },
 ): ValidationResult<DailyLogInsert> {
   const details: Record<string, string> = {};
-  const todayUtc = getTodayUtc();
+  const todayDate = getTodayLocal();
 
   // Required: user_id
   if (!log.user_id || typeof log.user_id !== 'string') {
@@ -91,7 +96,7 @@ export function validateDailyLog(
     details.date = 'validation.invalid_date_format';
   } else if (!isValidDateValue(log.date)) {
     details.date = 'validation.invalid_date_value';
-  } else if (!isNotFutureDate(log.date, todayUtc)) {
+  } else if (!isNotFutureDate(log.date, todayDate)) {
     details.date = 'validation.future_date_not_allowed';
   }
 
@@ -153,7 +158,7 @@ export function validateDailyLog(
 
 export function validateCycleStart(cycle: Partial<CycleInsert> & { user_id?: string }): ValidationResult<CycleInsert> {
   const details: Record<string, string> = {};
-  const todayUtc = getTodayUtc();
+  const todayDate = getTodayLocal();
 
   // Required: user_id
   if (!cycle.user_id || typeof cycle.user_id !== 'string') {
@@ -167,7 +172,7 @@ export function validateCycleStart(cycle: Partial<CycleInsert> & { user_id?: str
     details.start_date = 'validation.invalid_date_format';
   } else if (!isValidDateValue(cycle.start_date)) {
     details.start_date = 'validation.invalid_date_value';
-  } else if (!isNotFutureDate(cycle.start_date, todayUtc)) {
+  } else if (!isNotFutureDate(cycle.start_date, todayDate)) {
     details.start_date = 'validation.future_date_not_allowed';
   }
 
@@ -182,7 +187,7 @@ export function validateCycleEnd(
   cycle: { end_date?: string | null; start_date: string } & { user_id?: string },
 ): ValidationResult {
   const details: Record<string, string> = {};
-  const todayUtc = getTodayUtc();
+  const todayDate = getTodayLocal();
 
   // end_date must be after start_date
   if (cycle.end_date) {
@@ -190,7 +195,7 @@ export function validateCycleEnd(
       details.end_date = 'validation.invalid_date_format';
     } else if (!isValidDateValue(cycle.end_date)) {
       details.end_date = 'validation.invalid_date_value';
-    } else if (!isNotFutureDate(cycle.end_date, todayUtc)) {
+    } else if (!isNotFutureDate(cycle.end_date, todayDate)) {
       details.end_date = 'validation.future_date_not_allowed';
     } else if (cycle.end_date < cycle.start_date) {
       details.end_date = 'validation.end_date_before_start_date';
@@ -338,6 +343,258 @@ export function validatePassword(password: string): ValidationResult {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Smart Event Validator
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function validateSmartEvent(input: unknown): ValidationResult<SmartEventInsert> {
+  const details: Record<string, string> = {};
+
+  // Ensure input is an object
+  if (!input || typeof input !== 'object') {
+    return { valid: false, reason: 'validation.invalid_input_type' };
+  }
+
+  const event = input as Record<string, unknown>;
+
+  // Required: user_id (non-empty string, UUID preferred)
+  if (!event.user_id || typeof event.user_id !== 'string') {
+    return { valid: false, reason: 'validation.missing_user_id' };
+  }
+
+  // Required: title
+  if (!event.title || typeof event.title !== 'string') {
+    details.title = 'validation.title_required';
+  } else if (event.title.length > 500) {
+    details.title = 'validation.title_too_long';
+  }
+
+  // Required: start_time
+  if (!event.start_time || typeof event.start_time !== 'string') {
+    details.start_time = 'validation.start_time_required';
+  }
+
+  // Required: end_time
+  if (!event.end_time || typeof event.end_time !== 'string') {
+    details.end_time = 'validation.end_time_required';
+  }
+
+  // Optional: type (one of 'manual' | 'ai' | 'log')
+  if (event.type !== undefined && event.type !== null) {
+    const validTypes: SmartEventType[] = ['manual', 'ai', 'log'];
+    if (typeof event.type !== 'string' || !validTypes.includes(event.type as SmartEventType)) {
+      details.type = 'validation.invalid_event_type';
+    }
+  }
+
+  // Optional: location (string)
+  if (event.location !== undefined && event.location !== null) {
+    if (typeof event.location !== 'string') {
+      details.location = 'validation.location_must_be_string';
+    } else if (event.location.length > 500) {
+      details.location = 'validation.location_too_long';
+    }
+  }
+
+  // Optional: tags (array of strings)
+  if (event.tags !== undefined && event.tags !== null) {
+    if (!Array.isArray(event.tags)) {
+      details.tags = 'validation.tags_must_be_array';
+    } else {
+      const invalidTags = event.tags.filter((t) => typeof t !== 'string' || t.length > 100);
+      if (invalidTags.length > 0) {
+        details.tags = 'validation.invalid_tag_format';
+      }
+    }
+  }
+
+  // Optional: participants (array of strings)
+  if (event.participants !== undefined && event.participants !== null) {
+    if (!Array.isArray(event.participants)) {
+      details.participants = 'validation.participants_must_be_array';
+    } else {
+      const invalidParticipants = event.participants.filter((p) => typeof p !== 'string' || p.length > 100);
+      if (invalidParticipants.length > 0) {
+        details.participants = 'validation.invalid_participant_format';
+      }
+    }
+  }
+
+  // Optional: data field (if present, must be serializable JSON - no circular refs)
+  if (event.metadata !== undefined && event.metadata !== null) {
+    try {
+      if (typeof event.metadata !== 'object') {
+        details.metadata = 'validation.invalid_metadata_type';
+      } else {
+        JSON.stringify(event.metadata);
+      }
+    } catch {
+      details.metadata = 'validation.invalid_data_field';
+    }
+  }
+
+  // Optional: recurrence (if present, must be serializable JSON)
+  if (event.recurrence !== undefined && event.recurrence !== null) {
+    try {
+      if (typeof event.recurrence !== 'object') {
+        details.recurrence = 'validation.invalid_recurrence_type';
+      } else {
+        JSON.stringify(event.recurrence);
+      }
+    } catch {
+      details.recurrence = 'validation.invalid_recurrence_format';
+    }
+  }
+
+  if (Object.keys(details).length > 0) {
+    return { valid: false, reason: 'validation.smart_event_invalid', details };
+  }
+
+  return { valid: true, value: input as SmartEventInsert };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification Preferences Validator
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function validateNotificationPreferences(
+  input: unknown,
+): ValidationResult<NotificationPreferenceInsert> {
+  const details: Record<string, string> = {};
+
+  // Ensure input is an object
+  if (!input || typeof input !== 'object') {
+    return { valid: false, reason: 'validation.invalid_input_type' };
+  }
+
+  const prefs = input as Record<string, unknown>;
+
+  // Required: user_id (non-empty string)
+  if (!prefs.user_id || typeof prefs.user_id !== 'string') {
+    return { valid: false, reason: 'validation.missing_user_id' };
+  }
+
+  // Optional: daily_reminders (boolean)
+  if (prefs.daily_reminders !== undefined && prefs.daily_reminders !== null) {
+    if (typeof prefs.daily_reminders !== 'boolean') {
+      details.daily_reminders = 'validation.daily_reminders_must_be_boolean';
+    }
+  }
+
+  // Optional: period_alerts (boolean)
+  if (prefs.period_alerts !== undefined && prefs.period_alerts !== null) {
+    if (typeof prefs.period_alerts !== 'boolean') {
+      details.period_alerts = 'validation.period_alerts_must_be_boolean';
+    }
+  }
+
+  // Optional: ovulation_alerts (boolean)
+  if (prefs.ovulation_alerts !== undefined && prefs.ovulation_alerts !== null) {
+    if (typeof prefs.ovulation_alerts !== 'boolean') {
+      details.ovulation_alerts = 'validation.ovulation_alerts_must_be_boolean';
+    }
+  }
+
+  // Optional: behavioral_alerts (boolean)
+  if (prefs.behavioral_alerts !== undefined && prefs.behavioral_alerts !== null) {
+    if (typeof prefs.behavioral_alerts !== 'boolean') {
+      details.behavioral_alerts = 'validation.behavioral_alerts_must_be_boolean';
+    }
+  }
+
+  // Optional: max_per_day (number, 0-99)
+  if (prefs.max_per_day !== undefined && prefs.max_per_day !== null) {
+    if (!Number.isInteger(prefs.max_per_day) || (prefs.max_per_day as number) < 0 || (prefs.max_per_day as number) > 99) {
+      details.max_per_day = 'validation.max_per_day_invalid';
+    }
+  }
+
+  // Optional: quiet_hours_start (number between 0-23)
+  if (prefs.quiet_hours_start !== undefined && prefs.quiet_hours_start !== null) {
+    if (!Number.isInteger(prefs.quiet_hours_start) || (prefs.quiet_hours_start as number) < 0 || (prefs.quiet_hours_start as number) > 23) {
+      details.quiet_hours_start = 'validation.quiet_hours_start_invalid';
+    }
+  }
+
+  // Optional: quiet_hours_end (number between 0-23)
+  if (prefs.quiet_hours_end !== undefined && prefs.quiet_hours_end !== null) {
+    if (!Number.isInteger(prefs.quiet_hours_end) || (prefs.quiet_hours_end as number) < 0 || (prefs.quiet_hours_end as number) > 23) {
+      details.quiet_hours_end = 'validation.quiet_hours_end_invalid';
+    }
+  }
+
+  // Optional: timezone (valid IANA timezone string)
+  if (prefs.timezone !== undefined && prefs.timezone !== null) {
+    if (typeof prefs.timezone !== 'string') {
+      details.timezone = 'validation.timezone_must_be_string';
+    } else {
+      try {
+        const supportedTimezones = Intl.supportedValuesOf('timeZone');
+        if (!supportedTimezones.includes(prefs.timezone as string)) {
+          details.timezone = 'validation.timezone_not_supported';
+        }
+      } catch {
+        // Intl.supportedValuesOf not available in some older RN environments
+        // Allow null/undefined timezone in those cases
+        if (typeof prefs.timezone !== 'string' || prefs.timezone.length === 0) {
+          details.timezone = 'validation.timezone_not_supported';
+        }
+      }
+    }
+  }
+
+  if (Object.keys(details).length > 0) {
+    return { valid: false, reason: 'validation.notification_preferences_invalid', details };
+  }
+
+  return { valid: true, value: input as NotificationPreferenceInsert };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Partner Update Validator
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function validatePartnerUpdate(input: unknown): ValidationResult {
+  const details: Record<string, string> = {};
+
+  // Ensure input is an object
+  if (!input || typeof input !== 'object') {
+    return { valid: false, reason: 'validation.invalid_input_type' };
+  }
+
+  const update = input as Record<string, unknown>;
+
+  // Required: partner_id (non-empty string)
+  if (!update.partner_id || typeof update.partner_id !== 'string') {
+    return { valid: false, reason: 'validation.missing_partner_id' };
+  }
+
+  // Required: permission_level (one of 'read' | 'write' | 'none')
+  if (update.permission_level !== undefined && update.permission_level !== null) {
+    const validLevels = ['read', 'write', 'none'];
+    if (typeof update.permission_level !== 'string' || !validLevels.includes(update.permission_level as string)) {
+      details.permission_level = 'validation.invalid_permission_level';
+    }
+  }
+
+  // Optional: nickname (string max 50 chars, no special chars except hyphen and underscore)
+  if (update.nickname !== undefined && update.nickname !== null) {
+    if (typeof update.nickname !== 'string') {
+      details.nickname = 'validation.nickname_must_be_string';
+    } else if (update.nickname.length > 50) {
+      details.nickname = 'validation.nickname_too_long';
+    } else if (!/^[a-zA-Z0-9_-]*$/.test(update.nickname)) {
+      details.nickname = 'validation.nickname_invalid_format';
+    }
+  }
+
+  if (Object.keys(details).length > 0) {
+    return { valid: false, reason: 'validation.partner_update_invalid', details };
+  }
+
+  return { valid: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Export all validators as a namespace for convenience
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -348,4 +605,7 @@ export const validators = {
   profileUpdate: validateProfileUpdate,
   email: validateEmail,
   password: validatePassword,
+  smartEvent: validateSmartEvent,
+  notificationPreferences: validateNotificationPreferences,
+  partnerUpdate: validatePartnerUpdate,
 };

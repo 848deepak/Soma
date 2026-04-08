@@ -14,6 +14,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { logAuthEvent } from "@/lib/logAuthEvent";
 
+export const SESSION_RESTORE_TIMEOUT_MS = 10000;
+const SESSION_RESTORE_MAX_RETRIES = 2;
+
 export interface AuthState {
   user: User | null;
   session: Session | null;
@@ -53,60 +56,75 @@ export function useAuth(): AuthState {
     );
 
     const resolveInitialSession = async () => {
-      try {
-        // Keep startup bounded while still allowing persisted session restoration.
-        timeoutId = setTimeout(() => {
+      for (let attempt = 1; attempt <= SESSION_RESTORE_MAX_RETRIES; attempt += 1) {
+        try {
+          // Keep startup bounded while still allowing persisted session restoration.
+          timeoutId = setTimeout(() => {
+            if (isMounted) {
+              const message = `Session timeout after ${SESSION_RESTORE_TIMEOUT_MS}ms`;
+              console.warn("[Auth] Session timeout:", {
+                attempt,
+                maxRetries: SESSION_RESTORE_MAX_RETRIES,
+                timeoutMs: SESSION_RESTORE_TIMEOUT_MS,
+              });
+              if (attempt === SESSION_RESTORE_MAX_RETRIES) {
+                initialSessionResolved = true;
+                setSession(null);
+                finalizeInitialLoading();
+                logAuthEvent({
+                  type: "session_restore",
+                  success: false,
+                  error: message,
+                });
+              }
+            }
+          }, SESSION_RESTORE_TIMEOUT_MS);
+
+          const { data, error } = await supabase.auth.getSession();
+
           if (isMounted) {
-            console.warn(
-              "[Auth] Session timeout after 3s, defaulting to no session",
-            );
+            clearTimeout(timeoutId);
             initialSessionResolved = true;
-            setSession(null);
+            if (error) {
+              console.warn("[Auth] Session error:", error.message);
+              setSession(null);
+              logAuthEvent({
+                type: "session_restore",
+                success: false,
+                error: error.message,
+              });
+            } else {
+              setSession(data.session ?? null);
+              logAuthEvent({
+                type: "session_restore",
+                success: !!data.session,
+                userId: data.session?.user?.id,
+              });
+            }
             finalizeInitialLoading();
-            logAuthEvent({
-              type: "session_restore",
-              success: false,
-              error: "Session timeout",
-            });
+            return;
           }
-        }, 3000);
-
-        const { data, error } = await supabase.auth.getSession();
-
-        if (isMounted) {
-          clearTimeout(timeoutId);
-          initialSessionResolved = true;
-          if (error) {
-            console.warn("[Auth] Session error:", error.message);
-            setSession(null);
-            logAuthEvent({
-              type: "session_restore",
-              success: false,
-              error: error.message,
-            });
-          } else {
-            setSession(data.session ?? null);
-            logAuthEvent({
-              type: "session_restore",
-              success: !!data.session,
-              userId: data.session?.user?.id,
-            });
-          }
-          finalizeInitialLoading();
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown session error";
-        console.warn("[Auth] Session resolution error:", message);
-        if (isMounted) {
-          clearTimeout(timeoutId);
-          initialSessionResolved = true;
-          setSession(null);
-          finalizeInitialLoading();
-          logAuthEvent({
-            type: "session_restore",
-            success: false,
-            error: message,
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown session error";
+          console.warn("[Auth] Session resolution error:", {
+            attempt,
+            maxRetries: SESSION_RESTORE_MAX_RETRIES,
+            message,
           });
+          if (isMounted) {
+            clearTimeout(timeoutId);
+            if (attempt === SESSION_RESTORE_MAX_RETRIES) {
+              initialSessionResolved = true;
+              setSession(null);
+              finalizeInitialLoading();
+              logAuthEvent({
+                type: "session_restore",
+                success: false,
+                error: message,
+              });
+              return;
+            }
+          }
         }
       }
     };

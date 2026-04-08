@@ -33,7 +33,7 @@ let mockCurrentCycleData: any = {
 };
 
 // Mock hooks
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth", () => ({
   useProfile: () => ({
     data: {
       first_name: "Jane",
@@ -45,7 +45,7 @@ jest.mock("@/hooks/useProfile", () => ({
   }),
 }));
 
-jest.mock("@/hooks/useDailyLogs", () => ({
+jest.mock("@/src/domain/calendar", () => ({
   useTodayLog: () => ({
     data: {
       hydration_glasses: 6,
@@ -58,7 +58,7 @@ jest.mock("@/hooks/useDailyLogs", () => ({
   }),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => ({
+jest.mock("@/src/domain/cycle", () => ({
   useCurrentCycle: () => ({
     data: mockCurrentCycleData,
     isLoading: false,
@@ -69,9 +69,14 @@ jest.mock("@/hooks/useCurrentCycle", () => ({
     { day: "Mon", date: 15, isCurrent: true, hasPeriod: false },
     { day: "Tue", date: 16, isCurrent: false, hasPeriod: false },
   ],
+  useCycleHistory: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
 }));
 
-jest.mock("@/hooks/useRealtimeSync", () => ({
+jest.mock("@/src/domain/logging", () => ({
   useRealtimeSync: jest.fn(),
 }));
 
@@ -86,21 +91,7 @@ jest.mock("@/hooks/useCareCircle", () => ({
   }),
 }));
 
-jest.mock("@/src/store/useCycleStore", () => ({
-  useCycleStore: (selector: any) => {
-    const mockStore = {
-      hydrate: jest.fn(),
-    };
-    return typeof selector === "function" ? selector(mockStore) : mockStore;
-  },
-}));
-
-const mockPush = jest.fn();
-jest.mock("expo-router", () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
-}));
+describe("HomeScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCurrentCycleData = {

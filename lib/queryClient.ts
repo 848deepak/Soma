@@ -16,6 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PersistedClient, Persister } from '@tanstack/react-query-persist-client';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
 
+const CACHE_SCHEMA_VERSION = 1;
+
 // Create a custom persister using AsyncStorage (simpler than MMKV for this use case)
 const createAsyncStoragePersister = (): Persister => {
   const prefix = 'REACT_QUERY_OFFLINE_CACHE';
@@ -23,7 +25,13 @@ const createAsyncStoragePersister = (): Persister => {
   return {
     persistClient: async (client: PersistedClient) => {
       try {
-        await AsyncStorage.setItem(prefix, JSON.stringify(client));
+        await AsyncStorage.setItem(
+          prefix,
+          JSON.stringify({
+            ...client,
+            cacheVersion: CACHE_SCHEMA_VERSION,
+          }),
+        );
       } catch (error) {
         console.warn('[QueryClient] Failed to persist cache to AsyncStorage:', error);
       }
@@ -32,7 +40,26 @@ const createAsyncStoragePersister = (): Persister => {
       try {
         const stored = await AsyncStorage.getItem(prefix);
         if (!stored) return undefined;
-        return JSON.parse(stored) as PersistedClient;
+        const parsed = JSON.parse(stored) as Record<string, unknown> | null;
+
+        if (!parsed || typeof parsed !== 'object') {
+          await AsyncStorage.removeItem(prefix);
+          return undefined;
+        }
+
+        if ('cacheVersion' in parsed && parsed.cacheVersion !== CACHE_SCHEMA_VERSION) {
+          console.warn('[QueryClient] Cache version mismatch, discarding persisted cache');
+          await AsyncStorage.removeItem(prefix);
+          return undefined;
+        }
+
+        if (!parsed.clientState || !parsed.cacheState) {
+          console.warn('[QueryClient] Stale/invalid cache schema, discarding');
+          await AsyncStorage.removeItem(prefix);
+          return undefined;
+        }
+
+        return parsed as unknown as PersistedClient;
       } catch (error) {
         console.warn('[QueryClient] Failed to restore cache from AsyncStorage:', error);
         return undefined;
