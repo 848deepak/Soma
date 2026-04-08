@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { DerivedCycleData } from "@/src/domain/cycle";
 import { CURRENT_CYCLE_KEY } from "@/src/domain/cycle";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { enqueueSync } from "@/src/database/localDB";
 import { OfflineQueueManager } from "@/src/services/OfflineQueueManager";
@@ -493,7 +494,9 @@ export function useStartNewCycle() {
     onSuccess: () => {
       trackEvent("cycle_started");
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "cycle-history"
+      });
     },
   });
 }
@@ -539,7 +542,9 @@ export function useEndCurrentCycle() {
     onSuccess: (result) => {
       trackEvent("cycle_ended", { queued_for_sync: result.queued });
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "cycle-history"
+      });
     },
     onError: (error: Error) => {
       if (__DEV__) {
@@ -591,13 +596,28 @@ export function useDeleteAllData() {
       if (profileError) throw profileError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      // For profile queries, invalidate all variants (different userIds)
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "profile"
+      });
+
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-log"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-logs"] });
-      queryClient.invalidateQueries({ queryKey: ["partner"] });
-      queryClient.invalidateQueries({ queryKey: ["partner-logs"] });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "cycle-history"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-log"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-logs"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "partner"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "partner-logs"
+      });
     },
   });
 }
@@ -682,10 +702,18 @@ export function useResetPredictions() {
     mutationFn: resetPredictionsAction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-log"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-logs"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "cycle-history"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-log"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-logs"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "profile"
+      });
     },
   });
 }
@@ -697,9 +725,15 @@ export function useLogPeriodRange() {
     mutationFn: logPeriodRangeAction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-log"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-logs"] });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "cycle-history"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-log"
+      });
+      queryClient.invalidateQueries({ predicate: (query) =>
+        Array.isArray(query.queryKey) && query.queryKey[0] === "daily-logs"
+      });
     },
   });
 }

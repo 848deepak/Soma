@@ -6,6 +6,7 @@ import { AppState } from "react-native";
 import { CURRENT_CYCLE_KEY, type DerivedCycleData } from "@/src/domain/cycle";
 import { endCurrentPeriod } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { trackEvent } from "@/src/services/analytics";
 import { getPeriodAutoEndDays } from "@/src/services/remoteConfig";
@@ -64,7 +65,7 @@ export function usePeriodAutoEnd(): void {
       });
 
       queryClient.invalidateQueries({ queryKey: CURRENT_CYCLE_KEY });
-      queryClient.invalidateQueries({ queryKey: ["cycle-history"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cycleHistory() });
     } catch (error) {
       console.warn("[AutoEnd] Failed to auto-end period:", error);
     } finally {

@@ -23,6 +23,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logDataEvent, logError, logWarn } from '@/platform/monitoring/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Development smoke test: verify uuid is working
+// ─────────────────────────────────────────────────────────────────────────────
+if (__DEV__) {
+  const testId = uuid();
+  console.assert(
+    typeof testId === 'string' && testId.length === 36,
+    '[OfflineQueueManager] UUID function is broken or not installed'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 

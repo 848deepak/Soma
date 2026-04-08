@@ -10,13 +10,15 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import { logDataAccess } from "@/src/services/auditService";
 import type { DailyLogRow } from "@/types/database";
 import { todayLocal } from "@/src/domain/utils/dateUtils";
 
-export const DAILY_LOGS_KEY = (limit: number) => ["daily-logs", limit] as const;
+// Re-export from query keys registry for backward compatibility
+export const DAILY_LOGS_KEY = (limit: number) => QUERY_KEYS.dailyLogs(limit);
 export const DAILY_LOGS_DATE_RANGE_KEY = (from: string, to: string) =>
-  ["daily-logs-range", from, to] as const;
+  QUERY_KEYS.dailyLogsByDateRange(from, to);
 
 /**
  * Get today's ISO date string in user's LOCAL timezone.
@@ -24,7 +26,7 @@ export const DAILY_LOGS_DATE_RANGE_KEY = (from: string, to: string) =>
  */
 export const todayIso = () => todayLocal();
 
-export const TODAY_LOG_KEY = () => ["daily-log", todayLocal()] as const;
+export const TODAY_LOG_KEY = () => QUERY_KEYS.dailyLog(todayLocal());
 
 /**
  * Fetches the N most recent daily log rows for the signed-in user.
@@ -32,7 +34,7 @@ export const TODAY_LOG_KEY = () => ["daily-log", todayLocal()] as const;
  */
 export function useDailyLogs(limit: number = 90) {
   return useQuery<DailyLogRow[]>({
-    queryKey: DAILY_LOGS_KEY(limit),
+    queryKey: QUERY_KEYS.dailyLogs(limit),
     queryFn: async () => {
       const {
         data: { user },
@@ -68,7 +70,7 @@ export function useDailyLogs(limit: number = 90) {
  */
 export function useDailyLogsByDateRange(fromDate: string, toDate: string) {
   return useQuery<DailyLogRow[]>({
-    queryKey: DAILY_LOGS_DATE_RANGE_KEY(fromDate, toDate),
+    queryKey: QUERY_KEYS.dailyLogsByDateRange(fromDate, toDate),
     queryFn: async () => {
       const {
         data: { user },
@@ -103,7 +105,7 @@ export function useDailyLogsByDateRange(fromDate: string, toDate: string) {
  */
 export function useTodayLog() {
   return useQuery<DailyLogRow | null>({
-    queryKey: TODAY_LOG_KEY(),
+    queryKey: QUERY_KEYS.dailyLog(todayLocal()),
     queryFn: async () => {
       const {
         data: { user },

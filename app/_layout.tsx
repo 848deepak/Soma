@@ -218,6 +218,7 @@ export function AuthBootstrap({
   const previousUserIdRef = useRef<string | null>(null);
   const currentSegmentRef = useRef<string | undefined>(segments[0]);
   const bootstrapRunIdRef = useRef(0);
+  const navigationLockRef = useRef(false);
 
   // Flush offline queue whenever connectivity is restored
   useNetworkSync();
@@ -290,6 +291,31 @@ export function AuthBootstrap({
     let isMounted = true;
     const bootstrapRunId = ++bootstrapRunIdRef.current;
 
+    /**
+     * Safely navigate to a route while holding a lock to prevent double navigation.
+     * Navigation is guarded: only the first router.replace() call succeeds.
+     */
+    const safeNavigate = (destination: string, reason: string) => {
+      if (navigationLockRef.current) {
+        if (__DEV__) {
+          console.warn('[Bootstrap] Navigation blocked — lock active', {
+            destination,
+            reason,
+            currentLock: navigationLockRef.current,
+          });
+        }
+        return;
+      }
+      navigationLockRef.current = true;
+      if (__DEV__) {
+        console.log('[Bootstrap] Navigation locked and proceeding to:', {
+          destination,
+          reason,
+        });
+      }
+      router.replace(destination as never);
+    };
+
     async function bootstrap() {
       try {
         const hasLaunched = await AsyncStorage.getItem(HAS_LAUNCHED_KEY);
@@ -320,7 +346,7 @@ export function AuthBootstrap({
           // No session at all — first-time user → show auth
           if (isMounted) {
             if (!inAuth) {
-              router.replace("/auth/login" as never);
+              safeNavigate("/auth/login", "no_session");
             }
             setHasBootstrapped(true);
           }
@@ -349,7 +375,7 @@ export function AuthBootstrap({
           // (Anonymous session created as fallback by the "Continue without account" path)
           if (isMounted) {
             if (!inAuth) {
-              router.replace("/auth/login" as never);
+              safeNavigate("/auth/login", "anonymous_first_launch");
             }
             setHasBootstrapped(true);
           }
@@ -375,7 +401,7 @@ export function AuthBootstrap({
               route: "/welcome",
             });
             if (!inOnboarding) {
-              router.replace("/welcome" as never);
+              safeNavigate("/welcome", "profile_found_not_onboarded");
             }
             setHasBootstrapped(true);
             return;
@@ -397,7 +423,7 @@ export function AuthBootstrap({
               reason: "onboarded",
               route: "/(tabs)",
             });
-            router.replace("/(tabs)" as never);
+            safeNavigate("/(tabs)", "profile_found_onboarded");
           }
           setHasBootstrapped(true);
           return;
@@ -431,9 +457,9 @@ export function AuthBootstrap({
                 userId: user.id,
                 error: repairError instanceof Error ? repairError.message : String(repairError),
               });
-              // Route to welcome on profile repair failure
-              if (isMounted && !inOnboarding) {
-                router.replace("/welcome" as never);
+              // Route to welcome on profile repair failure, respecting navigation lock
+              if (isMounted && !inOnboarding && !navigationLockRef.current) {
+                safeNavigate("/welcome", "profile_repair_failure");
               }
             });
 
@@ -448,7 +474,7 @@ export function AuthBootstrap({
               setHasBootstrapped(true);
               return;
             }
-            router.replace("/(tabs)" as never);
+            safeNavigate("/(tabs)", "profile_repair");
             setHasBootstrapped(true);
             return;
           }
@@ -466,7 +492,7 @@ export function AuthBootstrap({
             route: "/welcome",
           });
           if (!inOnboarding) {
-            router.replace("/welcome" as never);
+            safeNavigate("/welcome", "profile_missing_anonymous");
           }
           setHasBootstrapped(true);
           return;
@@ -484,10 +510,10 @@ export function AuthBootstrap({
 
           if (cachedProfile.is_onboarded) {
             if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
-              router.replace("/(tabs)" as never);
+              safeNavigate("/(tabs)", "cached_profile_onboarded");
             }
           } else if (!inOnboarding) {
-            router.replace("/welcome" as never);
+            safeNavigate("/welcome", "cached_profile_not_onboarded");
           }
 
           setHasBootstrapped(true);
@@ -501,14 +527,14 @@ export function AuthBootstrap({
 
         // Avoid misclassifying existing users as new users on transient DB failures.
         if (inAuth || inOnboarding || currentSegmentRef.current !== "(tabs)") {
-          router.replace("/(tabs)" as never);
+          safeNavigate("/(tabs)", "profile_lookup_error_fallback");
         }
         setHasBootstrapped(true);
       } catch (error) {
         console.warn("[Auth] Bootstrap critical error:", error);
         // Last resort: route to login when route resolution fails.
         if (isMounted) {
-          router.replace("/auth/login" as never);
+          safeNavigate("/auth/login", "bootstrap_critical_error");
           setHasBootstrapped(true);
         }
       }
@@ -518,6 +544,7 @@ export function AuthBootstrap({
 
     return () => {
       isMounted = false;
+      navigationLockRef.current = false;
     };
     // We intentionally run this during bootstrap transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps

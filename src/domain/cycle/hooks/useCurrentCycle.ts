@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
+import { QUERY_KEYS } from "@/src/lib/queryKeys";
 import type { CyclePhase, CycleRow } from "@/types/database";
 import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import {
@@ -19,7 +20,8 @@ import {
   todayLocal,
 } from "@/src/domain/utils/dateUtils";
 
-export const CURRENT_CYCLE_KEY = ["current-cycle"] as const;
+// Re-export from query keys registry for backward compatibility
+export const CURRENT_CYCLE_KEY = QUERY_KEYS.currentCycle();
 
 // ─── Pure helper functions (also used by CycleIntelligence in Phase 3) ───────
 
@@ -92,7 +94,7 @@ export function useCurrentCycle(
   periodLen = CYCLE_DEFAULTS.PERIOD_DURATION,
 ) {
   return useQuery<DerivedCycleData | null>({
-    queryKey: CURRENT_CYCLE_KEY,
+    queryKey: QUERY_KEYS.currentCycle(),
     queryFn: async () => {
       const {
         data: { user },
