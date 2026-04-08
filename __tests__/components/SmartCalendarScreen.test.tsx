@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
 
+import { renderWithProviders } from "../testUtils";
 import {
     SmartCalendarScreen,
     type CycleDataMap,
@@ -35,18 +35,9 @@ jest.mock("@/hooks/useDailyLogs", () => ({
   useDailyLogs: () => ({ data: [] }),
 }));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: false },
-    mutations: { retry: false },
-  },
-});
-
 function renderScreen(cycleData?: CycleDataMap) {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <SmartCalendarScreen cycleData={cycleData} />
-    </QueryClientProvider>,
+  return renderWithProviders(
+    <SmartCalendarScreen cycleData={cycleData} />
   );
 }
 

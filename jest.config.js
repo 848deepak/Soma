@@ -22,6 +22,7 @@ module.exports = {
     "**/__tests__/**/*.[jt]s?(x)",
     "**/?(*.)+(spec|test).[jt]s?(x)",
     "!**/__tests__/e2e/**",
+    "!**/__tests__/testUtils.*",
   ],
   collectCoverageFrom: [
     "src/**/*.{ts,tsx}",

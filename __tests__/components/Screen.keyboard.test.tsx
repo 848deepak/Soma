@@ -1,12 +1,12 @@
 import React from "react";
-import { render } from "@testing-library/react-native";
 import { ScrollView } from "react-native";
 
+import { renderWithProviders } from "../testUtils";
 import { Screen } from "@/src/components/ui/Screen";
 
 describe("Screen keyboard behavior", () => {
   it("configures ScrollView to keep form interactions usable while keyboard is open", () => {
-    const view = render(
+    const view = renderWithProviders(
       <Screen>
         <></>
       </Screen>,

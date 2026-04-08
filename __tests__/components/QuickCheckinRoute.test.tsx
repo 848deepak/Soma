@@ -1,5 +1,5 @@
 import React from "react";
-import { render } from "@testing-library/react-native";
+import { renderWithProviders } from "../testUtils";
 
 const mockRedirectSpy = jest.fn();
 
@@ -18,7 +18,7 @@ describe("QuickCheckinRoute", () => {
   });
 
   it("redirects legacy quick-checkin route to canonical daily log route", () => {
-    render(<QuickCheckinRoute />);
+    renderWithProviders(<QuickCheckinRoute />);
 
     expect(mockRedirectSpy).toHaveBeenCalledWith("/log");
   });

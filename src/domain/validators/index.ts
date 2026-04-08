@@ -97,7 +97,7 @@ export function validateDailyLog(
 
   // Optional: flow_level (0-3 for daily log, not 4 which is quick-check only)
   if (log.flow_level !== undefined && log.flow_level !== null) {
-    if (!Number.isInteger(log.flow_level) || !FLOW_OPTIONS.includes(log.flow_level as FlowLevel)) {
+    if (!Number.isInteger(log.flow_level) || !FLOW_OPTIONS.includes(log.flow_level as number as typeof FLOW_OPTIONS[number])) {
       details.flow_level = 'validation.invalid_flow_level';
     }
   }
@@ -136,13 +136,6 @@ export function validateDailyLog(
       details.notes = 'validation.notes_must_be_string';
     } else if (log.notes.length > 1000) {
       details.notes = 'validation.notes_too_long';
-    }
-  }
-
-  // Optional: fertility_flow_level (only if provided, same validation as flow_level)
-  if (log.fertility_flow_level !== undefined && log.fertility_flow_level !== null) {
-    if (!Number.isInteger(log.fertility_flow_level) || !FLOW_OPTIONS.includes(log.fertility_flow_level as FlowLevel)) {
-      details.fertility_flow_level = 'validation.invalid_fertility_flow_level';
     }
   }
 

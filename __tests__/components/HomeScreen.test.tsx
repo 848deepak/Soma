@@ -5,13 +5,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   fireEvent,
-  render,
   screen,
   waitFor,
 } from "@testing-library/react-native";
 import React from "react";
 
-import { AuthProvider } from "@/src/context/AuthProvider";
+import { renderWithProviders } from "../testUtils";
 import { HomeScreen } from "@/src/screens/HomeScreen";
 
 // Mock navigation
@@ -96,23 +95,12 @@ jest.mock("@/src/store/useCycleStore", () => ({
   },
 }));
 
-// Test wrapper
-function TestWrapper({ children }: { children: React.ReactNode }) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
-    </QueryClientProvider>
-  );
-}
-
-describe("HomeScreen", () => {
+const mockPush = jest.fn();
+jest.mock("expo-router", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
   beforeEach(() => {
     jest.clearAllMocks();
     mockCurrentCycleData = {
@@ -128,10 +116,8 @@ describe("HomeScreen", () => {
   });
 
   it("renders greeting with user name", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -142,10 +128,8 @@ describe("HomeScreen", () => {
   });
 
   it("displays cycle day and phase", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -155,10 +139,8 @@ describe("HomeScreen", () => {
   });
 
   it("does not render disabled hydration widget", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -168,10 +150,8 @@ describe("HomeScreen", () => {
   });
 
   it("does not render disabled sleep widget", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -181,10 +161,8 @@ describe("HomeScreen", () => {
   });
 
   it("displays mood and energy levels", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -194,10 +172,8 @@ describe("HomeScreen", () => {
   });
 
   it("renders action buttons", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -207,10 +183,8 @@ describe("HomeScreen", () => {
   });
 
   it("renders dashboard content with current data", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -221,10 +195,8 @@ describe("HomeScreen", () => {
   });
 
   it("routes both log entry points to canonical log screen", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -248,10 +220,8 @@ describe("HomeScreen", () => {
       cycle: null,
     };
 
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -264,10 +234,8 @@ describe("HomeScreen", () => {
   });
 
   it("shows Care Circle entry card when not connected", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -296,10 +264,8 @@ describe("HomeScreen", () => {
       }),
     }));
 
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {
@@ -309,10 +275,8 @@ describe("HomeScreen", () => {
   });
 
   it("navigates to care-circle route when Care Circle card is tapped", async () => {
-    render(
-      <TestWrapper>
-        <HomeScreen />
-      </TestWrapper>,
+    renderWithProviders(
+      <HomeScreen />
     );
 
     await waitFor(() => {

@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
 
+import { renderWithProviders } from "../testUtils";
 import { PeriodLogModal } from "@/src/components/ui/PeriodLogModal";
 
 describe("PeriodLogModal", () => {
@@ -13,7 +14,7 @@ describe("PeriodLogModal", () => {
   });
 
   it("defaults start date to today when opened", () => {
-    render(
+    renderWithProviders(
       <PeriodLogModal
         visible
         onClose={jest.fn()}
@@ -28,7 +29,7 @@ describe("PeriodLogModal", () => {
   it("allows manual override and submits entered values", () => {
     const onSubmit = jest.fn();
 
-    render(
+    renderWithProviders(
       <PeriodLogModal
         visible
         onClose={jest.fn()}
@@ -54,7 +55,7 @@ describe("PeriodLogModal", () => {
   });
 
   it("supports quick date actions for start date", () => {
-    render(
+    renderWithProviders(
       <PeriodLogModal
         visible
         onClose={jest.fn()}
@@ -76,7 +77,7 @@ describe("PeriodLogModal", () => {
   it("blocks submit when end date is before start date", () => {
     const onSubmit = jest.fn();
 
-    render(
+    renderWithProviders(
       <PeriodLogModal
         visible
         onClose={jest.fn()}

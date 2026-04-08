@@ -6,7 +6,9 @@
  * and trend insights with mock data.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
+
+import { renderWithProviders } from "../testUtils";
 
 const mockLogDataAccess = jest.fn();
 
@@ -77,7 +79,7 @@ describe('InsightsScreen', () => {
   });
 
   it('emits observability event for insights overview', () => {
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
 
     expect(mockLogDataAccess).toHaveBeenCalledWith(
       'cycle_data',
@@ -87,33 +89,33 @@ describe('InsightsScreen', () => {
   });
 
   it('renders without crashing', () => {
-    expect(() => render(<InsightsScreen />)).not.toThrow();
+    expect(() => renderWithProviders(<InsightsScreen />)).not.toThrow();
   });
 
   it('shows page title "Body Trends"', () => {
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText(/Body/)).toBeTruthy();
   });
 
   it('shows "Cycle History" section header', () => {
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Cycle History')).toBeTruthy();
   });
 
   it('shows "Symptom Patterns" section header', () => {
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Symptom Patterns')).toBeTruthy();
   });
 
   it('shows empty state when no cycles available', () => {
     (useCycleHistory as jest.Mock).mockReturnValue({ data: [], isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText(/Complete your first cycle/)).toBeTruthy();
   });
 
   it('shows empty state when no symptoms logged', () => {
     (useDailyLogs as jest.Mock).mockReturnValue({ data: [], isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText(/Log symptoms to see patterns/)).toBeTruthy();
   });
 
@@ -121,7 +123,7 @@ describe('InsightsScreen', () => {
     (useCycleHistory as jest.Mock).mockReturnValue({ data: [], isLoading: true });
     (useDailyLogs as jest.Mock).mockReturnValue({ data: [], isLoading: true });
     // Should render loading state without errors
-    expect(() => render(<InsightsScreen />)).not.toThrow();
+    expect(() => renderWithProviders(<InsightsScreen />)).not.toThrow();
   });
 
   it('shows cycle history bars when cycle data is available', () => {
@@ -131,7 +133,7 @@ describe('InsightsScreen', () => {
       makeCycle('2024-03-01', 29),
     ];
     (useCycleHistory as jest.Mock).mockReturnValue({ data: cycles, isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     // Month labels should appear
     expect(screen.getByText('Jan')).toBeTruthy();
     expect(screen.getByText('Feb')).toBeTruthy();
@@ -145,7 +147,7 @@ describe('InsightsScreen', () => {
       makeLog('2024-01-03', ['Cramps']),
     ];
     (useDailyLogs as jest.Mock).mockReturnValue({ data: logs, isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Cramps')).toBeTruthy();
   });
 
@@ -154,7 +156,7 @@ describe('InsightsScreen', () => {
       data: [makeCycle('2024-01-01', 28)],
       isLoading: false,
     });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Keep Logging')).toBeTruthy();
   });
 
@@ -165,7 +167,7 @@ describe('InsightsScreen', () => {
       makeCycle('2024-03-01', 28),
     ];
     (useCycleHistory as jest.Mock).mockReturnValue({ data: cycles, isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Very Regular')).toBeTruthy();
   });
 
@@ -176,7 +178,7 @@ describe('InsightsScreen', () => {
       makeCycle('2024-03-01', 34), // delta +6
     ];
     (useCycleHistory as jest.Mock).mockReturnValue({ data: cycles, isLoading: false });
-    render(<InsightsScreen />);
+    renderWithProviders(<InsightsScreen />);
     expect(screen.getByText('Cycle Lengthening')).toBeTruthy();
   });
 });

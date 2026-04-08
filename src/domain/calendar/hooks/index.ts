@@ -5,8 +5,7 @@
  * Use: import { useDailyLogs, useCycleCalendar } from '@/domain/calendar/hooks';
  */
 
-export { useDailyLogs, useDailyLogsByDateRange } from './useDailyLogs';
-export type { DailyLog } from './useDailyLogs';
+export { useDailyLogs, useDailyLogsByDateRange, useTodayLog } from './useDailyLogs';
 
-export { useCycleCalendar } from './useCycleCalendar';
-export type { CycleCalendarQuery } from './useCycleCalendar';
+export { useCycleCalendar, buildCycleDataMap } from './useCycleCalendar';
+export type { CycleStatus, CycleDataMap } from './useCycleCalendar';

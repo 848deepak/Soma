@@ -251,7 +251,7 @@ export function HomeScreen() {
   useEffect(() => {
     // Force show content after 10 seconds even if still loading (reduced from 15s)
     const timeoutId = setTimeout(() => {
-      logWarn("loading_timeout_homescreen", {
+      logWarn("performance", "loading_timeout_homescreen", {
         message: "Loading timeout reached, showing content with fallbacks",
       });
       setForceShow(true);
@@ -352,7 +352,7 @@ export function HomeScreen() {
   useEffect(() => {
     // Force show content after 10 seconds even if still loading (reduced from 15s)
     const timeoutId = setTimeout(() => {
-      logWarn("loading_timeout_homescreen", {
+      logWarn("performance", "loading_timeout_homescreen", {
         message: "Loading timeout reached, showing content with fallbacks",
       });
       setForceShow(true);
@@ -801,7 +801,7 @@ export function HomeScreen() {
                     justifyContent: "space-between",
                   }}
                 >
-                  {miniCalendar.map((item) => (
+                  {miniCalendar.map((item: { day: string; date: number; isCurrent: boolean; hasPeriod: boolean }) => (
                     <View
                       key={`${item.day}-${item.date}`}
                       style={{ alignItems: "center" }}

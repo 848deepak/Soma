@@ -7,6 +7,7 @@ import {
     waitFor,
 } from "@testing-library/react-native";
 import { Alert } from "react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { THEME_PREFERENCE_KEY } from "@/src/constants/storage";
 import { ThemeProvider } from "@/src/context/ThemeContext";
@@ -58,7 +59,7 @@ jest.mock("@/src/services/notificationService", () => ({
     mockScheduleDailyLogReminder(...args),
 }));
 
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth/hooks/useProfile", () => ({
   useProfile: jest.fn(() => ({
     data: mockProfileData,
     isLoading: false,
@@ -76,7 +77,7 @@ jest.mock("@/hooks/useProfile", () => ({
   })),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => ({
+jest.mock("@/src/domain/cycle/hooks/useCurrentCycle", () => ({
   useCurrentCycle: jest.fn(() => ({
     data: {
       cycle: {
@@ -87,7 +88,7 @@ jest.mock("@/hooks/useCurrentCycle", () => ({
   })),
 }));
 
-jest.mock("@/hooks/useCycleActions", () => ({
+jest.mock("@/src/domain/cycle/hooks/useCycleActions", () => ({
   useStartNewCycle: jest.fn(() => ({
     mutateAsync: mockStartNewCycleMutateAsync,
     isPending: false,
@@ -131,8 +132,17 @@ describe("Settings reset safety flow", () => {
     (Alert.alert as jest.Mock).mockRestore?.();
   });
 
+  const renderWithQueryClient = (component: React.ReactElement) => {
+    const queryClient = new QueryClient();
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>{component}</ThemeProvider>
+      </QueryClientProvider>
+    );
+  };
+
   it("reset predictions confirmation triggers non-destructive mutation only", async () => {
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     expect(screen.getByText("Reset Predictions")).toBeTruthy();
     expect(
@@ -170,7 +180,7 @@ describe("Settings reset safety flow", () => {
   });
 
   it("delete all data remains a separate explicit destructive flow", async () => {
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     fireEvent.press(screen.getByText("Delete Account"));
 
@@ -195,7 +205,7 @@ describe("Settings reset safety flow", () => {
   });
 
   it.skip("keeps save disabled and blocks update when cycle length is invalid", async () => {
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     fireEvent.press(screen.getByText("Edit"));
 
@@ -221,7 +231,7 @@ describe("Settings reset safety flow", () => {
   });
 
   it.skip("allows saving when changes are valid", async () => {
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     fireEvent.press(screen.getByText("Edit"));
 
@@ -254,7 +264,7 @@ describe("Settings reset safety flow", () => {
 
   it("keeps reminders off and prompts for permission when denied", async () => {
     mockRequestPermissions.mockResolvedValueOnce({ granted: false });
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     await act(async () => {
       fireEvent(
@@ -279,7 +289,7 @@ describe("Settings reset safety flow", () => {
     mockUpdateNotificationPreferencesMutateAsync.mockRejectedValueOnce(
       new Error("save failed"),
     );
-    render(<SettingsScreen />);
+    renderWithQueryClient(<SettingsScreen />);
 
     await act(async () => {
       fireEvent(

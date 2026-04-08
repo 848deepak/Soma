@@ -20,6 +20,12 @@
  */
 
 import { Platform } from 'react-native';
+import type * as SentryType from '@sentry/react-native';
+
+declare global {
+  var Sentry: (typeof SentryType) | undefined;
+  var posthog: { capture: (event: string, props: Record<string, unknown>) => void } | undefined;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -35,7 +41,14 @@ export type LogCategory =
   | 'error'
   | 'network'
   | 'storage'
-  | 'validation';
+  | 'validation'
+  | 'ui'
+  | 'analytics'
+  | 'audit'
+  | 'error_tracking'
+  | 'notifications'
+  | 'offline_queue'
+  | 'store';
 
 export interface LogEvent {
   level: LogLevel;

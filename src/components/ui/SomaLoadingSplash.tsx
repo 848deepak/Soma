@@ -82,7 +82,7 @@ export function SomaLoadingSplash({
 
     // Auto-hide after timeout
     const timeoutTimer = setTimeout(() => {
-      logWarn("soma_loading_splash_timeout", {
+      logWarn("performance", "soma_loading_splash_timeout", {
         message: "Timeout reached, calling onTimeout",
       });
       onTimeout?.();

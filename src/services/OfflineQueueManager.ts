@@ -240,7 +240,7 @@ export class OfflineQueueManager {
 
             if (op.attemptCount >= op.maxAttempts) {
               // Move to dead-letter
-              logWarn('offline_queue_operation_deadlettered', {
+              logWarn('offline_queue', 'offline_queue_operation_deadlettered', {
                 requestId: op.requestId,
                 attempts: op.attemptCount,
                 error: syncResult.error,

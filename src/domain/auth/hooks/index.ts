@@ -8,5 +8,4 @@
 export { useAuth } from './useAuth';
 export type { AuthState } from './useAuth';
 
-export { useProfile } from './useProfile';
-export type { ProfileQuery } from './useProfile';
+export { useProfile, useUpdateProfile, useNotificationPreferences, useUpdateNotificationPreferences, PROFILE_QUERY_KEY } from './useProfile';

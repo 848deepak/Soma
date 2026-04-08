@@ -270,7 +270,7 @@ export async function signUpWithEmail(email: string, password: string) {
 
     // Some environments disable anonymous account upgrade.
     // Fallback: do explicit sign-up FIRST, then clean up anonymous session.
-    let fallbackData: { user: Awaited<ReturnType<typeof supabase.auth.signUp>>['data']['user'] | null } | null = null;
+    let fallbackUser: Awaited<ReturnType<typeof supabase.auth.signUp>>['data']['user'] | null = null;
 
     try {
       // Step 1: Complete the new sign-up with the new email/password
@@ -287,7 +287,7 @@ export async function signUpWithEmail(email: string, password: string) {
         throw new Error('Sign up completed without a user record. Please try again.');
       }
 
-      fallbackData = newSignUpData.user;
+      fallbackUser = newSignUpData.user;
 
       // Step 2: Profile repair for new user
       await ensureProfileRow(newSignUpData.user.id);

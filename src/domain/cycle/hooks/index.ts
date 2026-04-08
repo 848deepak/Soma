@@ -5,13 +5,21 @@
  * Use: import { useCurrentCycle, useCycleActions } from '@/domain/cycle/hooks';
  */
 
-export { useCurrentCycle, CURRENT_CYCLE_KEY, computeCycleDay, computePhase } from './useCurrentCycle';
-export type { CurrentCycleQuery } from './useCurrentCycle';
+export { useCurrentCycle, CURRENT_CYCLE_KEY, computeCycleDay, computePhase, buildMiniCalendar } from './useCurrentCycle';
+export type { DerivedCycleData } from './useCurrentCycle';
 
-export { useCycleActions } from './useCycleActions';
-export type { CycleAction, CycleActionError } from './useCycleActions';
+export {
+  useStartNewCycle,
+  useEndCurrentCycle,
+  useDeleteAllData,
+  useResetPredictions,
+  useLogPeriodRange,
+  logPeriodRangeAction,
+  endCurrentPeriod,
+  resetPredictionsAction,
+} from './useCycleActions';
+export type { PeriodRangeInput, ResetPredictionsInput, EndCurrentPeriodResult } from './useCycleActions';
 
 export { useCycleHistory } from './useCycleHistory';
-export type { CycleHistoryQuery } from './useCycleHistory';
 
 export { usePeriodAutoEnd } from './usePeriodAutoEnd';

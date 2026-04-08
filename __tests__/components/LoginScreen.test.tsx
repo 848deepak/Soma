@@ -2,9 +2,10 @@
  * __tests__/components/LoginScreen.test.tsx
  * Component tests for the LoginScreen (sign-in + password reset).
  */
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, waitFor } from "@testing-library/react-native";
 import { Alert } from "react-native";
 
+import { renderWithProviders } from "../testUtils";
 import { resetPassword, signInWithEmail } from "@/lib/auth";
 import { LoginScreen } from "@/src/screens/LoginScreen";
 
@@ -37,30 +38,30 @@ afterEach(() => {
 
 describe("LoginScreen – login mode", () => {
   it("renders email and password inputs", () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     expect(getByTestId("email-input")).toBeTruthy();
     expect(getByTestId("password-input")).toBeTruthy();
   });
 
   it("renders the Sign In button", () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     expect(getByTestId("primary-button")).toBeTruthy();
   });
 
   it("shows forgot-password and create-account links in login mode", () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     expect(getByTestId("forgot-password-button")).toBeTruthy();
     expect(getByTestId("create-account-button")).toBeTruthy();
   });
 
   it("shows the skip button for anonymous use", () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     expect(getByTestId("skip-button")).toBeTruthy();
   });
 
   it("alerts when email and password are empty", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("primary-button"));
     expect(Alert.alert).toHaveBeenCalledWith(
       "Missing fields",
@@ -69,7 +70,7 @@ describe("LoginScreen – login mode", () => {
   });
 
   it("calls signInWithEmail with trimmed credentials", async () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.changeText(getByTestId("email-input"), "  test@example.com  ");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.press(getByTestId("primary-button"));
@@ -103,7 +104,7 @@ describe("LoginScreen – login mode", () => {
   it("shows alert on sign in failure", async () => {
     jest.spyOn(Alert, "alert");
     mockSignIn.mockRejectedValueOnce(new Error("Invalid credentials"));
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.changeText(getByTestId("email-input"), "bad@example.com");
     fireEvent.changeText(getByTestId("password-input"), "wrongpass");
     fireEvent.press(getByTestId("primary-button"));
@@ -116,13 +117,13 @@ describe("LoginScreen – login mode", () => {
   });
 
   it("navigates to welcome when skip button is pressed", async () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("skip-button"));
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/welcome"));
   });
 
   it("navigates to signup when create account is pressed", () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("create-account-button"));
     expect(mockPush).toHaveBeenCalledWith("/auth/signup");
   });
@@ -149,7 +150,7 @@ describe("LoginScreen – reset mode", () => {
 
   it("alerts when email is empty in reset mode", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     fireEvent.press(getByTestId("primary-button"));
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -159,7 +160,7 @@ describe("LoginScreen – reset mode", () => {
   });
 
   it("calls resetPassword with trimmed email", async () => {
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     fireEvent.changeText(getByTestId("email-input"), "  user@example.com  ");
     fireEvent.press(getByTestId("primary-button"));
@@ -179,7 +180,7 @@ describe("LoginScreen – reset mode", () => {
   it("shows error alert when reset password fails", async () => {
     jest.spyOn(Alert, "alert");
     mockResetPw.mockRejectedValueOnce(new Error("Email not found"));
-    const { getByTestId } = render(<LoginScreen />);
+    const { getByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     fireEvent.changeText(getByTestId("email-input"), "unknown@example.com");
     fireEvent.press(getByTestId("primary-button"));
