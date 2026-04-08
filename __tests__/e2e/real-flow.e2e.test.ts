@@ -1,6 +1,7 @@
 import {
   clearUserDailyData,
   createRealSupabaseClient,
+  disposeRealSupabaseClient,
   loadLocalEnvFallback,
   todayIso,
 } from './realTestUtils';
@@ -17,8 +18,18 @@ const hasRealEnv = Boolean(
 const describeReal = hasRealEnv ? describe : describe.skip;
 
 describeReal('Real User Flow (Auth + Data)', () => {
+  const clientsToDispose: ReturnType<typeof createRealSupabaseClient>[] = [];
   const testEmail = process.env.SUPABASE_TEST_USER_EMAIL;
   const testPassword = process.env.SUPABASE_TEST_PASSWORD;
+
+  afterEach(async () => {
+    while (clientsToDispose.length > 0) {
+      const client = clientsToDispose.pop();
+      if (client) {
+        await disposeRealSupabaseClient(client);
+      }
+    }
+  });
 
   beforeAll(() => {
     if (!testEmail || !testPassword) {
@@ -30,6 +41,7 @@ describeReal('Real User Flow (Auth + Data)', () => {
 
   it('runs signup -> login -> session -> log write/read and optional partner step', async () => {
     const supabase = createRealSupabaseClient();
+    clientsToDispose.push(supabase);
     const email = testEmail!;
     const password = testPassword!;
 

@@ -4,9 +4,13 @@ import { Animated } from "react-native";
 import { renderWithProviders } from "../testUtils";
 import { SomaLoadingSplash } from "@/src/components/ui/SomaLoadingSplash";
 
-jest.mock("@/src/context/ThemeContext", () => ({
-  useAppTheme: jest.fn(),
-}));
+jest.mock("@/src/context/ThemeContext", () => {
+  const actual = jest.requireActual("@/src/context/ThemeContext");
+  return {
+    ...actual,
+    useAppTheme: jest.fn(),
+  };
+});
 
 describe("SomaLoadingSplash", () => {
   afterEach(() => {

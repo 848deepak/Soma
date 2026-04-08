@@ -21,18 +21,18 @@ jest.mock('@/src/services/auditService', () => ({
   logDataAccess: (...args: any[]) => mockLogDataAccess(...args),
 }));
 
-jest.mock('@/hooks/useCycleHistory', () => ({
+jest.mock('@/src/domain/cycle', () => ({
   useCycleHistory: jest.fn(),
 }));
 
-jest.mock('@/hooks/useDailyLogs', () => ({
+jest.mock('@/src/domain/calendar', () => ({
   useDailyLogs: jest.fn(),
   useTodayLog: jest.fn(() => ({ data: null, isLoading: false })),
 }));
 
 import { InsightsScreen } from '@/src/screens/InsightsScreen';
-import { useCycleHistory } from '@/hooks/useCycleHistory';
-import { useDailyLogs } from '@/hooks/useDailyLogs';
+import { useCycleHistory } from '@/src/domain/cycle';
+import { useDailyLogs } from '@/src/domain/calendar';
 import type { CompletedCycle, DailyLogRow, SymptomOption } from '@/types/database';
 
 function makeCycle(startDate: string, length: number): CompletedCycle {

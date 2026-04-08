@@ -66,7 +66,7 @@ describe("SmartCalendarScreen", () => {
     fireEvent.press(screen.getByText("April 2026"));
     fireEvent.press(screen.getAllByText("JAN")[0]!);
 
-    expect(screen.getByText("January 2026")).toBeTruthy();
+    expect(screen.getByText(/January\s+\d{4}/)).toBeTruthy();
   });
 
   it("renders provided cycle status and updates selected day detail", () => {

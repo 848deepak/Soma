@@ -19,14 +19,18 @@ jest.mock("@/src/services/encryptionService", () => ({
   },
 }));
 
-function Wrapper({ children }: { children: ReactNode }) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: {
+      retry: false,
+      // Prevent GC timeout handles from keeping Jest alive.
+      gcTime: Infinity,
     },
-  });
+  },
+});
 
+function Wrapper({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
@@ -42,11 +46,16 @@ describe("useSaveLog concurrent merge safety", () => {
   beforeEach(() => {
     jest.useRealTimers();
     jest.clearAllMocks();
+    queryClient.clear();
 
     (supabase.auth.getUser as jest.Mock).mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
     });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
   });
 
   it("preserves previously written fields when two saves happen concurrently", async () => {
@@ -97,7 +106,7 @@ describe("useSaveLog concurrent merge safety", () => {
       throw new Error(`Unexpected table: ${table}`);
     });
 
-    const { result } = renderHook(() => useSaveLog(), { wrapper: Wrapper });
+    const { result, unmount } = renderHook(() => useSaveLog(), { wrapper: Wrapper });
 
     await act(async () => {
       await Promise.all([
@@ -113,5 +122,7 @@ describe("useSaveLog concurrent merge safety", () => {
     expect(finalPayload.notes).toBe("Morning");
     expect(finalPayload.mood).toBe("Happy");
     expect(finalPayload.flow_level).toBe(2);
+
+    unmount();
   });
 });

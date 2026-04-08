@@ -1,6 +1,7 @@
 import {
   clearUserDailyData,
   createRealSupabaseClient,
+  disposeRealSupabaseClient,
   loadLocalEnvFallback,
   todayIso,
 } from './realTestUtils';
@@ -36,6 +37,7 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Pro
 
 describeReal('Real Supabase DB Flow', () => {
   jest.setTimeout(120000);
+  const clientsToDispose: ReturnType<typeof createRealSupabaseClient>[] = [];
 
   const testEmail = process.env.SUPABASE_TEST_USER_EMAIL;
   const testPassword = process.env.SUPABASE_TEST_PASSWORD;
@@ -50,21 +52,22 @@ describeReal('Real Supabase DB Flow', () => {
     }
   });
 
+  afterEach(async () => {
+    while (clientsToDispose.length > 0) {
+      const client = clientsToDispose.pop();
+      if (client) {
+        await disposeRealSupabaseClient(client);
+      }
+    }
+  });
+
+  afterAll(() => {
+    jest.useFakeTimers();
+  });
+
   async function signInForCrud() {
     const supabase = createRealSupabaseClient();
-    const anonSignIn = await withTimeout(
-      supabase.auth.signInAnonymously(),
-      15000,
-      'anonymous sign-in attempt',
-    );
-    if (!anonSignIn.error) {
-      return {
-        supabase,
-        userId: anonSignIn.data.user?.id,
-      };
-    }
-
-    // Anonymous auth is disabled; use email/password credentials
+    clientsToDispose.push(supabase);
     const emailSignIn = await withTimeout(
       supabase.auth.signInWithPassword({
         email: testEmail!,
@@ -178,9 +181,22 @@ describeReal('Real Supabase DB Flow', () => {
     const date = todayIso();
 
     const eventPromise = new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => resolve(false), 10000);
+      let settled = false;
+      let channel: ReturnType<typeof supabase.channel> | null = null;
 
-      const channel = supabase
+      const finish = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (channel) {
+          void supabase.removeChannel(channel);
+        }
+        resolve(value);
+      };
+
+      const timeout = setTimeout(() => finish(false), 10000);
+
+      channel = supabase
         .channel(`real-db-${userId}-${Date.now()}`)
         .on(
           'postgres_changes',
@@ -190,11 +206,7 @@ describeReal('Real Supabase DB Flow', () => {
             table: 'daily_logs',
             filter: `user_id=eq.${userId}`,
           },
-          () => {
-            clearTimeout(timeout);
-            void supabase.removeChannel(channel);
-            resolve(true);
-          },
+          () => finish(true),
         )
         .subscribe();
     });

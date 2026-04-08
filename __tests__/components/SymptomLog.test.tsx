@@ -16,7 +16,7 @@ jest.mock("@/lib/auth");
 jest.mock("expo-router");
 jest.mock("expo-haptics");
 
-jest.mock("@/hooks/useDailyLogs", () => ({
+jest.mock("@/src/domain/calendar", () => ({
   useDailyLogs: jest.fn(() => ({ data: [], isLoading: false })),
   useTodayLog: jest.fn(),
 }));
@@ -25,28 +25,25 @@ jest.mock("@/hooks/useSaveLog", () => ({
   useSaveLog: jest.fn(),
 }));
 
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth", () => ({
   useProfile: jest.fn(() => ({
     data: { cycle_length_average: 28, period_duration_average: 5 },
     isLoading: false,
   })),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => ({
+jest.mock("@/src/domain/cycle", () => ({
   useCurrentCycle: jest.fn(() => ({
     data: { cycle: null },
   })),
-}));
-
-jest.mock("@/hooks/useCycleActions", () => ({
   useEndCurrentCycle: jest.fn(() => ({
     mutateAsync: jest.fn(),
     isPending: false,
   })),
 }));
 
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useCurrentCycle } from "@/src/domain/cycle";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { DailyLogScreen } from "@/src/screens/DailyLogScreen";
 import { useRouter } from "expo-router";
