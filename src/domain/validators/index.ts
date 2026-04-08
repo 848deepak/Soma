@@ -528,8 +528,11 @@ export function validateNotificationPreferences(
       details.timezone = 'validation.timezone_must_be_string';
     } else {
       try {
-        const supportedTimezones = Intl.supportedValuesOf('timeZone');
-        if (!supportedTimezones.includes(prefs.timezone as string)) {
+        const intlWithSupportedValuesOf = Intl as typeof Intl & {
+          supportedValuesOf?: (key: 'timeZone') => string[];
+        };
+        const supportedTimezones = intlWithSupportedValuesOf.supportedValuesOf?.('timeZone');
+        if (supportedTimezones && !supportedTimezones.includes(prefs.timezone as string)) {
           details.timezone = 'validation.timezone_not_supported';
         }
       } catch {

@@ -86,7 +86,7 @@ describe("LoginScreen – login mode", () => {
     // Per architectural change (TASK 2): LoginScreen no longer routes after login.
     // AuthBootstrap in _layout.tsx handles all routing decisions.
     // This test verifies that sign-in succeeds and consent is recorded.
-    const { getByTestId, queryByText } = render(<LoginScreen />);
+    const { getByTestId, queryByText } = renderWithProviders(<LoginScreen />);
     fireEvent.changeText(getByTestId("email-input"), "test@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.press(getByTestId("primary-button"));
@@ -131,19 +131,19 @@ describe("LoginScreen – login mode", () => {
 
 describe("LoginScreen – reset mode", () => {
   it("switches to reset mode on forgot-password press", () => {
-    const { getByTestId, getByText } = render(<LoginScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     expect(getByText("Reset password")).toBeTruthy();
   });
 
   it("hides password input in reset mode", () => {
-    const { getByTestId, queryByTestId } = render(<LoginScreen />);
+    const { getByTestId, queryByTestId } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     expect(queryByTestId("password-input")).toBeNull();
   });
 
   it("shows Send Reset Link button in reset mode", () => {
-    const { getByTestId, getByText } = render(<LoginScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     expect(getByText("Send Reset Link")).toBeTruthy();
   });
@@ -170,7 +170,7 @@ describe("LoginScreen – reset mode", () => {
   });
 
   it("shows recovery email sent confirmation after successful reset", async () => {
-    const { getByTestId, getByText } = render(<LoginScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     fireEvent.changeText(getByTestId("email-input"), "user@example.com");
     fireEvent.press(getByTestId("primary-button"));
@@ -190,7 +190,7 @@ describe("LoginScreen – reset mode", () => {
   });
 
   it("returns to login mode via back to sign in link", () => {
-    const { getByTestId, getByText } = render(<LoginScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<LoginScreen />);
     fireEvent.press(getByTestId("forgot-password-button"));
     fireEvent.press(getByText("← Back to sign in"));
     expect(getByText("Welcome back")).toBeTruthy();

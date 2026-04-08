@@ -150,7 +150,7 @@ interface RootErrorBoundaryWithRouterContextProps {
   router: any;
 }
 
-class RootErrorBoundaryWithRouterContext extends React.Component<
+export class RootErrorBoundaryWithRouterContext extends React.Component<
   RootErrorBoundaryWithRouterContextProps,
   State
 > {

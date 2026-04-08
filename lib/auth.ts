@@ -220,6 +220,26 @@ export async function getCurrentUser() {
 }
 
 /**
+ * Returns the authenticated user's profile row, or null if missing.
+ */
+export async function getProfile() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Could not load profile.');
+  }
+
+  return data;
+}
+
+/**
  * Signs in anonymously if the user has no session.
  * Safe to call multiple times – does nothing if a session already exists.
  * Throws on Supabase errors so the caller can handle or surface the failure.

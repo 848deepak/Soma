@@ -113,7 +113,7 @@ describe("SignupScreen – input validation", () => {
 
 describe("SignupScreen – successful signup", () => {
   function fillValidForm(
-    getByTestId: ReturnType<typeof render>["getByTestId"],
+    getByTestId: ReturnType<typeof renderWithProviders>["getByTestId"],
   ) {
     fireEvent.changeText(getByTestId("email-input"), "newuser@example.com");
     fireEvent.changeText(getByTestId("password-input"), "securePass1");
@@ -142,21 +142,21 @@ describe("SignupScreen – successful signup", () => {
   });
 
   it("shows success screen after account creation", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Check your email")).toBeTruthy());
   });
 
   it("success screen shows Go to Sign In button", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
   });
 
   it("Go to Sign In navigates to login", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
@@ -184,7 +184,7 @@ describe("SignupScreen – signup failure", () => {
 
   it("does not show success screen after failure", async () => {
     mockSignUp.mockRejectedValueOnce(new Error("Something went wrong"));
-    const { getByTestId, queryByText } = render(<SignupScreen />);
+    const { getByTestId, queryByText } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "user@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.changeText(getByTestId("confirm-password-input"), "password123");
