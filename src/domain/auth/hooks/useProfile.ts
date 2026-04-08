@@ -20,7 +20,7 @@ import type {
 // Re-export from query keys registry for backward compatibility
 export const PROFILE_QUERY_KEY = (userId: string) => QUERY_KEYS.profile(userId);
 export const NOTIFICATION_PREFERENCES_QUERY_KEY =
-  QUERY_KEYS.notificationPreferences;
+  QUERY_KEYS.notificationPreferences();
 
 const DEFAULT_NOTIFICATION_PREFERENCES: Omit<
   NotificationPreferenceRow,

@@ -109,9 +109,7 @@ export async function logPeriodRangeAction({
       );
 
       const clientWrittenAt = new Date().toISOString();
-      await enqueueSync("cycles", resolvedActiveCycle.id, "upsert", encryptedPayload, {
-        clientWrittenAt,
-      });
+      await enqueueSync("cycles", resolvedActiveCycle.id, "upsert", encryptedPayload);
       queuedForSync = true;
     }
   } else {

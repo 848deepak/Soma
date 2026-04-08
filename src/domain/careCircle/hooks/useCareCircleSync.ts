@@ -96,8 +96,9 @@ export function useCareCircleSync(userId: string | undefined) {
               },
             });
 
-            logDataAccess('care_circle', 'access_revoked_realtime', {
+            logDataAccess('care_circle', 'update_consent', {
               viewer_user_id: userId,
+              action: 'access_revoked',
               revoked_at: new Date().toISOString(),
             });
           } else if (isPrimaryRevoking) {
@@ -121,8 +122,9 @@ export function useCareCircleSync(userId: string | undefined) {
               },
             });
 
-            logDataAccess('care_circle', 'revoked_viewer_realtime', {
+            logDataAccess('care_circle', 'update_consent', {
               user_id: userId,
+              action: 'revoked_viewer_access',
               revoked_viewer_id: revokedViewerId,
               revoked_at: new Date().toISOString(),
             });
