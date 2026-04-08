@@ -11,6 +11,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PostHog from "posthog-react-native";
 import { captureException } from "./errorTracking";
+import { logInfo } from "@/platform/monitoring/logger";
 
 type PostHogStatic = {
   initPostHog?: (apiKey: string, options: Record<string, unknown>) => Promise<void>;
@@ -75,7 +76,9 @@ class AnalyticsService {
           enableSessionRecording: false, // Respect privacy
         });
 
-        console.log("[Analytics] PostHog initialized");
+        logInfo('analytics', 'posthog_initialized', {
+          host: 'https://app.posthog.com',
+        });
       }
 
       this.isInitialized = true;

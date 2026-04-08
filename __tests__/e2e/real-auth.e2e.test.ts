@@ -1,11 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import {
   clearUserDailyData,
   createRealSupabaseClient,
+  disposeRealSupabaseClient,
   getRealSupabaseConfig,
   loadLocalEnvFallback,
 } from './realTestUtils';
+
+function fetchWithConnectionClose(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  headers.set('Connection', 'close');
+  return fetch(input, { ...init, headers });
+}
 
 loadLocalEnvFallback();
 
@@ -19,8 +29,18 @@ const hasRealEnv = Boolean(
 const describeReal = hasRealEnv ? describe : describe.skip;
 
 describeReal('Real Supabase Auth Flow', () => {
+  const clientsToDispose: SupabaseClient[] = [];
   const testEmail = process.env.SUPABASE_TEST_USER_EMAIL;
   const testPassword = process.env.SUPABASE_TEST_PASSWORD;
+
+  afterEach(async () => {
+    while (clientsToDispose.length > 0) {
+      const client = clientsToDispose.pop();
+      if (client) {
+        await disposeRealSupabaseClient(client);
+      }
+    }
+  });
 
   beforeAll(() => {
     if (!testEmail || !testPassword) {
@@ -32,6 +52,7 @@ describeReal('Real Supabase Auth Flow', () => {
 
   it('signs up, logs in, verifies profile row, refreshes token, and signs out', async () => {
     const supabase = createRealSupabaseClient();
+    clientsToDispose.push(supabase);
     const email = testEmail!;
     const password = testPassword!;
 
@@ -78,22 +99,30 @@ describeReal('Real Supabase Auth Flow', () => {
     };
 
     const persistentClientA = createClient(url, anonKey, {
+      global: {
+        fetch: fetchWithConnectionClose,
+      },
       auth: {
         persistSession: true,
-        autoRefreshToken: true,
+        autoRefreshToken: false,
         detectSessionInUrl: false,
         storage,
       },
     });
+    clientsToDispose.push(persistentClientA);
 
     const persistentClientB = createClient(url, anonKey, {
+      global: {
+        fetch: fetchWithConnectionClose,
+      },
       auth: {
         persistSession: true,
-        autoRefreshToken: true,
+        autoRefreshToken: false,
         detectSessionInUrl: false,
         storage,
       },
     });
+    clientsToDispose.push(persistentClientB);
 
     const setSessionResult = await persistentClientA.auth.setSession({
       access_token: persistedSession!.access_token,

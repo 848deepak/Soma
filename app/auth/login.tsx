@@ -1,8 +1,8 @@
 /**
  * app/auth/login.tsx
  * Expo Router route: /auth/login
- * Renders the LoginScreen component.
+ * Renders the LoginScreen component with error boundary.
  */
-import { LoginScreen } from '@/src/screens/LoginScreen';
+import { LoginScreenWithErrorBoundary } from '@/src/screens/LoginScreen';
 
-export default LoginScreen;
+export default LoginScreenWithErrorBoundary;

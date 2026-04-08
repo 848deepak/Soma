@@ -12,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { logAuthEvent } from "@/lib/logAuthEvent";
 
 const runtimeExtra =
   (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<
@@ -42,18 +43,28 @@ const webStorage = {
   },
 };
 
-const serverNoopStorage = {
-  getItem: async () => null,
-  setItem: async () => undefined,
-  removeItem: async () => undefined,
-};
+/**
+ * Resolves the appropriate auth storage backend based on platform.
+ * Native (iOS/Android): uses AsyncStorage for session persistence.
+ * Web: uses default Supabase web storage (sessionStorage).
+ */
+function resolveAuthStorage() {
+  if (Platform.OS === "web") {
+    // Web: let Supabase use its default web storage (sessionStorage)
+    logAuthEvent({ type: "storage_selected", backend: "web" });
+    return undefined;
+  }
+  // Native (iOS / Android): always use AsyncStorage
+  const platformBackend = Platform.OS === "ios" ? "ios" : "android";
+  logAuthEvent({ type: "storage_selected", backend: platformBackend });
+  return {
+    getItem: (key: string) => AsyncStorage.getItem(key),
+    setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+    removeItem: (key: string) => AsyncStorage.removeItem(key),
+  };
+}
 
-const authStorage =
-  typeof window === "undefined"
-    ? serverNoopStorage
-    : Platform.OS === "web"
-      ? webStorage
-      : AsyncStorage;
+const authStorage = resolveAuthStorage();
 
 function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   const controller = new AbortController();
@@ -90,6 +101,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     // URL-based OAuth callbacks are not used in this React Native app
-    detectSessionInUrl: false,
+    // Only detect URL sessions on web platform
+    detectSessionInUrl: Platform.OS === "web",
   },
 });

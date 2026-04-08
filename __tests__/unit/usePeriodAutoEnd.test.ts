@@ -5,9 +5,13 @@ import { AppState } from "react-native";
 import { usePeriodAutoEnd } from "@/hooks/usePeriodAutoEnd";
 
 jest.mock("@/lib/supabase");
-jest.mock("@/hooks/useCycleActions", () => ({
-  endCurrentPeriod: jest.fn(),
-}));
+jest.mock("@/src/domain/cycle", () => {
+  const actual = jest.requireActual("@/src/domain/cycle");
+  return {
+    ...actual,
+    endCurrentPeriod: jest.fn(),
+  };
+});
 jest.mock("@/src/context/AuthProvider", () => ({
   useAuthContext: jest.fn(),
 }));
@@ -22,7 +26,7 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 
 import { useQueryClient } from "@tanstack/react-query";
-import { endCurrentPeriod } from "@/hooks/useCycleActions";
+import { endCurrentPeriod } from "@/src/domain/cycle";
 import { supabase } from "@/lib/supabase";
 import { useAuthContext } from "@/src/context/AuthProvider";
 import { trackEvent } from "@/src/services/analytics";

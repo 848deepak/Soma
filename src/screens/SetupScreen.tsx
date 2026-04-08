@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { PROFILE_QUERY_KEY, useProfile } from "@/hooks/useProfile";
+import { PROFILE_QUERY_KEY, useProfile } from "@/src/domain/auth";
 import { ensureAnonymousSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { PressableScale } from "@/src/components/ui/PressableScale";
@@ -27,6 +27,16 @@ import {
   validateIsoDate,
   validateMinimumAge,
 } from "@/src/utils/validation";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
+
+function localTodayIso(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
 
 export function SetupScreen() {
   const router = useRouter();
@@ -48,22 +58,18 @@ export function SetupScreen() {
     setDateOfBirth(profile.date_of_birth ?? "");
   }, [profile]);
 
-  const { monthLabel, year, daysInMonth } = useMemo(() => {
+  const { monthLabel, year, dayOfMonth } = useMemo(() => {
     const today = new Date();
     return {
       monthLabel: today.toLocaleDateString(undefined, { month: "long" }),
       year: today.getFullYear(),
-      daysInMonth: new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0,
-      ).getDate(),
+      dayOfMonth: today.getDate(),
     };
   }, []);
 
   const dates = useMemo(
-    () => Array.from({ length: daysInMonth }, (_, index) => index + 1),
-    [daysInMonth],
+    () => Array.from({ length: dayOfMonth }, (_, index) => index + 1),
+    [dayOfMonth],
   );
 
   function validateDetailsStep(): {
@@ -184,6 +190,14 @@ export function SetupScreen() {
         String(selectedDate).padStart(2, "0"),
       ].join("-");
 
+      if (startDate > localTodayIso()) {
+        Alert.alert(
+          "Invalid start date",
+          "Period start date cannot be in the future.",
+        );
+        return;
+      }
+
       const { data: existingCycle, error: cycleFetchError } = await supabase
         .from("cycles")
         .select("id")
@@ -216,6 +230,7 @@ export function SetupScreen() {
       if (profileError) throw profileError;
       if (updatedProfile) {
         queryClient.setQueryData(PROFILE_QUERY_KEY, updatedProfile);
+        await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
       }
 
       await ensureNotificationPreferencesRow(user.id, false);
@@ -475,5 +490,13 @@ export function SetupScreen() {
         </View>
       </Screen>
     </KeyboardAvoidingView>
+  );
+}
+
+export function SetupScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SetupScreen">
+      <SetupScreen />
+    </ScreenErrorBoundary>
   );
 }

@@ -1,27 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Switch, TextInput, View, useColorScheme } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Switch, TextInput, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 
-import { HeaderBar } from '@/src/components/ui/HeaderBar';
-import { PressableScale } from '@/src/components/ui/PressableScale';
-import { Screen } from '@/src/components/ui/Screen';
-import { Typography } from '@/src/components/ui/Typography';
-import { PartnerView } from '@/src/components/PartnerView';
-import { PendingPartnerCard } from '@/src/components/PendingPartnerCard';
-import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
-import { usePartner } from '@/hooks/usePartner';
-import { usePendingConnections } from '@/hooks/usePendingConnections';
-import { isInviteCodeFormat, useEnsurePartnerInviteCode, useLinkPartner } from '@/hooks/useLinkPartner';
-import { logDataAccess } from '@/src/services/auditService';
-import type { PartnerPermissions } from '@/types/database';
+import {
+  isInviteCodeFormat,
+  useEnsurePartnerInviteCode,
+  useLinkPartner,
+} from "@/hooks/useLinkPartner";
+import { usePartner } from "@/hooks/usePartner";
+import { usePendingConnections } from "@/hooks/usePendingConnections";
+import { useProfile, useUpdateProfile } from "@/src/domain/auth";
+import { PartnerView } from "@/src/components/PartnerView";
+import { PendingPartnerCard } from "@/src/components/PendingPartnerCard";
+import { HeaderBar } from "@/src/components/ui/HeaderBar";
+import { PressableScale } from "@/src/components/ui/PressableScale";
+import { Screen } from "@/src/components/ui/Screen";
+import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
+import { logDataAccess } from "@/src/services/auditService";
+import type { PartnerPermissions } from "@/types/database";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Splits a 6-char code into 3 display groups: "A792B1" → ["A7", "92", "B1"] */
 function splitCode(code: string): string[] {
-  const cleaned = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cleaned = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (cleaned.length < 6) {
-    return ['··', '··', '··'];
+    return ["··", "··", "··"];
   }
   return [cleaned.slice(0, 2), cleaned.slice(2, 4), cleaned.slice(4, 6)];
 }
@@ -43,10 +49,24 @@ function PermissionRow({
   disabled?: boolean;
   isDark: boolean;
 }) {
+  const { colors } = useAppTheme();
   return (
-    <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <View
+      style={{
+        marginBottom: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
       <View style={{ flex: 1, paddingRight: 16 }}>
-        <Typography style={{ fontSize: 15, fontWeight: '500', color: isDark ? '#F2F2F2' : '#2D2327' }}>
+        <Typography
+          style={{
+            fontSize: 15,
+            fontWeight: "500",
+            color: colors.textPrimary,
+          }}
+        >
           {title}
         </Typography>
         <Typography variant="helper" style={{ marginTop: 2 }}>
@@ -57,7 +77,7 @@ function PermissionRow({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: '#D7CFCA', true: '#DDA7A5' }}
+        trackColor={{ false: "#D7CFCA", true: colors.primary }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -67,8 +87,8 @@ function PermissionRow({
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export function PartnerSyncScreen() {
-  const [linkCode, setLinkCode] = useState('');
-  const isDark = useColorScheme() === 'dark';
+  const [linkCode, setLinkCode] = useState("");
+  const { theme, isDark, colors } = useAppTheme();
 
   const { data: profile, isLoading: profileLoading } = useProfile();
   const { data: partnerState } = usePartner();
@@ -110,9 +130,7 @@ export function PartnerSyncScreen() {
     share_symptoms: false,
   };
 
-  const codeSegments = inviteCode
-    ? splitCode(inviteCode)
-    : ['··', '··', '··'];
+  const codeSegments = inviteCode ? splitCode(inviteCode) : ["··", "··", "··"];
   const isInviteCodeLoading = profileLoading || isEnsuringInviteCode;
   const hasInviteCode = Boolean(inviteCode);
 
@@ -123,39 +141,47 @@ export function PartnerSyncScreen() {
     marginTop: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.7)',
-    backgroundColor: isDark ? 'rgba(30,33,40,0.85)' : 'rgba(255,255,255,0.75)',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 20,
-    shadowColor: '#DDA7A5',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
     elevation: 3,
   };
 
-  function handlePermissionToggle(key: keyof PartnerPermissions, value: boolean) {
-    updateProfile.mutate({ partner_permissions: { ...permissions, [key]: value } });
+  function handlePermissionToggle(
+    key: keyof PartnerPermissions,
+    value: boolean,
+  ) {
+    updateProfile.mutate({
+      partner_permissions: { ...permissions, [key]: value },
+    });
   }
 
   function handleLinkPartner() {
-    const normalizedLength = linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').length;
+    const normalizedLength = linkCode
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "").length;
     if (normalizedLength !== 6) return;
 
-    void logDataAccess('care_circle', 'request', {
-      source: 'partner_sync_link_attempt',
+    void logDataAccess("care_circle", "request", {
+      source: "partner_sync_link_attempt",
       normalizedLength,
       hasPendingIncoming: (pendingState?.incoming?.length ?? 0) > 0,
       hasPendingOutgoing: (pendingState?.outgoing?.length ?? 0) > 0,
     });
 
-    linkPartner.mutate(linkCode, { onSuccess: () => setLinkCode('') });
+    linkPartner.mutate(linkCode, { onSuccess: () => setLinkCode("") });
   }
 
   useEffect(() => {
     if (profileLoading) return;
 
-    void logDataAccess('care_circle', 'view', {
-      source: 'partner_sync_screen',
+    void logDataAccess("care_circle", "view", {
+      source: "partner_sync_screen",
       hasInviteCode,
       isLinkedAsViewer,
       pendingIncoming: pendingState?.incoming?.length ?? 0,
@@ -177,16 +203,19 @@ export function PartnerSyncScreen() {
 
   return (
     <Screen>
-      <HeaderBar title={'Share Your\nRhythm'} subtitle="Connect with your partner securely." />
+      <HeaderBar
+        title={"Share Your\nRhythm"}
+        subtitle="Connect with your partner securely."
+      />
 
       {/* ── Your Access Key ─────────────────────────────────────────────────── */}
-      <View style={{ ...cardStyle, alignItems: 'center' }}>
+      <View style={{ ...cardStyle, alignItems: "center" }}>
         <Typography
           style={{
             marginBottom: 16,
             fontSize: 16,
-            fontWeight: '600',
-            color: isDark ? '#F2F2F2' : '#2D2327',
+            fontWeight: "600",
+            color: colors.textPrimary,
           }}
         >
           Your Access Key
@@ -198,17 +227,17 @@ export function PartnerSyncScreen() {
             width: 140,
             height: 140,
             borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
+            alignItems: "center",
+            justifyContent: "center",
             marginBottom: 16,
-            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF',
+            backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
             borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(221,167,165,0.2)',
+            borderColor: colors.border,
           }}
         >
           {isInviteCodeLoading ? (
-            <View style={{ alignItems: 'center', gap: 8 }}>
-              <ActivityIndicator size="small" color="#DDA7A5" />
+            <View style={{ alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
               <Typography variant="helper">Preparing access key…</Typography>
             </View>
           ) : hasInviteCode ? (
@@ -216,12 +245,14 @@ export function PartnerSyncScreen() {
               testID="partner-invite-qr"
               value={inviteCode!}
               size={112}
-              color={isDark ? '#F2F2F2' : '#2D2327'}
+              color={isDark ? "#F2F2F2" : "#2D2327"}
               backgroundColor="transparent"
             />
           ) : (
-            <View style={{ alignItems: 'center', gap: 8, paddingHorizontal: 8 }}>
-              <Typography variant="helper" style={{ textAlign: 'center' }}>
+            <View
+              style={{ alignItems: "center", gap: 8, paddingHorizontal: 8 }}
+            >
+              <Typography variant="helper" style={{ textAlign: "center" }}>
                 Could not load code
               </Typography>
               <PressableScale
@@ -229,12 +260,18 @@ export function PartnerSyncScreen() {
                 style={{
                   borderRadius: 999,
                   borderWidth: 1,
-                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(221,167,165,0.35)',
+                  borderColor: colors.border,
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                 }}
               >
-                <Typography style={{ fontSize: 12, fontWeight: '600', color: isDark ? '#F2F2F2' : '#2D2327' }}>
+                <Typography
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: colors.textPrimary,
+                  }}
+                >
                   Retry
                 </Typography>
               </PressableScale>
@@ -243,15 +280,17 @@ export function PartnerSyncScreen() {
         </View>
 
         {/* Code segments */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
           {codeSegments.map((segment, i) => (
             <View
               key={i}
               style={{
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(221,167,165,0.3)',
-                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)',
+                borderColor: colors.border,
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.08)"
+                  : colors.card,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
               }}
@@ -259,12 +298,12 @@ export function PartnerSyncScreen() {
               <Typography
                 style={{
                   fontSize: 18,
-                  fontWeight: '600',
-                  color: isDark ? '#F2F2F2' : '#2D2327',
+                  fontWeight: "600",
+                  color: colors.textPrimary,
                   letterSpacing: 1,
                 }}
               >
-                {profileLoading ? '··' : segment}
+                {profileLoading ? "··" : segment}
               </Typography>
             </View>
           ))}
@@ -281,8 +320,8 @@ export function PartnerSyncScreen() {
           <Typography
             style={{
               fontSize: 16,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
+              fontWeight: "600",
+              color: colors.textPrimary,
               marginBottom: 12,
             }}
           >
@@ -300,23 +339,32 @@ export function PartnerSyncScreen() {
 
       {/* ── Sharing Permissions ──────────────────────────────────────────────── */}
       <View style={cardStyle}>
-        <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{
+            marginBottom: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <Typography
             style={{
               fontSize: 16,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
+              fontWeight: "600",
+              color: colors.textPrimary,
             }}
           >
             Sharing Permissions
           </Typography>
-          {isUpdatingPermissions && <ActivityIndicator size="small" color="#DDA7A5" />}
+          {isUpdatingPermissions && (
+            <ActivityIndicator size="small" color={colors.primary} />
+          )}
         </View>
         <PermissionRow
           title="Share Mood"
           subtitle="Daily emotional insights"
           value={permissions.share_mood}
-          onValueChange={(v) => handlePermissionToggle('share_mood', v)}
+          onValueChange={(v) => handlePermissionToggle("share_mood", v)}
           disabled={isUpdatingPermissions}
           isDark={isDark}
         />
@@ -324,7 +372,7 @@ export function PartnerSyncScreen() {
           title="Share Fertility Status"
           subtitle="Cycle phase and predictions"
           value={permissions.share_fertility}
-          onValueChange={(v) => handlePermissionToggle('share_fertility', v)}
+          onValueChange={(v) => handlePermissionToggle("share_fertility", v)}
           disabled={isUpdatingPermissions}
           isDark={isDark}
         />
@@ -332,7 +380,7 @@ export function PartnerSyncScreen() {
           title="Share Specific Symptoms"
           subtitle="Physical symptoms logged"
           value={permissions.share_symptoms}
-          onValueChange={(v) => handlePermissionToggle('share_symptoms', v)}
+          onValueChange={(v) => handlePermissionToggle("share_symptoms", v)}
           disabled={isUpdatingPermissions}
           isDark={isDark}
         />
@@ -345,8 +393,8 @@ export function PartnerSyncScreen() {
             style={{
               marginBottom: 8,
               fontSize: 16,
-              fontWeight: '600',
-              color: isDark ? '#F2F2F2' : '#2D2327',
+              fontWeight: "600",
+              color: colors.textPrimary,
             }}
           >
             View a Partner's Data
@@ -354,18 +402,20 @@ export function PartnerSyncScreen() {
           <Typography variant="helper" style={{ marginBottom: 12 }}>
             Enter the 6-character access key shared with you.
           </Typography>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <TextInput
               style={{
                 flex: 1,
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(221,167,165,0.3)',
-                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.85)',
+                borderColor: colors.border,
+                backgroundColor: isDark
+                  ? "rgba(255,255,255,0.08)"
+                  : colors.card,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
                 fontSize: 16,
-                color: isDark ? '#F2F2F2' : '#2D2327',
+                color: colors.textPrimary,
               }}
               placeholder="A792B1"
               placeholderTextColor="#B0A8A4"
@@ -379,17 +429,20 @@ export function PartnerSyncScreen() {
               onPress={handleLinkPartner}
               style={{
                 borderRadius: 16,
-                backgroundColor: isDark ? '#A78BFA' : '#DDA7A5',
+                backgroundColor: colors.primary,
                 paddingHorizontal: 20,
                 paddingVertical: 12,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 opacity:
-                  linkCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').length !== 6 ||
+                  linkCode
+                    .trim()
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, "").length !== 6 ||
                   linkPartner.isPending
                     ? 0.5
                     : 1,
-                shadowColor: '#DDA7A5',
+                shadowColor: colors.primary,
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.3,
                 shadowRadius: 16,
@@ -399,15 +452,20 @@ export function PartnerSyncScreen() {
               {linkPartner.isPending ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Typography style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                <Typography
+                  style={{ fontSize: 15, fontWeight: "600", color: "#FFFFFF" }}
+                >
                   Link
                 </Typography>
               )}
             </PressableScale>
           </View>
           {linkPartner.isError && (
-            <Typography variant="helper" style={{ marginTop: 8, color: '#EF4444' }}>
-              {linkPartner.error?.message ?? 'Invalid code. Please try again.'}
+            <Typography
+              variant="helper"
+              style={{ marginTop: 8, color: "#EF4444" }}
+            >
+              {linkPartner.error?.message ?? "Invalid code. Please try again."}
             </Typography>
           )}
         </View>
@@ -420,8 +478,8 @@ export function PartnerSyncScreen() {
         style={{
           ...cardStyle,
           marginBottom: 32,
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: 12,
         }}
       >
@@ -430,22 +488,48 @@ export function PartnerSyncScreen() {
             width: 40,
             height: 40,
             borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: isDark ? 'rgba(167,139,250,0.2)' : 'rgba(221,167,165,0.2)',
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: isDark
+              ? "rgba(167,139,250,0.2)"
+              : theme === "lavender"
+                ? "rgba(155,138,196,0.2)"
+                : "rgba(221,167,165,0.2)",
           }}
         >
-          <Typography style={{ fontSize: 16, fontWeight: '600', color: isDark ? '#A78BFA' : '#DDA7A5' }}>
+          <Typography
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.primary,
+            }}
+          >
             ✓
           </Typography>
         </View>
         <View>
-          <Typography style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#F2F2F2' : '#2D2327' }}>
+          <Typography
+            style={{
+              fontSize: 14,
+              fontWeight: "600",
+              color: colors.textPrimary,
+            }}
+          >
             End-to-End Encrypted
           </Typography>
-          <Typography variant="helper">Your data is completely private</Typography>
+          <Typography variant="helper">
+            Your data is completely private
+          </Typography>
         </View>
       </View>
     </Screen>
+  );
+}
+
+export function PartnerSyncScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="PartnerSyncScreen">
+      <PartnerSyncScreen />
+    </ScreenErrorBoundary>
   );
 }

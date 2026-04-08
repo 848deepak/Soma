@@ -1,6 +1,10 @@
 import { View, type ViewStyle } from "react-native";
 
-import { SectionLabel, SettingsRow } from "@/src/components/settings/SettingsPrimitives";
+import {
+  GroupedRows,
+  SectionLabel,
+  SettingsRow,
+} from "@/src/components/settings/SettingsPrimitives";
 import { Typography } from "@/src/components/ui/Typography";
 
 type CycleActionsSectionProps = {
@@ -29,26 +33,29 @@ export function CycleActionsSection({
   return (
     <View style={cardStyle}>
       <SectionLabel label="Cycle Actions" isDark={isDark} />
-
-      <SettingsRow
-        title={isResetPending ? "Resetting Predictions…" : "Reset Predictions"}
-        isDark={isDark}
-        onPress={handleResetPredictions}
-      />
-
-      <SettingsRow
-        title={isStartPending ? "Starting…" : "Start Period Today"}
-        isDark={isDark}
-        onPress={handleStartPeriodToday}
-      />
-
-      {activeCycleStartDate ? (
+      <GroupedRows isDark={isDark}>
         <SettingsRow
-          title={isEndPending ? "Ending…" : "End Current Period"}
+          title={isResetPending ? "Resetting Predictions…" : "Reset Predictions"}
           isDark={isDark}
-          onPress={handleEndPeriodToday}
+          onPress={handleResetPredictions}
         />
-      ) : null}
+
+        <SettingsRow
+          title={isStartPending ? "Starting…" : "Start Period Today"}
+          isDark={isDark}
+          onPress={handleStartPeriodToday}
+          isLast={!activeCycleStartDate}
+        />
+
+        {activeCycleStartDate ? (
+          <SettingsRow
+            title={isEndPending ? "Ending…" : "End Current Period"}
+            isDark={isDark}
+            onPress={handleEndPeriodToday}
+            isLast
+          />
+        ) : null}
+      </GroupedRows>
 
       <Typography variant="helper" style={{ marginTop: 6 }}>
         {activeCycleStartDate

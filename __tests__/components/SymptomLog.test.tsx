@@ -6,9 +6,9 @@
  */
 import {
     fireEvent,
-    render,
     screen
 } from "@testing-library/react-native";
+import { renderWithProviders } from "../testUtils";
 import { Alert } from "react-native";
 
 jest.mock("@/lib/supabase");
@@ -16,7 +16,7 @@ jest.mock("@/lib/auth");
 jest.mock("expo-router");
 jest.mock("expo-haptics");
 
-jest.mock("@/hooks/useDailyLogs", () => ({
+jest.mock("@/src/domain/calendar", () => ({
   useDailyLogs: jest.fn(() => ({ data: [], isLoading: false })),
   useTodayLog: jest.fn(),
 }));
@@ -25,28 +25,25 @@ jest.mock("@/hooks/useSaveLog", () => ({
   useSaveLog: jest.fn(),
 }));
 
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth", () => ({
   useProfile: jest.fn(() => ({
     data: { cycle_length_average: 28, period_duration_average: 5 },
     isLoading: false,
   })),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => ({
+jest.mock("@/src/domain/cycle", () => ({
   useCurrentCycle: jest.fn(() => ({
     data: { cycle: null },
   })),
-}));
-
-jest.mock("@/hooks/useCycleActions", () => ({
   useEndCurrentCycle: jest.fn(() => ({
     mutateAsync: jest.fn(),
     isPending: false,
   })),
 }));
 
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useCurrentCycle } from "@/src/domain/cycle";
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { DailyLogScreen } from "@/src/screens/DailyLogScreen";
 import { useRouter } from "expo-router";
@@ -82,17 +79,17 @@ describe("DailyLogScreen (SymptomLog)", () => {
   });
 
   it("renders without crashing", () => {
-    expect(() => render(<DailyLogScreen />)).not.toThrow();
+    expect(() => renderWithProviders(<DailyLogScreen />)).not.toThrow();
   });
 
   it('shows "How are you feeling today?" header', () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText(/How are you/)).toBeTruthy();
     expect(screen.getByText(/feeling today/)).toBeTruthy();
   });
 
   it("renders all flow level options", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("None")).toBeTruthy();
     expect(screen.getByText("Light")).toBeTruthy();
     expect(screen.getByText("Medium")).toBeTruthy();
@@ -100,7 +97,7 @@ describe("DailyLogScreen (SymptomLog)", () => {
   });
 
   it("renders all 8 symptom options", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("Cramps")).toBeTruthy();
     expect(screen.getByText("Tender")).toBeTruthy();
     expect(screen.getByText("Bloating")).toBeTruthy();
@@ -112,12 +109,12 @@ describe("DailyLogScreen (SymptomLog)", () => {
   });
 
   it("shows Notes section", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("Notes")).toBeTruthy();
   });
 
   it("shows save button", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("Save Log")).toBeTruthy();
   });
 
@@ -126,7 +123,7 @@ describe("DailyLogScreen (SymptomLog)", () => {
       mutate: mockMutate,
       isPending: true,
     });
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("Saving…")).toBeTruthy();
   });
 
@@ -151,13 +148,13 @@ describe("DailyLogScreen (SymptomLog)", () => {
       },
       isLoading: false,
     });
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     // Notes should be pre-filled
     expect(screen.getByDisplayValue("Feeling tired")).toBeTruthy();
   });
 
   it("blocks save when there is no active cycle", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     expect(screen.getByText("Start your period to enable logging.")).toBeTruthy();
 
     expect(mockMutate).not.toHaveBeenCalled();
@@ -169,7 +166,7 @@ describe("DailyLogScreen (SymptomLog)", () => {
       data: { cycle: { id: "cycle-1", start_date: "2026-03-20" } },
     });
 
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     const saveButton = screen.getByText("Save Log");
     fireEvent.press(saveButton);
 
@@ -195,20 +192,20 @@ describe("DailyLogScreen (SymptomLog)", () => {
       },
       isPending: false,
     });
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     fireEvent.press(screen.getByText("Save Log"));
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
   it("calls router.back() when close button is pressed", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     const closeButton = screen.getByTestId("daily-log-close-button");
     fireEvent.press(closeButton);
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
   it("toggles symptom selection on press", () => {
-    render(<DailyLogScreen />);
+    renderWithProviders(<DailyLogScreen />);
     const crampsButton = screen.getByText("Cramps");
     // Pressing a symptom selects it
     fireEvent.press(crampsButton);

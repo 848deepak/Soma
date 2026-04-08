@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { validateNotificationPreferences } from "@/src/domain/validators";
 
 const DEFAULT_NOTIFICATION_PREFS = {
   daily_reminders: false,
@@ -29,15 +30,23 @@ export async function ensureNotificationPreferencesRow(
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
+  const payload = {
+    user_id: resolvedUserId,
+    ...DEFAULT_NOTIFICATION_PREFS,
+    daily_reminders: dailyReminders,
+    timezone,
+  };
+
+  // Validate before upsert
+  const validation = validateNotificationPreferences(payload);
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.notification_preferences_invalid');
+  }
+
   const { error } = await supabase
     .from("notification_preferences")
     .upsert(
-      {
-        user_id: resolvedUserId,
-        ...DEFAULT_NOTIFICATION_PREFS,
-        daily_reminders: dailyReminders,
-        timezone,
-      },
+      payload,
       { onConflict: "user_id" },
     );
 

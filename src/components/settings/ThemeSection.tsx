@@ -3,14 +3,13 @@ import { View, type ViewStyle } from "react-native";
 import { SectionLabel } from "@/src/components/settings/SettingsPrimitives";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
-
-type ThemeId = "Cream" | "Midnight";
+import { type ThemeType } from "@/src/theme/tokens";
 
 type ThemeSectionProps = {
   isDark: boolean;
   cardStyle: ViewStyle;
-  activeTheme: ThemeId;
-  handleThemeSelect: (theme: ThemeId) => void;
+  activeTheme: ThemeType;
+  handleThemeSelect: (theme: ThemeType) => void;
 };
 
 export function ThemeSection({
@@ -24,11 +23,31 @@ export function ThemeSection({
       <SectionLabel label="Theme" isDark={isDark} />
       <View style={{ flexDirection: "row", justifyContent: "center", gap: 24 }}>
         {[
-          { id: "Cream" as const, color: "#FFFDFB", border: "#DDA7A5" },
-          { id: "Midnight" as const, color: "#0F1115", border: "#A78BFA" },
+          {
+            id: "cream" as const,
+            label: "Cream",
+            color: "#FFFDFB",
+            border: "#DDA7A5",
+          },
+          {
+            id: "midnight" as const,
+            label: "Midnight",
+            color: "#0F1115",
+            border: "#A78BFA",
+          },
+          {
+            id: "lavender" as const,
+            label: "Lavender",
+            color: "#F3F0FF",
+            border: "#9B8AC4",
+          },
         ].map((theme) => (
           <PressableScale
             key={theme.id}
+            testID={`settings-theme-${theme.id}`}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: activeTheme === theme.id }}
+            accessibilityLabel={`${theme.label} theme`}
             onPress={() => handleThemeSelect(theme.id)}
             style={{ alignItems: "center" }}
           >
@@ -41,7 +60,8 @@ export function ThemeSection({
                 borderWidth: activeTheme === theme.id ? 3 : 2,
                 borderColor:
                   activeTheme === theme.id ? theme.border : theme.border + "66",
-                shadowColor: activeTheme === theme.id ? theme.border : "transparent",
+                shadowColor:
+                  activeTheme === theme.id ? theme.border : "transparent",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: activeTheme === theme.id ? 0.4 : 0,
                 shadowRadius: 8,
@@ -49,7 +69,7 @@ export function ThemeSection({
               }}
             />
             <Typography variant="helper" style={{ marginTop: 8 }}>
-              {theme.id}
+              {theme.label}
             </Typography>
           </PressableScale>
         ))}

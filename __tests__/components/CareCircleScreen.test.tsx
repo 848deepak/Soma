@@ -3,10 +3,10 @@
  * Component tests for Care Circle connection flow (role selection)
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import React from 'react';
 
+import { renderWithProviders } from "../testUtils";
 import { CareCircleScreen } from '@/src/screens/CareCircleScreen';
 import * as careCircleService from '@/src/services/careCircleService';
 
@@ -48,13 +48,9 @@ jest.mock('@tanstack/react-query', () => ({
   }),
 }));
 
-const queryClient = new QueryClient();
-
 const renderComponent = () => {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <CareCircleScreen />
-    </QueryClientProvider>,
+  return renderWithProviders(
+    <CareCircleScreen />
   );
 };
 

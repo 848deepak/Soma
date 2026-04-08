@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, TextInput, View, useColorScheme } from "react-native";
+import { Modal, TextInput, View } from "react-native";
 
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
 
 type PeriodLogValues = {
   startDate: string;
@@ -57,7 +58,7 @@ export function PeriodLogModal({
   onSubmit,
   isSubmitting = false,
 }: PeriodLogModalProps) {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -255,7 +256,9 @@ export function PeriodLogModal({
           </View>
 
           {validationError ? (
-            <Typography style={{ marginTop: -8, marginBottom: 12, color: "#EF4444" }}>
+            <Typography
+              style={{ marginTop: -8, marginBottom: 12, color: "#EF4444" }}
+            >
               {validationError}
             </Typography>
           ) : null}

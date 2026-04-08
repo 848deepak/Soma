@@ -7,7 +7,7 @@
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
-import { Dimensions, Pressable, View, useColorScheme } from "react-native";
+import { Dimensions, Pressable, View } from "react-native";
 import Animated, {
     FadeIn,
     useAnimatedStyle,
@@ -18,8 +18,10 @@ import Animated, {
 import { useSaveLog } from "@/hooks/useSaveLog";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import { HapticsService } from "@/src/services/haptics/HapticsService";
 import type { FlowLevel, MoodOption } from "@/types/database";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -64,7 +66,7 @@ const FLOW_LABELS = ["None", "Light", "Medium", "Heavy", "Very Heavy"];
 export function QuickCheckinScreen() {
   const router = useRouter();
   const saveLog = useSaveLog();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useAppTheme();
 
   const [flowLevel, setFlowLevel] = useState<number>(2);
   const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null);
@@ -433,5 +435,13 @@ export function QuickCheckinScreen() {
         </PressableScale>
       </Animated.View>
     </View>
+  );
+}
+
+export function QuickCheckinScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="QuickCheckinScreen">
+      <QuickCheckinScreen />
+    </ScreenErrorBoundary>
   );
 }

@@ -1,6 +1,11 @@
 import { View, type ViewStyle } from "react-native";
 
-import { SettingsRow, SectionLabel, ToggleRow } from "@/src/components/settings/SettingsPrimitives";
+import {
+  GroupedRows,
+  SectionLabel,
+  SettingsRow,
+  ToggleRow,
+} from "@/src/components/settings/SettingsPrimitives";
 import { usePendingConnections } from "@/hooks/usePendingConnections";
 
 type NotificationsSectionProps = {
@@ -30,30 +35,32 @@ export function NotificationsSection({
   return (
     <View style={cardStyle}>
       <SectionLabel label="Notifications" isDark={isDark} />
+      <GroupedRows isDark={isDark}>
+        <ToggleRow
+          label="Daily Reminders"
+          value={notificationsEnabled}
+          onValueChange={handleNotificationToggle}
+          isDark={isDark}
+          disabled={isNotificationSaving}
+          testID="settings-daily-reminders-toggle"
+        />
 
-      <ToggleRow
-        label="Daily Reminders"
-        value={notificationsEnabled}
-        onValueChange={handleNotificationToggle}
-        isDark={isDark}
-        disabled={isNotificationSaving}
-        testID="settings-daily-reminders-toggle"
-      />
+        <SettingsRow
+          title="Partner Sync"
+          isDark={isDark}
+          onPress={openPartnerSync}
+          badge={pendingCount}
+        />
 
-      <SettingsRow 
-        title="Partner Sync" 
-        isDark={isDark} 
-        onPress={openPartnerSync}
-        badge={pendingCount}
-      />
-
-      <ToggleRow
-        label="Analytics Consent"
-        value={analyticsEnabled}
-        onValueChange={handleAnalyticsToggle}
-        isDark={isDark}
-        testID="settings-analytics-consent-toggle"
-      />
+        <ToggleRow
+          label="Analytics Consent"
+          value={analyticsEnabled}
+          onValueChange={handleAnalyticsToggle}
+          isDark={isDark}
+          testID="settings-analytics-consent-toggle"
+          isLast
+        />
+      </GroupedRows>
     </View>
   );
 }

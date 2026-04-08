@@ -6,7 +6,7 @@
 import { useRouter } from 'expo-router';
 import { View, useColorScheme } from 'react-native';
 
-import { useProfile } from '@/hooks/useProfile';
+import { useProfile } from '@/src/domain/auth';
 import { Card } from '@/src/components/ui/Card';
 import { PressableScale } from '@/src/components/ui/PressableScale';
 import { Screen } from '@/src/components/ui/Screen';

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { PhiActionType, PhiResourceType } from "@/src/types/hipaa";
+import { logWarn } from "@/platform/monitoring/logger";
 
 type AuditMetadata = Record<string, unknown>;
 
@@ -22,6 +23,10 @@ export async function logDataAccess(
       metadata,
     });
   } catch (error) {
-    console.warn("[AuditService] Failed to write audit log", error);
+    logWarn('audit', 'audit_log_write_failed', {
+      resourceType,
+      action,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }

@@ -3,49 +3,49 @@
  */
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
-  Appearance,
-  KeyboardAvoidingView,
   Linking,
   Platform,
   Share,
-  useColorScheme,
+  View,
 } from "react-native";
 
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
+import { useCurrentCycle } from "@/src/domain/cycle";
 import {
   useDeleteAllData,
   useEndCurrentCycle,
   useResetPredictions,
   useStartNewCycle,
-} from "@/hooks/useCycleActions";
+} from "@/src/domain/cycle";
 import {
   useNotificationPreferences,
   useProfile,
   useUpdateNotificationPreferences,
-  useUpdateProfile,
-} from "@/hooks/useProfile";
+} from "@/src/domain/auth";
+import { CYCLE_DEFAULTS } from "@/src/domain/constants/cycleDefaults";
 import { signOut } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { useAuthContext } from "@/src/context/AuthProvider";
-import { HeaderBar } from "@/src/components/ui/HeaderBar";
-import { Screen } from "@/src/components/ui/Screen";
-import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
+import { ScreenErrorBoundary } from "@/src/components/ScreenErrorBoundary";
 import { AccountActionsSection } from "@/src/components/settings/AccountActionsSection";
+import { AccountProfileSection } from "@/src/components/settings/AccountProfileSection";
 import { CycleActionsSection } from "@/src/components/settings/CycleActionsSection";
 import { NotificationsSection } from "@/src/components/settings/NotificationsSection";
 import { PreferencesSection } from "@/src/components/settings/PreferencesSection";
 import { PrivacySection } from "@/src/components/settings/PrivacySection";
-import { SettingsProfileHeader } from "@/src/components/settings/SettingsProfileHeader";
 import { ThemeSection } from "@/src/components/settings/ThemeSection";
+import { Screen } from "@/src/components/ui/Screen";
+import { Typography } from "@/src/components/ui/Typography";
+import { useAuthContext } from "@/src/context/AuthProvider";
+import { useAppTheme } from "@/src/context/ThemeContext";
 import {
   getAnalyticsConsentStatus,
   requestAnalyticsConsent,
   revokeAnalyticsConsent,
   track,
 } from "@/src/services/analytics";
+import { logDataAccess } from "@/src/services/auditService";
 import {
   getConsentSnapshot,
   setAnalyticsConsent,
@@ -56,15 +56,24 @@ import {
   requestPermissions,
   scheduleDailyLogReminder,
 } from "@/src/services/notificationService";
-import { logDataAccess } from "@/src/services/auditService";
-import { validateIsoDate, validateMinimumAge } from "@/src/utils/validation";
+
+function formatDateOfBirth(isoDate: string | null | undefined): string {
+  if (!isoDate) return "Not set";
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+
+  return parsed.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function SettingsScreen() {
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { isDark, theme, setTheme } = useAppTheme();
   const { isAnonymous } = useAuthContext();
-  const { data: profile, isLoading } = useProfile();
-  const updateProfile = useUpdateProfile();
+  const { data: profile } = useProfile();
   const notificationPreferences = useNotificationPreferences();
   const updateNotificationPreferences = useUpdateNotificationPreferences();
   const startNewCycle = useStartNewCycle();
@@ -74,30 +83,11 @@ export function SettingsScreen() {
 
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [username, setUsername] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [cycleLength, setCycleLength] = useState("28");
-  const [periodDuration, setPeriodDuration] = useState("5");
-
-  const [activeTheme, setActiveTheme] = useState<"Cream" | "Midnight">(
-    isDark ? "Midnight" : "Cream",
-  );
 
   const { data: currentCycleData } = useCurrentCycle(
-    profile?.cycle_length_average ?? 28,
-    profile?.period_duration_average ?? 5,
+    profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH,
+    profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION,
   );
-
-  useEffect(() => {
-    if (!profile) return;
-    setFirstName(profile.first_name ?? "");
-    setUsername(profile.username ?? "");
-    setDateOfBirth(profile.date_of_birth ?? "");
-    setCycleLength(String(profile.cycle_length_average ?? 28));
-    setPeriodDuration(String(profile.period_duration_average ?? 5));
-  }, [profile]);
 
   useEffect(() => {
     void (async () => {
@@ -109,127 +99,18 @@ export function SettingsScreen() {
     })();
   }, []);
 
-  function handleThemeSelect(themeId: "Cream" | "Midnight") {
-    setActiveTheme(themeId);
-    if (themeId === "Midnight") {
-      Appearance.setColorScheme("dark");
-    } else {
-      Appearance.setColorScheme("light");
-    }
+  function handleThemeSelect(themeId: "cream" | "midnight" | "lavender") {
+    setTheme(themeId);
   }
 
-  const displayName = profile?.first_name || profile?.username || "You";
-  const isUsernameLocked = Boolean(profile?.username?.trim());
   const notificationsEnabled =
     notificationPreferences.data?.daily_reminders ?? false;
   const isNotificationSaving = updateNotificationPreferences.isPending;
-  const memberSince = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      })
-    : null;
-
-  const hasChanges = useMemo(() => {
-    if (!profile) return false;
-    return (
-      firstName.trim() !== (profile.first_name ?? "") ||
-      (!isUsernameLocked &&
-        username.trim().toLowerCase() !==
-          (profile.username ?? "").trim().toLowerCase()) ||
-      dateOfBirth.trim() !== (profile.date_of_birth ?? "") ||
-      Number(cycleLength) !== profile.cycle_length_average ||
-      Number(periodDuration) !== profile.period_duration_average
-    );
-  }, [
-    profile,
-    firstName,
-    username,
-    dateOfBirth,
-    cycleLength,
-    periodDuration,
-    isUsernameLocked,
-  ]);
-
-  const validationErrors = useMemo(() => {
-    if (!profile) {
-      return {
-        firstName: null,
-        username: null,
-        dateOfBirth: null,
-        cycleLength: null,
-        periodDuration: null,
-      };
-    }
-
-    const normalizedFirstName = firstName.trim();
-    const normalizedUsername = username
-      .trim()
-      .replace(/\s+/g, "")
-      .toLowerCase();
-    const normalizedDob = dateOfBirth.trim();
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
-
-    return {
-      firstName: normalizedFirstName
-        ? null
-        : "Please enter your first name.",
-      username:
-        isUsernameLocked || normalizedUsername
-          ? null
-          : "Please choose a username.",
-      dateOfBirth:
-        normalizedDob && !validateIsoDate(normalizedDob)
-          ? "Use YYYY-MM-DD format for date of birth."
-          : normalizedDob && !validateMinimumAge(normalizedDob, 13)
-            ? "You must be at least 13 years old to use Soma without parental consent."
-            : null,
-      cycleLength:
-        Number.isFinite(cycleLengthValue) &&
-        cycleLengthValue >= 15 &&
-        cycleLengthValue <= 60
-          ? null
-          : "Cycle length must be between 15 and 60 days.",
-      periodDuration:
-        Number.isFinite(periodDurationValue) &&
-        periodDurationValue >= 1 &&
-        periodDurationValue <= 15
-          ? null
-          : "Period duration must be between 1 and 15 days.",
-    };
-  }, [
-    profile,
-    firstName,
-    username,
-    dateOfBirth,
-    cycleLength,
-    periodDuration,
-    isUsernameLocked,
-  ]);
-
-  const firstValidationError = useMemo(
-    () =>
-      Object.values(validationErrors).find(
-        (value): value is string => Boolean(value),
-      ) ?? null,
-    [validationErrors],
-  );
-
-  const isFormValid = firstValidationError === null;
-
-  const sectionCardStyle = {
-    marginTop: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.7)",
-    backgroundColor: isDark ? "rgba(30,33,40,0.85)" : "rgba(255,255,255,0.75)",
-    padding: 20,
-    shadowColor: "#DDA7A5",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 2,
+  const primarySectionStyle = {
+    marginTop: 20,
+  };
+  const secondarySectionStyle = {
+    marginTop: 24,
   };
 
   async function handleNotificationToggle(value: boolean) {
@@ -306,115 +187,12 @@ export function SettingsScreen() {
     }
   }
 
-  async function handleSaveProfile() {
-    const normalizedFirstName = firstName.trim();
-    const normalizedUsername = username
-      .trim()
-      .replace(/\s+/g, "")
-      .toLowerCase();
-    const resolvedUsername = isUsernameLocked
-      ? (profile?.username ?? "")
-      : normalizedUsername;
-    const normalizedDob = dateOfBirth.trim();
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
-
-    if (!normalizedFirstName) {
-      void HapticsService.error();
-      Alert.alert("Missing name", "Please enter your first name.");
-      return;
-    }
-    if (!resolvedUsername) {
-      void HapticsService.error();
-      Alert.alert("Missing username", "Please choose a username.");
-      return;
-    }
-    if (normalizedDob && !validateIsoDate(normalizedDob)) {
-      void HapticsService.error();
-      Alert.alert("Invalid date", "Use YYYY-MM-DD format for date of birth.");
-      return;
-    }
-    if (normalizedDob && !validateMinimumAge(normalizedDob, 13)) {
-      void HapticsService.error();
-      Alert.alert(
-        "Age requirement",
-        "You must be at least 13 years old to use Soma without parental consent.",
-      );
-      return;
-    }
-    if (
-      !Number.isFinite(cycleLengthValue) ||
-      cycleLengthValue < 15 ||
-      cycleLengthValue > 60
-    ) {
-      void HapticsService.error();
-      Alert.alert(
-        "Invalid cycle length",
-        "Cycle length must be between 15 and 60 days.",
-      );
-      return;
-    }
-    if (
-      !Number.isFinite(periodDurationValue) ||
-      periodDurationValue < 1 ||
-      periodDurationValue > 15
-    ) {
-      void HapticsService.error();
-      Alert.alert(
-        "Invalid period duration",
-        "Period duration must be between 1 and 15 days.",
-      );
-      return;
-    }
-
-    try {
-      await HapticsService.impactMedium();
-      const basePayload = {
-        first_name: normalizedFirstName,
-        date_of_birth: normalizedDob || null,
-        cycle_length_average: cycleLengthValue,
-        period_duration_average: periodDurationValue,
-      };
-
-      await updateProfile.mutateAsync(
-        isUsernameLocked
-          ? basePayload
-          : { ...basePayload, username: resolvedUsername },
-      );
-      await HapticsService.success();
-      setIsEditMode(false);
-      Alert.alert("Saved", "Your settings were updated.");
-    } catch (error: unknown) {
-      await HapticsService.error();
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not update your settings.";
-      Alert.alert("Save Failed", message);
-    }
-  }
-
-  function handleEditProfile() {
-    setIsEditMode(true);
-  }
-
-  function handleCancelEdit() {
-    if (profile) {
-      setFirstName(profile.first_name ?? "");
-      setUsername(profile.username ?? "");
-      setDateOfBirth(profile.date_of_birth ?? "");
-      setCycleLength(String(profile.cycle_length_average ?? 28));
-      setPeriodDuration(String(profile.period_duration_average ?? 5));
-    }
-    setIsEditMode(false);
-  }
-
   async function handleLogout() {
     void HapticsService.impactMedium();
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Sign Out",
+        text: "Log Out",
         style: "destructive",
         onPress: async () => {
           setIsLoggingOut(true);
@@ -547,8 +325,10 @@ export function SettingsScreen() {
   }
 
   function handleResetPredictions() {
-    const cycleLengthValue = Number(cycleLength);
-    const periodDurationValue = Number(periodDuration);
+    const cycleLengthValue =
+      profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH;
+    const periodDurationValue =
+      profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION;
 
     Alert.alert(
       "Reset predictions?",
@@ -692,9 +472,7 @@ export function SettingsScreen() {
       string | undefined
     >;
     const appVersion =
-      Constants.expoConfig?.version ??
-      manifestExtra.version ??
-      "unknown";
+      Constants.expoConfig?.version ?? manifestExtra.version ?? "unknown";
     const userHint = profile?.username ? `@${profile.username}` : "anonymous";
     const body = [
       "Please describe the issue:",
@@ -702,7 +480,7 @@ export function SettingsScreen() {
       "--- Diagnostics ---",
       `Platform: ${Platform.OS}`,
       `App Version: ${appVersion}`,
-      `Theme: ${activeTheme}`,
+      `Theme: ${theme}`,
       `User: ${userHint}`,
     ].join("\n");
     const emailUrl = `mailto:support@soma-app.com?subject=${encodeURIComponent("Soma Issue Report")}&body=${encodeURIComponent(body)}`;
@@ -716,75 +494,43 @@ export function SettingsScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={96}
-    >
-      <Screen>
-      <SettingsProfileHeader
-        isDark={isDark}
-        isLoading={isLoading}
-        displayName={displayName}
-        memberSince={memberSince}
-      />
-
-      <HeaderBar title="Settings" />
+    <Screen horizontalPadding={16}>
+      <View style={{ marginTop: 6 }}>
+        <Typography
+          style={{
+            fontSize: 34,
+            lineHeight: 40,
+            fontWeight: "700",
+          }}
+        >
+          Settings
+        </Typography>
+        <Typography variant="muted" style={{ marginTop: 4 }}>
+          Manage your profile and preferences.
+        </Typography>
+      </View>
 
       <AccountProfileSection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
-        isEditMode={isEditMode}
-        handleEditProfile={handleEditProfile}
-        firstName={firstName}
-        setFirstName={setFirstName}
-        username={username}
-        setUsername={setUsername}
-        dateOfBirth={dateOfBirth}
-        setDateOfBirth={setDateOfBirth}
-        isUsernameLocked={isUsernameLocked}
-        validationErrors={{
-          firstName: validationErrors.firstName,
-          username: validationErrors.username,
-          dateOfBirth: validationErrors.dateOfBirth,
-        }}
+        sectionStyle={primarySectionStyle}
+        fullName={profile?.first_name?.trim() || "Deepak"}
+        username={profile?.username?.trim() || "deepak"}
+        dateOfBirth={formatDateOfBirth(profile?.date_of_birth) || "24 Aug 2002"}
+        openEditProfile={() => router.push("/settings/edit-profile" as never)}
       />
 
       <PreferencesSection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
-        cycleLength={cycleLength}
-        setCycleLength={setCycleLength}
-        periodDuration={periodDuration}
-        setPeriodDuration={setPeriodDuration}
-        isEditMode={isEditMode}
-        validationErrors={{
-          cycleLength: validationErrors.cycleLength,
-          periodDuration: validationErrors.periodDuration,
-        }}
-        handleCancelEdit={handleCancelEdit}
-        handleSaveProfile={handleSaveProfile}
-        isSaveDisabled={updateProfile.isPending || !hasChanges || !isFormValid}
-        isSavePending={updateProfile.isPending}
-        isFormValid={isFormValid}
-        firstValidationError={firstValidationError}
-      />
-
-      <CycleActionsSection
-        isDark={isDark}
-        cardStyle={sectionCardStyle}
-        isResetPending={resetPredictions.isPending}
-        isStartPending={startNewCycle.isPending}
-        isEndPending={endCurrentCycle.isPending}
-        activeCycleStartDate={currentCycleData?.cycle?.start_date}
-        handleResetPredictions={handleResetPredictions}
-        handleStartPeriodToday={handleStartPeriodToday}
-        handleEndPeriodToday={handleEndPeriodToday}
+        sectionStyle={primarySectionStyle}
+        cycleLength={String(profile?.cycle_length_average ?? CYCLE_DEFAULTS.CYCLE_LENGTH)}
+        periodDuration={String(profile?.period_duration_average ?? CYCLE_DEFAULTS.PERIOD_DURATION)}
+        openCycleLength={() => router.push("/settings/cycle-length" as never)}
+        openPeriodDuration={() => router.push("/settings/period-duration" as never)}
       />
 
       <NotificationsSection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
+        cardStyle={primarySectionStyle}
         notificationsEnabled={notificationsEnabled}
         handleNotificationToggle={handleNotificationToggle}
         isNotificationSaving={isNotificationSaving}
@@ -795,9 +541,11 @@ export function SettingsScreen() {
 
       <PrivacySection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
+        cardStyle={primarySectionStyle}
         openDataConsent={() => router.push("/legal/data-consent" as never)}
-        openDataPractices={() => router.push("/legal/data-practices" as never)}
+        openDataPractices={() =>
+          router.push("/legal/data-practices" as never)
+        }
         openDataRights={() => router.push("/legal/data-rights" as never)}
         openPrivacyPolicy={() => router.push("/legal/privacy" as never)}
         openTerms={() => router.push("/legal/terms" as never)}
@@ -806,16 +554,42 @@ export function SettingsScreen() {
         }
       />
 
+      <Typography
+        style={{
+          marginTop: 30,
+          marginBottom: 2,
+          fontSize: 11,
+          fontWeight: "600",
+          letterSpacing: 2,
+          textTransform: "uppercase",
+          color: isDark ? "rgba(242,242,242,0.5)" : "rgba(45,35,39,0.45)",
+        }}
+      >
+        More
+      </Typography>
+
+      <CycleActionsSection
+        isDark={isDark}
+        cardStyle={secondarySectionStyle}
+        isResetPending={resetPredictions.isPending}
+        isStartPending={startNewCycle.isPending}
+        isEndPending={endCurrentCycle.isPending}
+        activeCycleStartDate={currentCycleData?.cycle?.start_date}
+        handleResetPredictions={handleResetPredictions}
+        handleStartPeriodToday={handleStartPeriodToday}
+        handleEndPeriodToday={handleEndPeriodToday}
+      />
+
       <ThemeSection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
-        activeTheme={activeTheme}
+        cardStyle={secondarySectionStyle}
+        activeTheme={theme}
         handleThemeSelect={handleThemeSelect}
       />
 
       <AccountActionsSection
         isDark={isDark}
-        cardStyle={sectionCardStyle}
+        cardStyle={secondarySectionStyle}
         isDeletePending={deleteAllData.isPending}
         isLoggingOut={isLoggingOut}
         isAnonymous={isAnonymous}
@@ -825,7 +599,14 @@ export function SettingsScreen() {
         handleLogout={handleLogout}
         handleSignIn={handleSignIn}
       />
-      </Screen>
-    </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+export function SettingsScreenWithErrorBoundary() {
+  return (
+    <ScreenErrorBoundary screenName="SettingsScreen">
+      <SettingsScreen />
+    </ScreenErrorBoundary>
   );
 }

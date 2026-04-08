@@ -7,6 +7,15 @@ const ENV_CANDIDATES = ['.env.local', '.env'];
 
 type StringMap = Record<string, string>;
 
+function fetchWithConnectionClose(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  headers.set('Connection', 'close');
+  return fetch(input, { ...init, headers });
+}
+
 function parseEnvFile(content: string): StringMap {
   const result: StringMap = {};
   for (const rawLine of content.split(/\r?\n/)) {
@@ -68,12 +77,41 @@ export function getRealSupabaseConfig(): { url: string; anonKey: string } {
 export function createRealSupabaseClient(): SupabaseClient {
   const { url, anonKey } = getRealSupabaseConfig();
   return createClient(url, anonKey, {
+    global: {
+      fetch: fetchWithConnectionClose,
+    },
     auth: {
       persistSession: false,
-      autoRefreshToken: true,
+      // Avoid background token refresh timers that can keep Jest open.
+      autoRefreshToken: false,
       detectSessionInUrl: false,
     },
   });
+}
+
+export async function disposeRealSupabaseClient(client: SupabaseClient): Promise<void> {
+  try {
+    await client.removeAllChannels();
+  } catch {
+    // Best-effort cleanup.
+  }
+
+  try {
+    await client.auth.signOut();
+  } catch {
+    // Best-effort cleanup.
+  }
+
+  try {
+    const authWithStopAutoRefresh = client.auth as unknown as {
+      stopAutoRefresh?: () => void;
+    };
+    if (typeof authWithStopAutoRefresh.stopAutoRefresh === 'function') {
+      authWithStopAutoRefresh.stopAutoRefresh();
+    }
+  } catch {
+    // Best-effort cleanup.
+  }
 }
 
 export function uniqueEmail(prefix = 'soma-real'): string {

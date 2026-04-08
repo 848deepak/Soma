@@ -9,6 +9,10 @@ type ProcessPayload = {
   resultLocation?: string;
 };
 
+const ADMIN_HEADER_SKEW_SECONDS = 5 * 60;
+const ADMIN_NONCE_TTL_MS = 10 * 60 * 1000;
+const seenAdminNonces = new Map<string, number>();
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -35,6 +39,64 @@ function isTerminalStatus(status: string): boolean {
   return ['completed', 'rejected', 'cancelled'].includes(status);
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  const maxLength = Math.max(aBytes.length, bBytes.length);
+
+  // Compare across the full max length to avoid early exits.
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLength; i += 1) {
+    const aByte = i < aBytes.length ? aBytes[i] : 0;
+    const bByte = i < bBytes.length ? bBytes[i] : 0;
+    diff |= aByte ^ bByte;
+  }
+
+  return diff === 0;
+}
+
+function cleanupExpiredNonces(nowMs: number): void {
+  for (const [nonce, expiresAt] of seenAdminNonces.entries()) {
+    if (expiresAt <= nowMs) {
+      seenAdminNonces.delete(nonce);
+    }
+  }
+}
+
+function validateAdminRequestFreshness(req: Request): Response | null {
+  const timestampHeader = req.headers.get('x-admin-timestamp')?.trim();
+  const nonceHeader = req.headers.get('x-admin-nonce')?.trim();
+
+  if (!timestampHeader || !nonceHeader) {
+    return jsonResponse({ error: 'Missing admin freshness headers' }, 401);
+  }
+
+  if (nonceHeader.length < 16) {
+    return jsonResponse({ error: 'Invalid admin nonce' }, 401);
+  }
+
+  const timestampSeconds = Number(timestampHeader);
+  if (!Number.isFinite(timestampSeconds)) {
+    return jsonResponse({ error: 'Invalid admin timestamp' }, 401);
+  }
+
+  const nowMs = Date.now();
+  const nowSeconds = Math.floor(nowMs / 1000);
+  if (Math.abs(nowSeconds - Math.floor(timestampSeconds)) > ADMIN_HEADER_SKEW_SECONDS) {
+    return jsonResponse({ error: 'Stale admin request timestamp' }, 401);
+  }
+
+  cleanupExpiredNonces(nowMs);
+  if (seenAdminNonces.has(nonceHeader)) {
+    return jsonResponse({ error: 'Replay detected' }, 409);
+  }
+
+  // Best-effort replay defense at function-instance scope.
+  seenAdminNonces.set(nonceHeader, nowMs + ADMIN_NONCE_TTL_MS);
+  return null;
+}
+
 Deno.serve(async (req) => {
   try {
     const rateLimited = enforceRateLimit(req, {
@@ -57,10 +119,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Missing DATA_RIGHTS_ADMIN_TOKEN in function secrets' }, 500);
     }
 
-    const tokenHeader = req.headers.get('x-admin-token');
-    if (!tokenHeader || tokenHeader !== adminToken) {
+    const tokenHeader = req.headers.get('x-admin-token')?.trim();
+    if (!tokenHeader || !timingSafeEqual(tokenHeader, adminToken)) {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
+
+    const freshnessError = validateAdminRequestFreshness(req);
+    if (freshnessError) return freshnessError;
 
     const body = (await req.json()) as ProcessPayload;
     const requestId = body.requestId;

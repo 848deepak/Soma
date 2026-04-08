@@ -3,10 +3,10 @@
  * Component tests for Care Circle viewer-only support dashboard
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 import React from 'react';
 
+import { renderWithProviders } from "../testUtils";
 import { SupportDashboard } from '@/src/components/SupportDashboard';
 import * as careCircleService from '@/src/services/careCircleService';
 
@@ -35,8 +35,6 @@ const mockSharedData: SharedDataLog = {
   connection_role: 'viewer',
 };
 
-const queryClient = new QueryClient();
-
 const renderComponent = (props = {}) => {
   const defaultProps = {
     partnerId: 'user-2',
@@ -44,10 +42,8 @@ const renderComponent = (props = {}) => {
     ...props,
   };
 
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <SupportDashboard {...defaultProps} />
-    </QueryClientProvider>,
+  return renderWithProviders(
+    <SupportDashboard {...defaultProps} />
   );
 };
 
@@ -159,9 +155,7 @@ describe('SupportDashboard', () => {
 
     // Trigger a rerender with new data
     rerender(
-      <QueryClientProvider client={queryClient}>
-        <SupportDashboard partnerId="user-2" partnerName="Partner" />
-      </QueryClientProvider>,
+      <SupportDashboard partnerId="user-2" partnerName="Partner" />
     );
 
     // Component should update when new data is available

@@ -22,6 +22,7 @@
 import { Platform } from 'react-native';
 
 import { trackEvent } from '@/src/services/analytics';
+import { logWarn } from '@/platform/monitoring/logger';
 
 // Conditional import for native platforms only
 let Notifications: typeof import('expo-notifications') | null = null;
@@ -76,7 +77,9 @@ export type PermissionResult = { granted: boolean };
  */
 export async function requestPermissions(): Promise<PermissionResult> {
   if (!Notifications) {
-    console.warn('[Notifications] Not available on this platform');
+    logWarn('notifications', 'platform_not_supported', {
+      feature: 'request_permissions',
+    });
     return { granted: false };
   }
 
@@ -98,7 +101,11 @@ export async function scheduleDailyLogReminder(
   minute: number,
 ): Promise<string> {
   if (!Notifications) {
-    console.warn('[Notifications] Not available on this platform');
+    logWarn('notifications', 'platform_not_supported', {
+      feature: 'schedule_daily_reminder',
+      hour,
+      minute,
+    });
     return '';
   }
 
@@ -143,7 +150,10 @@ export async function schedulePeriodAlert(
   predictedDate: string,
 ): Promise<string> {
   if (!Notifications) {
-    console.warn('[Notifications] Not available on this platform');
+    logWarn('notifications', 'platform_not_supported', {
+      feature: 'schedule_period_alert',
+      predictedDate,
+    });
     return '';
   }
 
@@ -190,7 +200,10 @@ export async function scheduleFertileWindowAlert(
   windowStart: string,
 ): Promise<string> {
   if (!Notifications) {
-    console.warn('[Notifications] Not available on this platform');
+    logWarn('notifications', 'platform_not_supported', {
+      feature: 'schedule_fertile_window_alert',
+      windowStart,
+    });
     return '';
   }
 

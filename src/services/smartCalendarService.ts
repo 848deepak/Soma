@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { convertDailyLogToCalendarEvents, mergeAndSortEvents } from '@/src/features/smartCalendar/logIntegration';
 import { parseNaturalLanguageEvent } from '@/src/features/smartCalendar/nlpParser';
+import { validateSmartEvent } from '@/src/domain/validators';
 import type {
   SmartCalendarEvent,
   SmartEventDraft,
@@ -65,6 +66,12 @@ export async function createEventFromNaturalLanguage(input: string): Promise<Sma
   const draft = parseNaturalLanguageEvent(input);
   const payload = toDbEvent(draft, userId);
 
+  // Validate before insert
+  const validation = validateSmartEvent(payload);
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.smart_event_invalid');
+  }
+
   const { error } = await supabase.from('smart_events').insert(payload);
   if (error) throw error;
 
@@ -84,18 +91,26 @@ export async function createManualEvent(event: {
   const userId = await getCurrentUserId();
   if (!userId) return;
 
-  const { error } = await supabase.from('smart_events').insert({
+  const payload = {
     user_id: userId,
     title: event.title,
     start_time: event.startTime,
     end_time: event.endTime,
-    type: 'manual',
+    type: 'manual' as const,
     location: event.location ?? null,
     tags: event.tags ?? [],
     participants: event.participants ?? [],
     recurrence: event.recurrence ?? null,
     metadata: event.metadata ?? {},
-  });
+  };
+
+  // Validate before insert
+  const validation = validateSmartEvent(payload);
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'validation.smart_event_invalid');
+  }
+
+  const { error } = await supabase.from('smart_events').insert(payload);
 
   if (error) throw error;
 }

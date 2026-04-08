@@ -1,0 +1,1 @@
+export const logAuthEvent = jest.fn();

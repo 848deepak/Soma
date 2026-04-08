@@ -10,6 +10,7 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Sentry from "@sentry/react-native";
+import { logError, logWarn, logInfo } from "@/platform/monitoring/logger";
 
 interface ErrorMetadata {
   userId?: string;
@@ -46,7 +47,9 @@ function redactValue(value: unknown): unknown {
   return value;
 }
 
-function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+function sanitizeMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(metadata)) {
@@ -62,7 +65,9 @@ function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unk
 
 function sanitizeError(error: Error): { name: string; message: string } {
   const safeMessage =
-    error.message.length > 240 ? `${error.message.slice(0, 240)}...` : error.message;
+    error.message.length > 240
+      ? `${error.message.slice(0, 240)}...`
+      : error.message;
   return {
     name: error.name || "Error",
     message: safeMessage,
@@ -111,8 +116,9 @@ class ErrorTrackingService {
     const safeError = sanitizeError(error);
 
     if (this.isDevelopment) {
-      console.error("[ErrorTracking] Exception:", safeError.message, {
+      logError('error_tracking', 'exception_captured', {
         name: safeError.name,
+        message: safeError.message,
         metadata: sanitizedMetadata,
       });
     } else {
@@ -152,10 +158,8 @@ class ErrorTrackingService {
     const sanitizedMetadata = sanitizeMetadata(metadata);
 
     if (this.isDevelopment) {
-      console.log(
-        `[ErrorTracking] ${level.toUpperCase()}: ${message}`,
-        sanitizedMetadata,
-      );
+      const logFn = level === 'error' ? logError : level === 'warning' ? logWarn : logInfo;
+      logFn('error_tracking', `message_${level}`, { message, metadata: sanitizedMetadata });
     } else {
       Sentry.withScope((scope) => {
         if (metadata.userId) {
@@ -193,10 +197,11 @@ class ErrorTrackingService {
    */
   trackPerformance(metric: PerformanceMetric) {
     if (this.isDevelopment) {
-      console.log(
-        `[Performance] ${metric.name}: ${metric.duration}ms`,
-        metric.metadata,
-      );
+      logInfo('error_tracking', 'performance_metric', {
+        name: metric.name,
+        duration: metric.duration,
+        metadata: metric.metadata,
+      });
     } else {
       Sentry.addBreadcrumb({
         message: `Performance: ${metric.name}`,
@@ -231,13 +236,8 @@ class ErrorTrackingService {
     data?: Record<string, unknown>,
   ) {
     if (this.isDevelopment) {
-      const logFn =
-        level === "error"
-          ? console.error
-          : level === "warn"
-            ? console.warn
-            : console.log;
-      logFn(`[ErrorTracking] ${message}`, data);
+      const logFn = level === "error" ? logError : level === "warn" ? logWarn : logInfo;
+      logFn('error_tracking', `log_${level}`, { message, data });
     }
   }
 
@@ -281,7 +281,9 @@ class ErrorTrackingService {
 
       await AsyncStorage.setItem("error_logs", JSON.stringify(updatedLogs));
     } catch (storageError) {
-      console.warn("[ErrorTracking] Failed to store error locally");
+      logWarn('error_tracking', 'error_storage_failed', {
+        error: storageError instanceof Error ? storageError.message : String(storageError),
+      });
     }
   }
 
@@ -293,7 +295,9 @@ class ErrorTrackingService {
       const errorLogs = await AsyncStorage.getItem("error_logs");
       return errorLogs ? JSON.parse(errorLogs) : [];
     } catch (error) {
-      console.warn("[ErrorTracking] Failed to retrieve stored errors:", error);
+      logWarn('error_tracking', 'error_retrieval_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return [];
     }
   }
@@ -305,7 +309,9 @@ class ErrorTrackingService {
     try {
       await AsyncStorage.removeItem("error_logs");
     } catch (error) {
-      console.warn("[ErrorTracking] Failed to clear stored errors:", error);
+      logWarn('error_tracking', 'error_clear_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }
@@ -356,10 +362,16 @@ export function trackPerformance(metric: PerformanceMetric) {
  * Add debugging breadcrumb
  */
 export function addBreadcrumb(message: string, data?: Record<string, unknown>) {
-  errorTrackingService.addBreadcrumb(message, data ? sanitizeMetadata(data) : undefined);
+  errorTrackingService.addBreadcrumb(
+    message,
+    data ? sanitizeMetadata(data) : undefined,
+  );
 }
 
-export function sanitizeErrorForTelemetry(error: Error): { name: string; message: string } {
+export function sanitizeErrorForTelemetry(error: Error): {
+  name: string;
+  message: string;
+} {
   return sanitizeError(error);
 }
 

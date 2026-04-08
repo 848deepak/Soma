@@ -2,9 +2,10 @@
  * __tests__/components/SignupScreen.test.tsx
  * Component tests for the SignupScreen (account creation).
  */
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, waitFor } from "@testing-library/react-native";
 import { Alert } from "react-native";
 
+import { renderWithProviders } from "../testUtils";
 import { signUpWithEmail } from "@/lib/auth";
 import { SignupScreen } from "@/src/screens/SignupScreen";
 
@@ -32,24 +33,24 @@ beforeEach(() => {
 
 describe("SignupScreen – rendering", () => {
   it("renders email, password, and confirm password inputs", () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     expect(getByTestId("email-input")).toBeTruthy();
     expect(getByTestId("password-input")).toBeTruthy();
     expect(getByTestId("confirm-password-input")).toBeTruthy();
   });
 
   it("renders the Create Account button", () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     expect(getByTestId("signup-button")).toBeTruthy();
   });
 
   it("renders the Sign In link", () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     expect(getByTestId("signin-link")).toBeTruthy();
   });
 
   it("signs-in link navigates to login screen", () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.press(getByTestId("signin-link"));
     expect(mockPush).toHaveBeenCalledWith("/auth/login");
   });
@@ -58,7 +59,7 @@ describe("SignupScreen – rendering", () => {
 describe("SignupScreen – input validation", () => {
   it("alerts when email is empty", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.press(getByTestId("signup-button"));
     expect(Alert.alert).toHaveBeenCalledWith(
       "Missing email",
@@ -68,7 +69,7 @@ describe("SignupScreen – input validation", () => {
 
   it("alerts when email is invalid format", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "not-an-email");
     fireEvent.press(getByTestId("signup-button"));
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -79,7 +80,7 @@ describe("SignupScreen – input validation", () => {
 
   it("alerts when password is shorter than 6 characters", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "user@example.com");
     fireEvent.changeText(getByTestId("password-input"), "abc");
     fireEvent.press(getByTestId("signup-button"));
@@ -91,7 +92,7 @@ describe("SignupScreen – input validation", () => {
 
   it("alerts when passwords do not match", () => {
     jest.spyOn(Alert, "alert");
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "user@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.changeText(getByTestId("confirm-password-input"), "different123");
@@ -103,7 +104,7 @@ describe("SignupScreen – input validation", () => {
   });
 
   it("does not call signUpWithEmail when validation fails", () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     // Empty email → fails at first validation
     fireEvent.press(getByTestId("signup-button"));
     expect(mockSignUp).not.toHaveBeenCalled();
@@ -112,7 +113,7 @@ describe("SignupScreen – input validation", () => {
 
 describe("SignupScreen – successful signup", () => {
   function fillValidForm(
-    getByTestId: ReturnType<typeof render>["getByTestId"],
+    getByTestId: ReturnType<typeof renderWithProviders>["getByTestId"],
   ) {
     fireEvent.changeText(getByTestId("email-input"), "newuser@example.com");
     fireEvent.changeText(getByTestId("password-input"), "securePass1");
@@ -120,14 +121,14 @@ describe("SignupScreen – successful signup", () => {
   }
 
   it("calls signUpWithEmail once after submitting a valid form", async () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(mockSignUp).toHaveBeenCalledTimes(1));
   });
 
   it("calls signUpWithEmail with trimmed email and password", async () => {
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "  newuser@example.com  ");
     fireEvent.changeText(getByTestId("password-input"), "securePass1");
     fireEvent.changeText(getByTestId("confirm-password-input"), "securePass1");
@@ -141,21 +142,21 @@ describe("SignupScreen – successful signup", () => {
   });
 
   it("shows success screen after account creation", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Check your email")).toBeTruthy());
   });
 
   it("success screen shows Go to Sign In button", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
   });
 
   it("Go to Sign In navigates to login", async () => {
-    const { getByTestId, getByText } = render(<SignupScreen />);
+    const { getByTestId, getByText } = renderWithProviders(<SignupScreen />);
     fillValidForm(getByTestId);
     fireEvent.press(getByTestId("signup-button"));
     await waitFor(() => expect(getByText("Go to Sign In")).toBeTruthy());
@@ -168,7 +169,7 @@ describe("SignupScreen – signup failure", () => {
   it("shows alert with error message when signUpWithEmail throws", async () => {
     jest.spyOn(Alert, "alert");
     mockSignUp.mockRejectedValueOnce(new Error("Email already in use"));
-    const { getByTestId } = render(<SignupScreen />);
+    const { getByTestId } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "existing@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.changeText(getByTestId("confirm-password-input"), "password123");
@@ -183,7 +184,7 @@ describe("SignupScreen – signup failure", () => {
 
   it("does not show success screen after failure", async () => {
     mockSignUp.mockRejectedValueOnce(new Error("Something went wrong"));
-    const { getByTestId, queryByText } = render(<SignupScreen />);
+    const { getByTestId, queryByText } = renderWithProviders(<SignupScreen />);
     fireEvent.changeText(getByTestId("email-input"), "user@example.com");
     fireEvent.changeText(getByTestId("password-input"), "password123");
     fireEvent.changeText(getByTestId("confirm-password-input"), "password123");

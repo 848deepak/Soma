@@ -4,7 +4,8 @@
  * Component tests for HomeScreen (Dashboard).
  * Verifies correct rendering with mock data and interaction handling.
  */
-import { render, screen } from "@testing-library/react-native";
+import { screen } from "@testing-library/react-native";
+import { renderWithProviders } from "../testUtils";
 
 // Mock all hooks before importing the component
 jest.mock("@/lib/supabase");
@@ -28,51 +29,32 @@ jest.mock("@/src/context/AuthProvider", () => ({
   })),
 }));
 
-jest.mock("@/hooks/useProfile", () => ({
+jest.mock("@/src/domain/auth", () => ({
   useProfile: jest.fn(),
   useUpdateProfile: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
 }));
 
-jest.mock("@/hooks/useCurrentCycle", () => {
-  const original = jest.requireActual("@/hooks/useCurrentCycle");
+jest.mock("@/src/domain/cycle", () => {
+  const original = jest.requireActual("@/src/domain/cycle");
   return {
     ...original,
     useCurrentCycle: jest.fn(),
+    useCycleHistory: jest.fn(() => ({ data: [] })),
   };
 });
 
-jest.mock("@/hooks/useDailyLogs", () => ({
+jest.mock("@/src/domain/calendar", () => ({
   useDailyLogs: jest.fn(() => ({ data: [], isLoading: false })),
   useTodayLog: jest.fn(),
-}));
-
-jest.mock("@/hooks/useCycleHistory", () => ({
-  useCycleHistory: jest.fn(() => ({ data: [] })),
 }));
 
 jest.mock("@/hooks/useCareCircle", () => ({
   useCareCircle: jest.fn(() => ({ data: { asPrimary: [], asViewer: [] } })),
 }));
 
-jest.mock("@/src/store/useCycleStore", () => ({
-  useCycleStore: jest.fn(
-    (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        cycleDay: 14,
-        cycleLength: 28,
-        phaseLabel: "Ovulation Phase",
-        progress: 0.5,
-        insightTitle: "Your estrogen is peaking.",
-        insightDescription: "Great day for connections.",
-        hydrate: jest.fn(),
-        isSaving: false,
-      }),
-  ),
-}));
-
-import { useCurrentCycle } from "@/hooks/useCurrentCycle";
-import { useTodayLog } from "@/hooks/useDailyLogs";
-import { useProfile } from "@/hooks/useProfile";
+import { useCurrentCycle } from "@/src/domain/cycle";
+import { useTodayLog } from "@/src/domain/calendar";
+import { useProfile } from "@/src/domain/auth";
 import { HomeScreen } from "@/src/screens/HomeScreen";
 import { useRouter } from "expo-router";
 
@@ -137,22 +119,22 @@ describe("HomeScreen (Dashboard)", () => {
   });
 
   it("renders without crashing", () => {
-    expect(() => render(<HomeScreen />)).not.toThrow();
+    expect(() => renderWithProviders(<HomeScreen />)).not.toThrow();
   });
 
   it("displays the greeting with user first name", () => {
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText(/Good (Morning|Afternoon|Evening|Night)/)).toBeTruthy();
     expect(screen.getByText(/Luna/)).toBeTruthy();
   });
 
   it("shows phase label in progress ring area", () => {
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText("Ovulation Phase")).toBeTruthy();
   });
 
   it("renders only production-ready home widgets", () => {
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText("Current mood")).toBeTruthy();
     expect(screen.getByText("Readiness")).toBeTruthy();
     expect(screen.queryByText("Glasses today")).toBeNull();
@@ -164,7 +146,7 @@ describe("HomeScreen (Dashboard)", () => {
       data: null,
       isLoading: false,
     });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     // Should show dash placeholders
     const dashCells = screen.getAllByText("--");
     expect(dashCells.length).toBeGreaterThan(0);
@@ -191,7 +173,7 @@ describe("HomeScreen (Dashboard)", () => {
       },
       isLoading: false,
     });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.queryByText("Glasses today")).toBeNull();
     expect(screen.queryByText("6/8")).toBeNull();
   });
@@ -217,7 +199,7 @@ describe("HomeScreen (Dashboard)", () => {
       },
       isLoading: false,
     });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.queryByText("Last night")).toBeNull();
     expect(screen.queryByText("7h 0m")).toBeNull();
   });
@@ -243,12 +225,12 @@ describe("HomeScreen (Dashboard)", () => {
       },
       isLoading: false,
     });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText("Energetic")).toBeTruthy();
   });
 
   it("shows primary logging actions", () => {
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText("Log Period")).toBeTruthy();
     expect(screen.getByText("Log Today's Flow & Mood")).toBeTruthy();
   });
@@ -274,12 +256,12 @@ describe("HomeScreen (Dashboard)", () => {
       },
       isLoading: false,
     });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText("Calm")).toBeTruthy();
   });
 
   it("renders 7 mini calendar days", () => {
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     // All 7 weekday abbreviations should be rendered
     const dayAbbreviations = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     // At least one should appear (the mini calendar always shows 7 days)
@@ -295,7 +277,7 @@ describe("HomeScreen (Dashboard)", () => {
 
   it('falls back to greeting "there" when no profile loaded', () => {
     (useProfile as jest.Mock).mockReturnValue({ data: null, isLoading: false });
-    render(<HomeScreen />);
+    renderWithProviders(<HomeScreen />);
     expect(screen.getByText(/Good (Morning|Afternoon|Evening|Night)/)).toBeTruthy();
     expect(screen.getByText(/there/)).toBeTruthy();
   });

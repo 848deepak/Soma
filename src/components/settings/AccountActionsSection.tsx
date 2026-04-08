@@ -1,6 +1,10 @@
 import { View, type ViewStyle } from "react-native";
 
-import { SectionLabel, SettingsRow } from "@/src/components/settings/SettingsPrimitives";
+import {
+  GroupedRows,
+  SectionLabel,
+  SettingsRow,
+} from "@/src/components/settings/SettingsPrimitives";
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
 
@@ -33,18 +37,21 @@ export function AccountActionsSection({
     <>
       <View style={cardStyle}>
         <SectionLabel label="Account" isDark={isDark} />
-        <SettingsRow title="Export Data" isDark={isDark} onPress={handleExportData} />
-        <SettingsRow
-          title="Report an Issue"
-          isDark={isDark}
-          onPress={handleSendFeedback}
-        />
-        <SettingsRow
-          title="Delete Account"
-          tone="danger"
-          isDark={isDark}
-          onPress={handleDeleteAllData}
-        />
+        <GroupedRows isDark={isDark}>
+          <SettingsRow title="Export Data" isDark={isDark} onPress={handleExportData} />
+          <SettingsRow
+            title="Report an Issue"
+            isDark={isDark}
+            onPress={handleSendFeedback}
+          />
+          <SettingsRow
+            title="Delete Account"
+            tone="danger"
+            isDark={isDark}
+            onPress={handleDeleteAllData}
+            isLast
+          />
+        </GroupedRows>
 
         <Typography variant="helper" style={{ marginTop: 6 }}>
           {isDeletePending

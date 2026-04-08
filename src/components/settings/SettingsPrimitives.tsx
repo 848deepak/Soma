@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import { Switch, TextInput, View } from "react-native";
 
 import { PressableScale } from "@/src/components/ui/PressableScale";
 import { Typography } from "@/src/components/ui/Typography";
+import { useAppTheme } from "@/src/context/ThemeContext";
 
 export function SectionLabel({
   label,
@@ -10,15 +12,17 @@ export function SectionLabel({
   label: string;
   isDark: boolean;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <Typography
       style={{
-        marginBottom: 12,
+        marginBottom: 10,
         fontSize: 11,
         fontWeight: "600",
         letterSpacing: 2,
         textTransform: "uppercase",
-        color: isDark ? "rgba(242,242,242,0.5)" : "#9B7E8C",
+        color: isDark ? "rgba(242,242,242,0.52)" : colors.textSecondary,
       }}
     >
       {label}
@@ -26,30 +30,64 @@ export function SectionLabel({
   );
 }
 
+export function GroupedRows({
+  isDark,
+  children,
+}: {
+  isDark: boolean;
+  children: ReactNode;
+}) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View
+      style={{
+        borderRadius: 14,
+        overflow: "hidden",
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : "rgba(255,255,255,0.72)",
+        borderWidth: 1,
+        borderColor: isDark ? "rgba(255,255,255,0.08)" : colors.borderLight,
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
 export function SettingsRow({
   title,
+  value,
   tone = "normal",
   isDark,
   onPress,
   badge,
+  showChevron = true,
+  isLast = false,
 }: {
   title: string;
+  value?: string;
   tone?: "normal" | "danger";
   isDark: boolean;
   onPress?: () => void;
   badge?: number;
+  showChevron?: boolean;
+  isLast?: boolean;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <PressableScale
       onPress={onPress}
       style={{
-        marginBottom: 8,
-        borderRadius: 16,
-        backgroundColor: isDark
-          ? "rgba(255,255,255,0.06)"
-          : "rgba(255,218,185,0.2)",
         paddingHorizontal: 16,
-        paddingVertical: 16,
+        minHeight: 44,
+        paddingVertical: 12,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(45,35,39,0.08)",
       }}
     >
       <View
@@ -63,8 +101,8 @@ export function SettingsRow({
           <Typography
             style={{
               fontSize: 15,
-              color:
-                tone === "danger" ? "#EF4444" : isDark ? "#F2F2F2" : "#2D2327",
+              fontWeight: "500",
+              color: tone === "danger" ? "#EF4444" : colors.textPrimary,
             }}
           >
             {title}
@@ -93,14 +131,28 @@ export function SettingsRow({
             </View>
           )}
         </View>
-        <Typography
-          style={{
-            fontSize: 18,
-            color: tone === "danger" ? "#EF4444" : "#9B7E8C",
-          }}
-        >
-          ›
-        </Typography>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {value ? (
+            <Typography
+              style={{
+                fontSize: 15,
+                color: colors.textSecondary,
+              }}
+            >
+              {value}
+            </Typography>
+          ) : null}
+          {showChevron ? (
+            <Typography
+              style={{
+                fontSize: 18,
+                color: tone === "danger" ? "#EF4444" : colors.textSecondary,
+              }}
+            >
+              ›
+            </Typography>
+          ) : null}
+        </View>
       </View>
     </PressableScale>
   );
@@ -113,6 +165,7 @@ export function ToggleRow({
   isDark,
   disabled = false,
   testID,
+  isLast = false,
 }: {
   label: string;
   value: boolean;
@@ -120,26 +173,30 @@ export function ToggleRow({
   isDark: boolean;
   disabled?: boolean;
   testID?: string;
+  isLast?: boolean;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <View
       style={{
-        marginBottom: 8,
-        borderRadius: 16,
-        backgroundColor: isDark
-          ? "rgba(255,255,255,0.06)"
-          : "rgba(255,218,185,0.2)",
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        minHeight: 44,
+        paddingVertical: 10,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(45,35,39,0.08)",
       }}
     >
       <Typography
         style={{
           fontSize: 15,
-          color: isDark ? "#F2F2F2" : "#2D2327",
+          fontWeight: "500",
+          color: colors.textPrimary,
         }}
       >
         {label}
@@ -150,7 +207,7 @@ export function ToggleRow({
         disabled={disabled}
         testID={testID}
         accessibilityLabel={label}
-        trackColor={{ false: "#D7CFCA", true: "#DDA7A5" }}
+        trackColor={{ false: "#D7CFCA", true: colors.primary }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -178,6 +235,8 @@ export function InputField({
   errorMessage?: string | null;
   inputTestID?: string;
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <View style={{ marginBottom: 10 }}>
       <Typography variant="helper" style={{ marginBottom: 6 }}>
@@ -189,7 +248,7 @@ export function InputField({
           borderWidth: 1,
           borderColor: isDark
             ? "rgba(255,255,255,0.1)"
-            : "rgba(221,167,165,0.3)",
+            : colors.border,
           backgroundColor: isDark
             ? "rgba(255,255,255,0.04)"
             : "rgba(255,255,255,0.75)",
@@ -204,13 +263,13 @@ export function InputField({
           editable={editable}
           placeholder={placeholder}
           keyboardType={keyboardType}
-          placeholderTextColor="#9B7E8C"
+          placeholderTextColor={colors.textSecondary}
           style={{
             fontSize: 15,
             color: editable
               ? isDark
-                ? "#F2F2F2"
-                : "#2D2327"
+                ? colors.textPrimary
+                : colors.textPrimary
               : isDark
                 ? "rgba(242,242,242,0.7)"
                 : "rgba(45,35,39,0.65)",

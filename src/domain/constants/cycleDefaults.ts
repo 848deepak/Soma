@@ -1,0 +1,9 @@
+export const CYCLE_DEFAULTS: {
+  CYCLE_LENGTH: number;
+  PERIOD_DURATION: number;
+  LUTEAL_PHASE_LENGTH: number;
+} = {
+  CYCLE_LENGTH: 28,
+  PERIOD_DURATION: 5,
+  LUTEAL_PHASE_LENGTH: 14,
+};
